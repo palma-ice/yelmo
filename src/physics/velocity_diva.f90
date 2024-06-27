@@ -443,6 +443,7 @@ end if
         ! Note: L19 define the F1 integral as purely going from the base to the surface,
         ! whereas here F1 is calculated from the base to each point in the vertical. So, 
         ! it is not technically "F1" as defined by L19, Eq. 30, except at the surface.
+        !!$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
             if (f_ice(i,j) .eq. 1.0) then 
@@ -450,8 +451,10 @@ end if
             end if  
         end do
         end do  
+        !!$omp end parallel do
 
         ! Next calculate 3D horizontal velocity components 
+        !!$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,F1_ac)
         do k = 1, nz_aa
         do j = 1, ny 
         do i = 1, nx 
@@ -472,6 +475,7 @@ end if
         end do 
         end do  
         end do
+        !!$omp end parallel do
         
         return 
 
@@ -503,7 +507,7 @@ end if
         ny    = size(H_ice,2)
         nz_aa = size(zeta_aa,1) 
         
-        !$omp parallel do
+        !!$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,visc_eff_ac)
         do k = 1, nz_aa 
         do j = 1, ny
         do i = 1, nx 
@@ -530,7 +534,7 @@ end if
         end do 
         end do 
         end do 
-        !$omp end parallel do
+        !!$omp end parallel do
 
         return 
 
@@ -635,6 +639,8 @@ end if
         wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
         wt3D = 8.0   ! Volume of square [-1:1,-1:1, -1:1]=> 2x2x2 => 8
 
+        !!$omp parallel do collapse(2) private(i,j,im1,jm1,ip1,jp1,im1m,ip1m,jm1m,jp1m,k,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn) &
+        !!$omp& private(eps_sq_n,ATTn,dudxn8,dudyn8,dvdxn8,dvdyn8,dudzn8,dvdzn8,eps_sq_n8,ATTn8,viscn8)
         do i = 1, nx
             do j = 1, ny  
 
@@ -717,6 +723,7 @@ end if
 
             end do
         end do
+        !!$omp end parallel do
 
         return
 
@@ -847,6 +854,7 @@ end if
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
 
+        !!$omp parallel do collapse(2) private(i,j,visc_eff_mean)
         do j = 1, ny 
         do i = 1, nx
 
@@ -864,6 +872,7 @@ end if
 
         end do 
         end do 
+        !!$omp end parallel do
 
         return
 
@@ -892,6 +901,7 @@ end if
         nz_aa = size(visc,3)
 
         ! Vertically integrate at each point
+        !!$omp parallel do collapse(2) private(i,j,H_eff)
         do j = 1, ny 
         do i = 1, nx
 
@@ -909,6 +919,7 @@ end if
 
         end do 
         end do 
+        !!$omp end parallel do
 
         return
 
@@ -988,6 +999,7 @@ end if
         else 
             ! Calculate basal velocity normally 
 
+            !!$omp parallel do collapse(2) private(i,j,F2_ac)
             do j = 1, ny 
             do i = 1, nx 
 
@@ -1006,6 +1018,7 @@ end if
 
             end do 
             end do  
+            !!$omp end parallel do
 
             ! No treatment of boundary conditions needed since ux_b/uy_b are derived.
 
@@ -1038,6 +1051,7 @@ end if
         nx = size(taub_acx,1)
         ny = size(taub_acy,2) 
 
+        !!$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1049,6 +1063,7 @@ end if
 
         end do 
         end do  
+        !!$omp end parallel do
 
         return 
 

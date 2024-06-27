@@ -85,7 +85,7 @@ contains
         
         ! Initialize rk4 object if necessary 
         if (.not. allocated(tpo%rk4%tau)) then 
-            call rk4_2D_init(tpo%rk4,nx,ny,dt_min=1e-3)
+            call rk4_2D_init(tpo%rk4,nx,ny,dt_min=1e-3_wp)
         end if 
 
         ! Get time step
@@ -414,13 +414,6 @@ end if
         call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
 
         ! == Determine thickness threshold for calving spatially ==
-
-        ! Calculate filtered bedrock elevations adjusted for sea level on top (ie, water depth)
-        tpo%now%z_bed_filt = bnd%z_bed - bnd%z_sl
-        if (tpo%par%zb_sigma .gt. 0.0) then 
-            call smooth_gauss_2D(tpo%now%z_bed_filt,tpo%par%dx, &
-                                        tpo%par%zb_sigma / tpo%par%dx)
-        end if
 
         call define_calving_thickness_threshold(tpo%now%H_calv,tpo%now%z_bed_filt,tpo%par%Hc_ref, &
                                             tpo%par%Hc_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)

@@ -209,7 +209,7 @@ contains
 
         eps_0_sq = eps_0*eps_0
 
-        !$omp parallel do
+        !!$omp parallel do collapse(3) private(i,j,k,de_now)
         do k = 1, nz 
         do j = 1, ny 
         do i = 1, nx 
@@ -234,7 +234,7 @@ contains
         end do 
         end do 
         end do
-        !$omp end parallel do
+        !!$omp end parallel do
 
         return
         
@@ -281,7 +281,7 @@ contains
 
         eps_0_sq = eps_0*eps_0
 
-        !$omp parallel do
+        !!$omp parallel do collapse(3) private(i,j,k,de_now)
         do k = 1, nz 
         do j = 1, ny 
         do i = 1, nx 
@@ -306,7 +306,7 @@ contains
         end do 
         end do 
         end do
-        !$omp end parallel do
+        !!$omp end parallel do
 
         return
         
@@ -335,6 +335,7 @@ contains
         ny = size(visc_eff_int,2)
 
 
+        !!$omp parallel do collapse(2) private(i,j,visc_eff_mean)
         do j = 1, ny 
         do i = 1, nx
 
@@ -350,6 +351,7 @@ contains
 
         end do 
         end do 
+        !!$omp end parallel do
 
         ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then
@@ -580,7 +582,7 @@ contains
         ! Step 1: Calculate all vertical derivatives, some of which are used 
         ! as correction terms for the horizontal derivatives w.r.t. sigma-coordinate transformation. 
 
-        !$omp parallel do
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_now_acx,H_now_acy,k,h1,h2,H_now)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -766,11 +768,12 @@ end if
 
         end do
         end do 
-        !$omp end parallel do
+        !!$omp end parallel do
 
         ! Set 2: Calculate all horizontal derivatives accounting for correction terms
 
-        !$omp parallel do
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
+        !!$omp& private(c_x,c_y,dzbdx_acy,dzsdx_acy,c_x_acy,dzbdy_acx,dzsdy_acx,c_y_acx,dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa)
         do j = 1, ny 
         do i = 1, nx 
             
@@ -1034,7 +1037,7 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do
+        !!$omp end parallel do
         
         ! Step X: fill in partially filled margin points with neighbor strain-rate values
         
@@ -1116,6 +1119,7 @@ end if
         ! dyz = 0.5*(dyz+dzy)
         ! dzz = dzz  <= Not calculated, as it is not needed 
 
+        !!$omp parallel do collapse(2) private(i,j,k,im1,ip1,jm1,jp1,ddn,ddan,ddbn,shear_squared)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1234,7 +1238,8 @@ end if
             end if 
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -1515,7 +1520,7 @@ end if
         yn  = [wt0, wt0,-wt0,-wt0]
         wtn = [1.0,1.0,1.0,1.0]
 
-        !$omp parallel do
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dudxn,dudyn,dvdxn,dvdyn)
         do j=1, ny
         do i=1, nx
 
@@ -1557,7 +1562,7 @@ end if
 
         end do
         end do
-        !$omp end parallel do
+        !!$omp end parallel do
 
         ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
         call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &

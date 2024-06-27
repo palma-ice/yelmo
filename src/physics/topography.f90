@@ -373,6 +373,7 @@ contains
             ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
             ! determine the fraction of grid point that should be ice covered. 
 
+            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1, H_neighb,mask)
             do j = 1, ny
             do i = 1, nx 
 
@@ -394,9 +395,11 @@ contains
 
             end do 
             end do
+            !!$omp end parallel do
 
             ! Determine ice fractional cover for margin points 
 
+            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1, H_neighb,mask,n_now,H_eff)
             do j = 1, ny
             do i = 1, nx 
 
@@ -461,6 +464,7 @@ contains
 
             end do 
             end do 
+            !!$omp end parallel do
 
         end if 
 
@@ -500,6 +504,7 @@ contains
         ! Initialize mask to zero everywhere to start 
         mask_frnt = 0
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,f_neighb)
         do j = 1, ny
         do i = 1, nx 
 
@@ -555,6 +560,7 @@ contains
 
         end do
         end do 
+        !!$omp end parallel do
 
         return 
 
@@ -680,6 +686,7 @@ contains
         
         ! Calculate the surface elevation based on whole grid values,
         ! except at the grounding line which is treated with subgrid interpolations. 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,f_grnd_neighb,is_grline,v1,v2,v3,v4,H_ice_int,z_bed_int,z_sl_int,z_srf_int)
         do j = 1, ny 
         do i = 1, nx
 
@@ -748,7 +755,8 @@ contains
             end if 
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
 
         return
         
@@ -974,6 +982,7 @@ contains
         f_grnd_acy = 0.0_wp 
 
         ! Find grounding line cells and determine fraction 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,Hg_1,Hg_2,Hg_3,Hg_4,Hg_max,Hg_min)
         do j = 1, ny 
         do i = 1, nx
 
@@ -1067,6 +1076,7 @@ contains
 
         end do 
         end do 
+        !!$omp end parallel do
 
 
 if (.TRUE.) then 
@@ -1128,6 +1138,7 @@ end if
         
         ! x-direction, ac-node
         f_grnd_x = 1.0
+        !!$omp parallel do collapse(2) private(i,j,H_grnd_1,H_grnd_2)
         do j = 1, ny 
         do i = 1, nx-1 
 
@@ -1161,9 +1172,11 @@ end if
 
         end do 
         end do 
+        !!$omp end parallel do
 
         ! y-direction, ac-node
         f_grnd_y = 1.0
+        !!$omp parallel do collapse(2) private(i,j,H_grnd_1,H_grnd_2)
         do j = 1, ny-1 
         do i = 1, nx 
 
@@ -1197,6 +1210,7 @@ end if
 
         end do 
         end do 
+        !!$omp end parallel do
 
         ! Set boundary points equal to neighbor for aesthetics 
         f_grnd_x(nx,:) = f_grnd_x(nx-1,:) 
@@ -1237,6 +1251,7 @@ end if
         ! Initialize f_grnd to zero everywhere
         f_grnd = 0.0_wp 
 
+        !!$omp parallel do collapse(2) private(i,j,H_eff_now,z_base_now,x,mu,sigma)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1281,6 +1296,7 @@ end if
             
         end do 
         end do 
+        !!$omp end parallel do
 
         return
 
@@ -1398,6 +1414,7 @@ end if
 
         ! 1. Next, determine grounding line =====================================
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx
 
@@ -1431,6 +1448,7 @@ end if
 
         end do 
         end do 
+        !!$omp end parallel do
 
         ! 2. Next, determine distances to grounding line ======================
         
@@ -1439,6 +1457,7 @@ end if
 
             dist_gl_ref = dist_gl
 
+            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dists,dist_direct_min,dist_corners_min)
             do j = 1, ny 
             do i = 1, nx
 
@@ -1501,7 +1520,8 @@ end if
                 end if
 
             end do 
-            end do 
+            end do
+            !!$omp end parallel do
             
             if (count(dist_gl .eq. dist_max) .eq. 0) then 
                 ! No more points to check 
@@ -1703,6 +1723,7 @@ end if
                 ! Note: fmb_scale=10 suggested by DeConto and Pollard (2016, nat) based
                 ! on plume modeling work of Slater et al. (2015, grl)
 
+                !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,mask,n_margin,dz,area_flt,bmb_eff)
                 do j = 1, ny 
                 do i = 1, nx 
 
@@ -1771,7 +1792,8 @@ end if
                     end if 
 
                 end do 
-                end do 
+                end do
+                !!$omp end parallel do
 
             case DEFAULT 
 
@@ -1829,6 +1851,7 @@ end if
         allocate(Hg_int(nxi,nxi))
         allocate(bmb_int(nxi,nxi))
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,Hg_1,Hg_2,Hg_3,Hg_4,Hg_int,i1,j1,wt)
         do j = 1, ny 
         do i = 1, nx
 
@@ -1884,7 +1907,8 @@ end if
             end if 
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
 
         return
         
@@ -2050,6 +2074,7 @@ end if
     call determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt)
     
     ! Get grounded fractions on all four grids by averaging over the quadrants
+    !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
     do j = 1, ny
     do i = 1, nx 
         
@@ -2092,6 +2117,7 @@ end if
 
     end do
     end do
+    !!$omp end parallel do
     
     return 
 
@@ -2120,6 +2146,7 @@ end if
     ny = size(f_flt,2)
 
     ! Calculate grounded fractions of all four quadrants of each a-grid cell
+    !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1, f_NW,f_N,f_NE,f_W,f_m,f_E,f_SW,f_S,f_SE, fq_NW,fq_NE,fq_SW,fq_SE)
     do j = 1, ny
     do i = 1, nx
         
@@ -2182,7 +2209,8 @@ end if
       
     end do
     end do
-    
+    !!$omp end parallel do
+
     return 
 
   end subroutine determine_grounded_fractions_CISM_quads

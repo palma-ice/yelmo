@@ -4,6 +4,8 @@ module yelmo_tools
 
     use yelmo_defs, only : sp, dp, wp, missing_value, TOL_UNDERFLOW, pi, &
                             io_unit_err
+
+    !$ use omp_lib
     
     implicit none 
 
@@ -3016,6 +3018,7 @@ contains
         nx = size(var,1)
         ny = size(var,2)
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,ip2,V0,V1,V2)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -3074,7 +3077,8 @@ if (margin2nd) then
 end if
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
 
         ! Special case for infinite boundary conditions - ensure that slope 
         ! is the same, not the variable itself.
@@ -3116,6 +3120,7 @@ subroutine calc_gradient_acy(dvardy,var,f_ice,dy,grad_lim,margin2nd,zero_outside
         nx = size(var,1)
         ny = size(var,2)
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,jp2,V0,V1,V2)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -3174,7 +3179,8 @@ if (margin2nd) then
 end if
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
         
         ! Special case for infinite boundary conditions - ensure that slope 
         ! is the same, not the variable itself.
@@ -4028,7 +4034,7 @@ end if
         real(wp), allocatable :: filter0(:,:), filter(:,:) 
         real(wp), allocatable :: var_old(:,:) 
         logical,  allocatable :: mask_apply_local(:,:) 
-        logical,  allocatable :: mask_use_local(:,:) 
+        logical,  allocatable :: mask_use_local(:,:)
 
         nx    = size(var,1)
         ny    = size(var,2)
@@ -4100,6 +4106,7 @@ end if
         var_old(n2+1:n2+nx,1:n2)       = var(:,n2:1:-1)
         var_old(n2+1:n2+nx,ny+1:ny+n2) = var(:,(ny-n2+1):ny)
         
+        !!$omp parallel do collapse(2) private(i,j,filter)
         do j = n2+1, n2+ny 
         do i = n2+1, n2+nx 
 
@@ -4120,6 +4127,7 @@ end if
 
         end do 
         end do 
+        !!$omp end parallel do
 
         return 
 
@@ -4249,8 +4257,8 @@ end if
             if (count(mask_apply) .eq. 0) exit 
 
             ! Smooth z_bed at desired locations, and H_ice so that H_ice avoids spurious patterns
-            call smooth_gauss_2D(z_bed,dx=dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
-            call smooth_gauss_2D(H_ice,dx=dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
+            call smooth_gauss_2D(z_bed,dx=dx,f_sigma=2.0_wp,mask_apply=mask_apply,mask_use=mask_use)
+            call smooth_gauss_2D(H_ice,dx=dx,f_sigma=2.0_wp,mask_apply=mask_apply,mask_use=mask_use)
             
         end do
 
@@ -4423,13 +4431,13 @@ end if
         nx = size(var,1)
         ny = size(var,2)
 
-        !$omp parallel do
+        !!$omp parallel do collapse(2) private(i,j)
         do j = 1, ny
         do i = 1, nx
             var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),zeta)
         end do
         end do
-        !$omp end parallel do
+        !!$omp end parallel do
 
         return
 
@@ -4451,13 +4459,13 @@ end if
         nx = size(var,1)
         ny = size(var,2)
 
-        !$omp parallel do 
+        !!$omp parallel do collapse(2) private(i,j)
         do j = 1, ny
         do i = 1, nx
             var_int(i,j) = integrate_trapezoid1D_pt(var(i,j,:),zeta)
         end do
         end do
-        !$omp end parallel do 
+        !!$omp end parallel do 
 
         return
 

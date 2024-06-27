@@ -157,7 +157,10 @@ contains
 
         ! Next, calculate vertical velocity at each point through the column
 
-        !$omp parallel do 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,k,kmid,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
+        !!$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
+        !!$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa,dudxn8,dvdyn8) &
+        !!$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
         do j = 1, ny
         do i = 1, nx
 
@@ -343,7 +346,7 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do 
+        !!$omp end parallel do 
 
         return 
 
@@ -472,14 +475,18 @@ end if
         ! with no correction factor for sigma-transformation.
         ! Note: we only need dudx and dvdy, but routine also calculate cross terms, which will not be used.
 
-        !$omp parallel do 
+        !!$omp parallel do private(k)
         do k = 1, nz_aa
             call calc_strain_rate_horizontal_2D(dudx(:,:,k),dudy,dvdx,dvdy(:,:,k),ux(:,:,k),uy(:,:,k),f_ice,dx,dy,boundaries)
         end do
+        !!$omp end parallel do
 
         ! Next, calculate vertical velocity at each point through the column
 
-        !$omp parallel do 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
+        !!$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
+        !!$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa) &
+        !!$omp& private(kup,kdn,uxn_up,uxn_dn,dudzn,dudz_aa,uyn_up,uyn_dn,dvdzn,dvdz_aa,zeta_now,c_x,c_y,c_t)
         do j = 1, ny
         do i = 1, nx
 
@@ -669,7 +676,7 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do 
+        !!$omp end parallel do 
 
         return 
 
@@ -758,7 +765,10 @@ end if
         
         ! Next, calculate velocity 
 
-        !$omp parallel do 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
+        !!$omp& private(dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa,ux_aa,uy_aa) &
+        !!$omp& private(uz_grid) &
+        !!$omp& private(zeta_now,c_x,c_y,c_t)
         do j = 1, ny
         do i = 1, nx
 
@@ -925,7 +935,7 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do 
+        !!$omp end parallel do 
 
         return 
 
@@ -982,6 +992,7 @@ end if
         ! Assume grid resolution is symmetrical 
         dy = dx 
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_mid)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1018,6 +1029,7 @@ end if
             
         end do
         end do 
+        !!$omp end parallel do
 
         ! SPECIAL CASES: edge cases for stability...
 
@@ -1204,6 +1216,7 @@ end if
                 ! floating ice (using ice thickness)
 
                 ! x-direction 
+                !!$omp parallel do collapse(2) private(i,j,H_gl,dzsdx_1,dzsdx_2,dzsdx,taud_old)
                 do j = 1, ny 
                 do i = 1, nx-1 
 
@@ -1423,6 +1436,7 @@ end if
         tau_bc_int_acx = 0.0 
         tau_bc_int_acy = 0.0 
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,i1,j1,H_ice_now,z_srf_now,z_sl_now)
         do j = 1, ny
         do i = 1, nx 
 
@@ -1492,6 +1506,7 @@ end if
 
         end do 
         end do
+        !!$omp end parallel do
 
         return
 
@@ -1626,6 +1641,7 @@ end if
         ! Find partially-filled outer margins and set velocity to zero
         ! (this will also treat all other ice-free points too) 
         
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1648,6 +1664,7 @@ end if
 
         end do
         end do
+        !!$omp end parallel do
 
         return
 

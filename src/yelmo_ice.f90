@@ -24,6 +24,8 @@ module yelmo_ice
     use topography, only : remove_englacial_lakes
     use mass_conservation, only : calc_G_boundaries, check_mass_conservation, apply_tendency
 
+    !$  use omp_lib
+
     implicit none 
 
     private
@@ -72,6 +74,9 @@ contains
         logical, parameter :: very_verbose      = .FALSE. 
         logical, parameter :: check_mb          = .FALSE. 
 
+        !$ logical, parameter :: l_write_timer=.true.
+        !$ real(8) :: time1, time2
+
         ! Safety: check status of model object, 
         ! Has it been initialized?
         if (.not. allocated(dom%tpo%now%H_ice)) then 
@@ -119,6 +124,16 @@ contains
         call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt=0.0_wp,step="init",check_mb=check_mb)
 
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
+
+        ! Calculate filtered bedrock elevations adjusted for sea level on top (ie, water depth)
+        !$ time1 = omp_get_wtime()
+        dom%tpo%now%z_bed_filt = dom%bnd%z_bed - dom%bnd%z_sl
+        if (dom%tpo%par%zb_sigma .gt. 0.0) then 
+          call smooth_gauss_2D(dom%tpo%now%z_bed_filt,dom%tpo%par%dx, &
+                               dom%tpo%par%zb_sigma / dom%tpo%par%dx)
+        end if
+        !$ time2 = omp_get_wtime()
+        !$ if(l_write_timer) print *,'TIME smooth_gauss_2D',time2-time1
         
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
@@ -144,7 +159,6 @@ contains
             ! Calculate adaptive timestep using proportional-integral (PI) methods
             call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
                                     dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%tpo%par%pc_k,dom%par%pc_controller)
-
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -245,14 +259,19 @@ contains
 
                 ! Step 1: Perform predictor step for topography
                 ! Get predicted new ice thickness and store it for later use
-
+                !$ time1 = omp_get_wtime()
                 ! call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,dom%tpo%par%topo_fixed)
                 call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"predictor")
                 call calc_ytopo_diagnostic(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
+                !$ time2 = omp_get_wtime()
+                !$ if(l_write_timer) print *,'TIME ytopo predictor',time2-time1
 
                 ! Step 2: Calculate dynamics for predicted ice thickness 
 
+                !$ time1 = omp_get_wtime()
                 call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+                !$ time2 = omp_get_wtime()
+                !$ if(l_write_timer) print *,'TIME ydyn',time2-time1
 
                 if (dom%par%pc_filter_vel) then 
                     
@@ -275,13 +294,16 @@ end if
                 ! Step 3: Perform corrector step for topography
                 ! Get corrected ice thickness and store it for later use
                 
+                !$ time1 = omp_get_wtime()
                 ! Call corrector step for topography
                 call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector")
                 call calc_ytopo_diagnostic(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
-
+                !$ time2 = omp_get_wtime()
+                !$ if(l_write_timer) print *,'TIME ytopo corrector',time2-time1
 
                 ! Step 4: Determine truncation error for ice thickness
 
+                !$ time1 = omp_get_wtime()
 if (.TRUE.) then 
     ! not rk4...
 
@@ -357,12 +379,15 @@ end if
                     exit 
                 
                 end if 
+                !$ time2 = omp_get_wtime()
+                !$ if(l_write_timer) print *,'TIME truncation error',time2-time1
 
             end do   ! End iteration loop 
             
 
             ! === Predictor-corrector completed successfully ===
 
+            !$ time1 = omp_get_wtime()
 if (.not. update_others_pc) then
             ! Now, using old topography still, update additional fields.
 
@@ -450,6 +475,9 @@ end if
 
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)
+
+            !$ time2 = omp_get_wtime()
+            !$ if(l_write_timer) print *,'TIME end',time2-time1
 
             ! Additionally check if minimum timestep is reached continuously
 

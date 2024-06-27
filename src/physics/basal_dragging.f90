@@ -985,6 +985,7 @@ contains
         wtn  = [1.0,1.0,1.0,1.0]
         wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b)
         do j = 1, ny
         do i = 1, nx
 
@@ -1041,7 +1042,8 @@ contains
             end if 
 
         end do
-        end do 
+        end do
+        !!$omp end parallel do
         
         return
         
@@ -1076,7 +1078,8 @@ contains
             write(*,*) "f_gl = ", f_gl
             stop 
         end if 
-        
+       
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx-1
 
@@ -1097,7 +1100,8 @@ contains
             end if 
 
         end do 
-        end do  
+        end do 
+        !!$omp end parallel do
 
         return
         

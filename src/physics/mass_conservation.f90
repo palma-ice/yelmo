@@ -132,6 +132,7 @@ contains
             nx = size(H_ice,1)
             ny = size(H_ice,2)
 
+            !!$omp parallel do collapse(2) private(i,j,H_prev,dHdt)
             do j = 1, ny 
             do i = 1, nx 
 
@@ -157,6 +158,7 @@ contains
 
             end do
             end do
+            !!$omp end parallel do
 
         end if 
 
@@ -618,6 +620,7 @@ contains
 
         H_tmp = H_ice_new 
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_margin,H_eff)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -645,12 +648,14 @@ contains
             if (H_tmp(i,j) .lt. H_min_tol) H_ice_new(i,j) = 0.0_wp 
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
 
         ! Remove ice islands =====
 
         H_tmp = H_ice_new 
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_island)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -670,13 +675,15 @@ contains
             end if 
 
         end do 
-        end do 
+        end do
+        !!$omp end parallel do
 
         ! Reduce ice thickness for margin points that are thicker 
         ! than inland neighbors ====
 
         H_tmp = H_ice_new
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_eff,H_max)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -704,6 +711,7 @@ contains
             
         end do 
         end do
+        !!$omp end parallel do
         
         select case(trim(boundaries))
 
@@ -985,6 +993,7 @@ contains
 
         H_new = H_ice 
 
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1023,6 +1032,7 @@ contains
 
         end do 
         end do
+        !!$omp end parallel do
 
         ! Determine rate of mass balance related to changes applied here
 

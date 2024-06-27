@@ -62,6 +62,7 @@ contains
                 ! Calculate subgrid discharge
 
                 ! Loop over domain, calculate discharge at each relevant point
+                !!$omp parallel do collapse(2) private(i,j,cosalpha,f_sd,f_l,f_r)
                 do j = 1, ny 
                 do i = 1, nx 
 
@@ -94,6 +95,7 @@ contains
 
                 end do
                 end do
+                !!$omp end parallel do
 
             case DEFAULT
 

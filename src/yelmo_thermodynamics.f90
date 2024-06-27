@@ -346,7 +346,7 @@ end select
         ! ===================================================
 
         ! ajr: openmp problematic here - leads to NaNs
-        !!!$omp parallel do
+        !!$omp parallel do collapse(2) private(i,j,H_ice_now,T_shlf,T_base)
         do j = 2, ny-1
         do i = 2, nx-1 
             
@@ -414,11 +414,12 @@ end select
 
         end do 
         end do 
-        !!!$omp end parallel do
+        !!$omp end parallel do
 
         ! Extrapolate thermodynamics to ice-free and partially ice-covered 
         ! neighbors to the ice margin.
         ! (Helps with stability to give good values of ATT to newly advected points)
+        !!$omp parallel do collapse(2) private(i,j,wt_neighb,wt_tot)
         do j = 2, ny-1
         do i = 2, nx-1 
             
@@ -447,6 +448,7 @@ end select
     
         end do 
         end do 
+        !!$omp end parallel do
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)
@@ -505,7 +507,7 @@ end select
         ! ===================================================
 
         ! ajr: openmp problematic here - leads to NaNs
-        !!!$omp parallel do
+        !!$omp parallel do collapse(2) private(i,j,T_base)
         do j = 1, ny
         do i = 1, nx 
 
@@ -543,7 +545,7 @@ end select
 
         end do 
         end do 
-        !!!$omp end parallel do
+        !!$omp end parallel do
 
         return 
 

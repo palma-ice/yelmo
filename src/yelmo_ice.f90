@@ -74,7 +74,7 @@ contains
         logical, parameter :: very_verbose      = .FALSE. 
         logical, parameter :: check_mb          = .FALSE. 
 
-        !$ logical, parameter :: l_write_timer=.true.
+        !$ logical, parameter :: l_write_timer=.false.
         !$ real(8) :: time1, time2
 
         ! Safety: check status of model object, 

@@ -18,7 +18,7 @@ module yelmo_defs
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: wp = sp 
+    integer,  parameter :: wp = dp 
 
     ! Define legacy deprecated kind parameter 'prec'
     ! ajr: slowly transition from 'prec' to 'wp' 

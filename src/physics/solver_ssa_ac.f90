@@ -767,7 +767,7 @@ contains
                 k = k+1
                 lgs%a_value(k) = -4.0_wp*inv_dydy*(N_aa(i,jp1)+N_aa(i,j))   &
                                  -1.0_wp*inv_dxdx*(N_ab(i,j)+N_ab(im1,j))   &
-                                 -beta_min
+                                 -beta_now
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,jp1)      ! column counter for uy(i,jp1)

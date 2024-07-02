@@ -45,7 +45,7 @@ contains
         call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
         call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
         
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
 
         ! Static information
         call nc_write(filename,"basins",  ylmo%bnd%basins, dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
@@ -304,7 +304,7 @@ contains
             call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
             call nc_write_dim(filename,"zeta_rock",x=dom%thrm%par%zr%zeta_aa,units="1")
             call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
-            call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years")
+            call nc_write_dim(filename,"time",     x=time,dx=1.0_wp,nx=1, units="years")
             
             call nc_write_dim(filename,"pc_steps", x=[1,2,3],units="1")
             

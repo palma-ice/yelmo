@@ -359,7 +359,6 @@ program yelmo_test
                 
                 call write_step_2D(yelmo_r,file2D_r,time=time_r)
                 call yelmo_write_reg_step(yelmo_r,file1D_r,time=time_r)  
-
             end if 
 
             if (time .gt. time_r) then

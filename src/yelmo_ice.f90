@@ -480,13 +480,17 @@ end if
             !$ if(l_write_timer) print *,'TIME end',time2-time1
 
             ! Additionally check if minimum timestep is reached continuously
+            ! when the minimum is set to a very small value.
 
             ! Set limit for check to be the last 50 timesteps or, if it is smaller,
             ! the total number of timesteps in this call of yelmo_update
             n_lim = min(50,nstep)
 
-            if (n .ge. n_lim) then
-
+            if (n .ge. n_lim .and. dom%par%dt_min .le. 1e-2) then
+                ! Currently n timesteps have been made at the limit of n_lim
+                ! and the dt_min value is quite low. So the model may be stuck
+                ! advancing in time. 
+                
                 ! Check how many of the last 50 timesteps are dt = dt_min 
                 n_dtmin = count(abs(dt_save((n-n_lim+1):n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3)
                 

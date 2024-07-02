@@ -441,17 +441,13 @@ program yelmo_test
 
         ! == MODEL OUTPUT =======================================================
 
-        write(*,*) "Here 1"
         if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time)
         end if 
 
-        write(*,*) "Here 2"
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
             call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         end if 
-
-        write(*,*) "Here 3"
 
         if (test_restart) then 
 
@@ -514,21 +510,16 @@ contains
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        write(*,*) "Here in 1"
         ! Determine current writing time step 
         n = nc_size(filename,"time",ncid)
         call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
         if (abs(time-time_prev).gt.1e-5) n = n+1 
 
         ! Update the time step
-        write(*,*) "write_step_2D: ", "time = ", time, n
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-        write(*,*) "Here in 2." 
 
         ! Write model metrics (model speed, dt, eta)
         call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
-
-        write(*,*) "Here in 3." 
 
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)

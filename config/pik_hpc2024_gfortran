@@ -1,0 +1,43 @@
+FC = gfortran
+
+# NetCDF
+INC_NC  = -I${NETCDFF_ROOT}/include
+# the -rpath options ensure that the same shared libraries are found at runtime
+LIB_NC  = -L${NETCDFF_ROOT}/lib -Wl\,-rpath=${NETCDFF_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
+
+LISROOT = ../utils/lis_gfortran
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+PETSCROOT = /opt/local/lib/petsc
+INC_PETSC = -I$(PETSC_DIR)/include
+LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
+
+FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
+
+ifeq ($(parallel), 1)
+    # Overwrite default choices with openmp relevant choices 
+
+    LISROOT = ../utils/lis_gfortran
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none -fomit-frame-pointer -fopenmp 
+
+endif 
+
+# Define which linear solvers to include (LIS necessary, PETSC optional)
+INC_LINEAR = $(INC_LIS)
+LIB_LINEAR = $(LIB_LIS)
+ifeq ($(petsc), 1)
+    # Add petsc library to flags
+    INC_LINEAR = $(INC_LIS) $(INC_PETSC) 
+    LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
+endif
+
+LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O3
+DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG
+DFLAGS_PROFILE = -O3 -p -ggdb
+

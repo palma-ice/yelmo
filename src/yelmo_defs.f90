@@ -20,6 +20,11 @@ module yelmo_defs
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: wp = sp 
 
+    ! Define a yelmo-specific kind parameter so that
+    ! external models can make use of the same precision
+    ! as needed. 
+    integer, parameter :: wp_yelmo = wp 
+    
     ! Define legacy deprecated kind parameter 'prec'
     ! ajr: slowly transition from 'prec' to 'wp' 
     integer,  parameter :: prec = wp 

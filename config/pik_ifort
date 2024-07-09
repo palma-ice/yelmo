@@ -1,5 +1,5 @@
-FC  = mpiifort
-#FC  = ifort
+#FC  = mpiifort
+FC  = ifort
 
 INC_NC  = -I${NETCDF_FORTRANROOT}/include
 LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf
@@ -36,6 +36,6 @@ endif
 
 LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
 
-DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_NODEBUG = -O3 -fp-model precise
 DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
 DFLAGS_PROFILE = -O2 -fp-model precise -pg

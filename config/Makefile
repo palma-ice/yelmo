@@ -165,3 +165,13 @@ clean:
 	rm -f  *.x gmon.out $(objdir)/*.o $(objdir)/*.mod $(objdir)/*.a $(objdir)/*.so
 	rm -rf *.x.dSYM
 	rm -f ./git_yelmo.txt
+
+
+# Experimental
+yelmo-shared: $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests)
+	$(FC) -shared -o $(objdir)/libyelmo.so -fPIC $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests) \
+		$(LFLAGS) $(INC_LIS) 
+	./check_githash > git_yelmo.txt
+	@echo " "
+	@echo "    $(objdir)/libyelmo.so is ready."
+	@echo " "

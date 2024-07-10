@@ -18,7 +18,7 @@ module yelmo_defs
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: wp = dp 
+    integer,  parameter :: wp = sp 
 
     ! Define a yelmo-specific kind parameter so that
     ! external models can make use of the same precision

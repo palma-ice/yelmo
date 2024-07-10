@@ -1,10 +1,9 @@
-#FC  = mpiifort
 FC  = ifort
 
 INC_NC  = -I${NETCDF_FORTRANROOT}/include
 LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf
 
-LISROOT = /home/robinson/apps/lis/lis
+LISROOT = libs/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -14,10 +13,10 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = /home/robinson/apps/lis/lis-omp
+    LISROOT = libs/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

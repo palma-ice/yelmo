@@ -2,7 +2,7 @@ program yelmo_trough
     ! For mimicking Feldmann and Levermann (2017, TC) 
     ! and for running mismip+ etc. 
 
-    use mpi 
+    use omp_lib
 
     use nml
     use ncio 
@@ -36,10 +36,6 @@ program yelmo_trough
     
     real(8)  :: cpu_start_time, cpu_end_time, cpu_dtime  
     integer  :: perr 
-
-    ! Initialize MPI
-    call MPI_INIT(perr)
-
 
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
@@ -293,9 +289,6 @@ end if
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
     
-    ! Finalize MPI
-    call MPI_FINALIZE(perr)
-
 contains
     
     subroutine define_calving_front(calv_mask,xx,x_cf)
@@ -547,9 +540,9 @@ contains
         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice-covered fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a",long_name="Calving mass balance rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv_flt",ylmo%tpo%now%calv_flt,units="m/a",long_name="Calving rate (floating)", &
+        call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,units="m/a",long_name="Calving mass balance rate (floating)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_thermodynamics ==

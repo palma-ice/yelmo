@@ -1,5 +1,3 @@
-#FC  = mpiifort
-#FC  = ifort
 FC = ifx
 
 #INC_NC  = -I${NETCDF_FORTRANROOT}/include
@@ -9,7 +7,7 @@ INC_NC  = -I${NETCDFFI_ROOT}/include
 # the -rpath options ensure that the same shared libraries are found at runtime
 LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
 
-LISROOT = ../utils/lis
+LISROOT = libs/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -19,10 +17,10 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = ../utils/lis
+    LISROOT = libs/lis
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

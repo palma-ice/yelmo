@@ -1,4 +1,4 @@
-FC  = mpifort
+FC  = ifort
 
 NETCDF_CROOT=/albedo/soft/sw/spack-sw/netcdf-c/4.8.1-vvxxdc3
 NETCDF_FORTRANROOT=/albedo/soft/sw/spack-sw/netcdf-fortran/4.5.4-uwfs3bu
@@ -15,7 +15,7 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
     LISROOT = ${HOME}/apps/lis/lis-omp

@@ -2,6 +2,7 @@
 module yelmo_defs
     
     use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+    use omp_lib
 
     use nml, only : nml_replace
 

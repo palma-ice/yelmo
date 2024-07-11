@@ -1,5 +1,7 @@
 Makefile
 libyelmo
+libs/exlib
+libs/lis*
 ice_data
 tests/plots
 output
@@ -15,4 +17,3 @@ tmp
 maps/scrip*.nc
 check_sim.x
 git_yelmo.txt
-libs/lis*

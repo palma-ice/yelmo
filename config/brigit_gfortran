@@ -1,0 +1,40 @@
+FC  = gfortran
+
+INC_NC  = -I/opt/ohpc/pub/libs/gnu8/impi/netcdf-fortran/4.4.5/include
+LIB_NC  = -L/opt/ohpc/pub/libs/gnu8/impi/netcdf-fortran/4.4.5/lib -lnetcdff
+
+LISROOT = /home/jablasco/apps/lis/lis
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+PETSCROOT = /opt/local/lib/petsc
+INC_PETSC = -I $(PETSC_DIR)/include
+LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
+
+FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none
+
+ifeq ($(parallel), 1)
+    # Overwrite default choices with openmp relevant choices 
+
+    LISROOT = ${HOME}/apps/lis/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -module $(objdir) -L$(objdir) -qopenmp 
+
+endif 
+
+# Define which linear solvers to include (LIS necessary, PETSC optional)
+INC_LINEAR = $(INC_LIS)
+LIB_LINEAR = $(LIB_LIS)
+ifeq ($(petsc), 1)
+    # Add petsc library to flags
+    INC_LINEAR = $(INC_LIS) $(INC_PETSC)
+    LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
+endif
+
+LFLAGS  = $(LIB_NC) $(LIB_LIS)  -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2
+DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all
+DFLAGS_PROFILE = -O2 -p -ggdb

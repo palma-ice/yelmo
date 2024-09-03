@@ -13,6 +13,7 @@ module ice_optimization
         real(wp) :: cf_time_end
         real(wp) :: cf_init
         real(wp) :: cf_min_par
+        real(wp) :: cf_max_par
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
@@ -37,6 +38,7 @@ module ice_optimization
         real(wp) :: tf_max
         integer  :: tf_basins(100) 
 
+        !logical  :: grounded_melt
         real(wp) :: cf_ref_wais 
 
         real(wp), allocatable :: cf_min(:,:) 
@@ -81,6 +83,7 @@ contains
         call nml_read(path_par,group,"cf_time_end", opt%cf_time_end)
         call nml_read(path_par,group,"cf_init",     opt%cf_init)
         call nml_read(path_par,group,"cf_min",      opt%cf_min_par)
+        call nml_read(path_par,group,"cf_max",      opt%cf_max_par)
         call nml_read(path_par,group,"tau_c",       opt%tau_c)
         call nml_read(path_par,group,"H0",          opt%H0)
         call nml_read(path_par,group,"sigma_err",   opt%sigma_err)   
@@ -104,6 +107,7 @@ contains
         call nml_read(path_par,group,"tf_max",      opt%tf_max)
         call nml_read(path_par,group,"tf_basins",   opt%tf_basins)
 
+        !call nml_read(path_par,group,"grounded_melt", opt%grounded_melt)
         call nml_read(path_par,group,"cf_ref_wais", opt%cf_ref_wais)
         
         return

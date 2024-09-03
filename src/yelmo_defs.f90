@@ -128,6 +128,7 @@ module yelmo_defs
         real(wp)           :: dmb_sigma_ref
         real(wp)           :: dmb_m_d 
         real(wp)           :: dmb_m_r
+        logical            :: grounded_melt
 
         ! Internal parameters 
         real(dp)           :: time 
@@ -750,7 +751,7 @@ module yelmo_defs
     type ydata_param_class 
         logical             :: pd_topo_load 
         character(len=1028) :: pd_topo_path 
-        character(len=56)   :: pd_topo_names(4)
+        character(len=56)   :: pd_topo_names(5)
         logical             :: pd_tsrf_load  
         character(len=1028) :: pd_tsrf_path 
         character(len=56)   :: pd_tsrf_name
@@ -773,7 +774,7 @@ module yelmo_defs
     type ydata_pd_class   ! pd = present-day
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(wp), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
-        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
+        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:), mask(:,:) 
         real(wp), allocatable :: T_srf(:,:), smb(:,:)
         real(wp), allocatable :: depth_iso(:,:,:)  
         

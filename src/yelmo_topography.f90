@@ -48,7 +48,7 @@ module yelmo_topography
     
 contains
     
-    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step,use_H_pred)
+    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,dta,time,topo_fixed,pc_step,use_H_pred)
 
         implicit none 
 
@@ -57,6 +57,7 @@ contains
         type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm  
         type(ybound_class), intent(IN)    :: bnd 
+        type(ydata_class),  intent(IN)    :: dta ! jablasco: necessary for optimization melt
         real(wp),           intent(IN)    :: time
         logical,            intent(IN)    :: topo_fixed  
         character(len=*),   intent(IN)    :: pc_step 
@@ -102,10 +103,15 @@ contains
         call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
         
         ! Combine basal mass balance into one field accounting for 
-        ! grounded/floating fraction of grid cells 
+        ! grounded/floating fraction of grid cells
+
+        ! jablasco
+        ! if optimization is active and ocean melt is allowed for grounded ice:
+        ! set ocean melt on grounded points that shold be floating
+ 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice, &
                             tpo%now%H_grnd,tpo%now%f_grnd_bmb,tpo%par%gz_Hg0,tpo%par%gz_Hg1, &
-                            tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%boundaries)
+                            tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%boundaries,tpo%par%grounded_melt,dta%pd%mask)
         
         ! Combine frontal mass balance into one field, and 
         ! calculate as needed 
@@ -964,7 +970,8 @@ end if
         call nml_read(filename,"ytopo","dmb_sigma_ref",     par%dmb_sigma_ref,    init=init_pars)
         call nml_read(filename,"ytopo","dmb_m_d",           par%dmb_m_d,          init=init_pars)
         call nml_read(filename,"ytopo","dmb_m_r",           par%dmb_m_r,          init=init_pars)
-        
+        call nml_read(filename,"ytopo","grounded_melt",     par%grounded_melt,    init=init_pars)
+ 
         ! === Set internal parameters =====
 
         par%nx  = nx 

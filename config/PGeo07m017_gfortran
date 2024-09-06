@@ -1,12 +1,11 @@
-FC = mpif90
-#FC = gfortran 
+FC = gfortran 
 
 NC_CROOT = /opt/homebrew/Cellar/netcdf/4.9.2_1
 NC_FROOT = /opt/homebrew/Cellar/netcdf-fortran/4.6.1
 INC_NC  = -I${NC_FROOT}/include
 LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf 
 
-LISROOT = /Users/alrobi001/apps/lis/lis
+LISROOT = libs/exlib/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -16,10 +15,10 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = /Users/robinson/apps/lis/lis-omp
+    LISROOT = libs/exlib/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

@@ -1,5 +1,7 @@
 Makefile
 libyelmo
+libs/exlib
+libs/lis*
 ice_data
 tests/plots
 output

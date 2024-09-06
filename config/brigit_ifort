@@ -1,5 +1,4 @@
-FC  = mpiifort
-#FC  = ifort
+FC  = ifort
 
 INC_NC  = -I/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/include
 LIB_NC  = -L/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/lib -lnetcdff -L/opt/ohpc/pub/libs/intel/impi/hdf5/1.10.5/lib -L/opt/ohpc/pub/libs/intel/impi/netcdf/4.6.3/lib -lnetcdf -lnetcdf -lhdf5_hl -lhdf5 -lz -lm
@@ -14,7 +13,7 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
     LISROOT = ${HOME}/apps/lis/lis-omp

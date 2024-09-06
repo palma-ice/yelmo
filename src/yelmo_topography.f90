@@ -445,7 +445,7 @@ end if
 
                 ! Scale calving with 'thin' calving rate to ensure 
                 ! small ice thicknesses are removed.
-                call apply_calving_rate_thin(tpo%now%cmb_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
+                call apply_calving_rate_thin(tpo%now%cmb_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%H_ref_calv_thin,tpo%par%boundaries)
 
             case("eigen")
                 ! Use Eigen calving as defined by Levermann et al. (2012)
@@ -456,7 +456,7 @@ end if
 
                 ! Scale calving with 'thin' calving rate to ensure 
                 ! small ice thicknesses are removed.
-                call apply_calving_rate_thin(tpo%now%cmb_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
+                call apply_calving_rate_thin(tpo%now%cmb_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%H_ref_calv_thin,tpo%par%boundaries)
 
             case("kill") 
                 ! Delete all floating ice (using characteristic time parameter)
@@ -937,6 +937,7 @@ end if
         call nml_read(filename,"ytopo","topo_rel_field",    par%topo_rel_field,   init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
         call nml_read(filename,"ytopo","calv_thin",         par%calv_thin,        init=init_pars)
+        call nml_read(filename,"ytopo","H_ref_calv_thin",   par%H_ref_calv_thin,  init=init_pars)
         call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)
         call nml_read(filename,"ytopo","H_min_flt",         par%H_min_flt,        init=init_pars)
         call nml_read(filename,"ytopo","sd_min",            par%sd_min,           init=init_pars)

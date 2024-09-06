@@ -106,6 +106,7 @@ module yelmo_defs
         character(len=12)  :: topo_rel_field  
         real(wp)           :: calv_tau  
         real(wp)           :: calv_thin
+        real(wp)           :: H_ref_calv_thin
         real(wp)           :: H_min_grnd
         real(wp)           :: H_min_flt 
         real(wp)           :: sd_min 

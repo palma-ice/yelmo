@@ -1,0 +1,13 @@
+{
+    "hpc"           : "pik_hpc2024",
+    "account"       : "megarun", 
+    "jobname"       : "Yelmo",
+    "omp"           : 16,
+
+    "queues_file"   : ".runme/queues.json",
+    "info_file"     : ".runme/yelmo_info.json",
+
+    "email"         : "",
+    "mail_type"     : ["FAIL", "REQUEUE"]
+
+}

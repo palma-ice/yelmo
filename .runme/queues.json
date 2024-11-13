@@ -1,0 +1,123 @@
+{
+
+    "pik_hpc2024" :
+    {
+        "job_template"  : ".runme/submit_slurm",
+        
+        "queues" :
+        {   "priority" :
+            {   "qos"  : "priority",
+                "partition" : "priority",
+                "wall" : "24:00:00" 
+            },
+            "short" :
+            {   "qos"  : "short",
+                "partition" : "standard",
+                "wall" : "24:00:00"  
+            },
+            "medium" :
+            {   "qos"  : "medium",
+                "partition" : "standard",
+                "wall" : "168:00:00" 
+            },
+            "long" :
+            {   "qos"  : "long",
+                "partition" : "standard",
+                "wall" : "720:00:00" 
+            },
+            "standby" :
+            {   "qos"  : "standby",
+                "partition" : "priority",
+                "wall" : "168:00:00" 
+            },
+            "standby_cancel" :
+            {   "qos"  : "standby_cancel",
+                "partition" : "priority",
+                "wall" : "168:00:00" 
+            },
+            "io" :
+            {   "qos"  : "io",
+                "partition" : "io",
+                "wall" : "72:00:00" 
+            },
+            "gpushort" :
+            {   "qos"  : "gpushort",
+                "partition" : "gpu",
+                "wall" : "24:00:00"  
+            },
+            "gpumedium" :
+            {   "qos"  : "gpumedium",
+                "partition" : "gpu",
+                "wall" : "168:00:00" 
+            },
+            "gpulong" :
+            {   "qos"  : "gpulong",
+                "partition" : "gpu",
+                "wall" : "720:00:00" 
+            },
+            "gpupreempt" :
+            {   "qos"  : "gpupreempt",
+                "partition" : "gpu",
+                "wall" : "720:00:00" 
+            }
+        }
+    },
+
+    "awi_albedo" :
+    {
+        "job_template"  : ".runme/submit_slurm",
+        
+        "queues" :
+        {   "30min" :
+            {   "qos"  : "30min",
+                "partition" : "smp",
+                "wall" : "00:30:00"  
+            },
+            "12h" :
+            {   "qos"  : "12h",
+                "partition" : "smp",
+                "wall" : "12:00:00"  
+            },
+            "48h" :
+            {   "qos"  : "48h",
+                "partition" : "smp",
+                "wall" : "48:00:00"  
+            },
+            "1wk" :
+            {   "qos"  : "1wk",
+                "partition" : "smp",
+                "wall" : "168:00:00" 
+            }
+        }
+    },
+
+    "dkrz_levante" :
+    {
+        "job_template"  : ".runme/submit_slurm",
+        
+        "queues" :
+        {   "compute" :
+            {   "qos"  : "normal",
+                "partition" : "compute",
+                "wall" : "08:00:00"  
+            },
+            "shared" :
+            {   "qos"  : "normal",
+                "partition" : "shared",
+                "wall" : "168:00:00"  
+            },
+            "interactive" :
+            {   "qos"  : "normal",
+                "partition" : "interactive",
+                "wall" : "12:00:00" 
+            },
+            "gpu" :
+            {   "qos"  : "normal",
+                "partition" : "gpu",
+                "wall" : "12:00:00" 
+            }
+        }
+    }
+}
+
+

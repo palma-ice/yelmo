@@ -266,6 +266,9 @@ def main():
     if info["par_path_as_argument"] is True:
         par_paths.append(par_path)   # add included parameter file provided at command line too
 
+    # Eliminate empty entries
+    par_paths = [entry for entry in par_paths if entry and entry != "None"]
+    
     # Copy the default parameter files to the rundir 
     copy_files(par_paths,rundir)
     

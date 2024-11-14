@@ -212,7 +212,7 @@ end if
 
                     ! Diagnose mass balance (forcing) tendency on ice thickness from previous iteration
                     call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice_n,tpo%now%f_grnd,mbal,dt)
-
+                    
                     ! Apply rate and update ice thickness
                     call apply_tendency(tpo%now%H_ice,tpo%now%mb_applied,dt,"mbal",adjust_mb=.TRUE.)
                     
@@ -327,25 +327,27 @@ end if
                     if (use_H_pred) then 
 
                         ! Load predictor fields in current state variables
-                        tpo%now%H_ice      = tpo%now%pred%H_ice 
-                        tpo%now%dHidt_dyn  = tpo%now%pred%dHidt_dyn
-                        tpo%now%mb_applied = tpo%now%pred%mb_applied 
-                        tpo%now%mb_relax   = tpo%now%pred%mb_relax 
-                        tpo%now%mb_resid   = tpo%now%pred%mb_resid 
-                        tpo%now%cmb        = tpo%now%pred%cmb 
-                        tpo%now%cmb_flt    = tpo%now%pred%cmb_flt 
-                        tpo%now%cmb_grnd   = tpo%now%pred%cmb_grnd 
+                        tpo%now%H_ice       = tpo%now%pred%H_ice 
+                        tpo%now%dHidt_dyn   = tpo%now%pred%dHidt_dyn
+                        tpo%now%mb_applied  = tpo%now%pred%mb_applied 
+                        tpo%now%bmb_applied = tpo%now%pred%bmb_applied 
+                        tpo%now%mb_relax    = tpo%now%pred%mb_relax 
+                        tpo%now%mb_resid    = tpo%now%pred%mb_resid 
+                        tpo%now%cmb         = tpo%now%pred%cmb 
+                        tpo%now%cmb_flt     = tpo%now%pred%cmb_flt 
+                        tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd 
                         
                     else
                         ! Load corrector fields in current state variables
-                        tpo%now%H_ice      = tpo%now%corr%H_ice 
-                        tpo%now%dHidt_dyn  = tpo%now%corr%dHidt_dyn
-                        tpo%now%mb_applied = tpo%now%corr%mb_applied 
-                        tpo%now%mb_relax   = tpo%now%corr%mb_relax 
-                        tpo%now%mb_resid   = tpo%now%corr%mb_resid 
-                        tpo%now%cmb        = tpo%now%corr%cmb 
-                        tpo%now%cmb_flt    = tpo%now%corr%cmb_flt 
-                        tpo%now%cmb_grnd   = tpo%now%corr%cmb_grnd 
+                        tpo%now%H_ice       = tpo%now%corr%H_ice 
+                        tpo%now%dHidt_dyn   = tpo%now%corr%dHidt_dyn
+                        tpo%now%mb_applied  = tpo%now%corr%mb_applied 
+                        tpo%now%bmb_applied = tpo%now%corr%bmb_applied 
+                        tpo%now%mb_relax    = tpo%now%corr%mb_relax 
+                        tpo%now%mb_resid    = tpo%now%corr%mb_resid 
+                        tpo%now%cmb         = tpo%now%corr%cmb 
+                        tpo%now%cmb_flt     = tpo%now%corr%cmb_flt 
+                        tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd 
                         
                     end if
                     
@@ -738,6 +740,7 @@ end if
                 tpo%now%rates%dHidt         = 0.0
                 tpo%now%rates%dHidt_dyn     = 0.0
                 tpo%now%rates%mb_applied    = 0.0
+                tpo%now%rates%bmb_applied   = 0.0
                 tpo%now%rates%mb_relax      = 0.0
                 tpo%now%rates%mb_resid      = 0.0
                 tpo%now%rates%mb_err        = 0.0
@@ -753,19 +756,20 @@ end if
             case("step")
                 ! Add current step to total
 
-                tpo%now%rates%dzsdt         = tpo%now%rates%dzsdt      + tpo%now%dzsdt*dt
-                tpo%now%rates%dHidt         = tpo%now%rates%dHidt      + tpo%now%dHidt*dt
-                tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn  + tpo%now%dHidt_dyn*dt
-                tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied + tpo%now%mb_applied*dt
-                tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax   + tpo%now%mb_relax*dt
-                tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid   + tpo%now%mb_resid*dt
-                tpo%now%rates%mb_err        = tpo%now%rates%mb_err     + tpo%now%mb_err*dt
-                tpo%now%rates%bmb           = tpo%now%rates%bmb        + tpo%now%bmb*dt
-                tpo%now%rates%fmb           = tpo%now%rates%fmb        + tpo%now%fmb*dt
-                tpo%now%rates%dmb           = tpo%now%rates%dmb        + tpo%now%dmb*dt
-                tpo%now%rates%cmb           = tpo%now%rates%cmb       + tpo%now%cmb*dt
-                tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt   + tpo%now%cmb_flt*dt
-                tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd  + tpo%now%cmb_grnd*dt
+                tpo%now%rates%dzsdt         = tpo%now%rates%dzsdt       + tpo%now%dzsdt*dt
+                tpo%now%rates%dHidt         = tpo%now%rates%dHidt       + tpo%now%dHidt*dt
+                tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn   + tpo%now%dHidt_dyn*dt
+                tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied  + tpo%now%mb_applied*dt
+                tpo%now%rates%bmb_applied   = tpo%now%rates%bmb_applied + tpo%now%bmb_applied*dt
+                tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax    + tpo%now%mb_relax*dt
+                tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid    + tpo%now%mb_resid*dt
+                tpo%now%rates%mb_err        = tpo%now%rates%mb_err      + tpo%now%mb_err*dt
+                tpo%now%rates%bmb           = tpo%now%rates%bmb         + tpo%now%bmb*dt
+                tpo%now%rates%fmb           = tpo%now%rates%fmb         + tpo%now%fmb*dt
+                tpo%now%rates%dmb           = tpo%now%rates%dmb         + tpo%now%dmb*dt
+                tpo%now%rates%cmb           = tpo%now%rates%cmb         + tpo%now%cmb*dt
+                tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt     + tpo%now%cmb_flt*dt
+                tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd    + tpo%now%cmb_grnd*dt
 
                 tpo%now%rates%dt_tot = tpo%now%rates%dt_tot + dt  
                 
@@ -778,6 +782,7 @@ end if
                     tpo%now%rates%dHidt         = tpo%now%rates%dHidt / tpo%now%rates%dt_tot
                     tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied / tpo%now%rates%dt_tot
+                    tpo%now%rates%bmb_applied   = tpo%now%rates%bmb_applied / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_err        = tpo%now%rates%mb_err / tpo%now%rates%dt_tot
@@ -803,6 +808,7 @@ end if
                         tpo%now%dHidt       = tpo%now%rates%dHidt
                         tpo%now%dHidt_dyn   = tpo%now%rates%dHidt_dyn
                         tpo%now%mb_applied  = tpo%now%rates%mb_applied
+                        tpo%now%bmb_applied = tpo%now%rates%bmb_applied
                         tpo%now%mb_relax    = tpo%now%rates%mb_relax
                         tpo%now%mb_resid    = tpo%now%rates%mb_resid
                         tpo%now%mb_err      = tpo%now%rates%mb_err
@@ -1015,6 +1021,7 @@ end if
         allocate(now%rates%dHidt(nx,ny))
         allocate(now%rates%dHidt_dyn(nx,ny))
         allocate(now%rates%mb_applied(nx,ny))
+        allocate(now%rates%bmb_applied(nx,ny))
         allocate(now%rates%mb_relax(nx,ny))
         allocate(now%rates%mb_resid(nx,ny))
         allocate(now%rates%mb_err(nx,ny))
@@ -1035,6 +1042,7 @@ end if
         allocate(now%dHidt(nx,ny))
         allocate(now%dHidt_dyn(nx,ny))
         allocate(now%mb_applied(nx,ny))
+        allocate(now%bmb_applied(nx,ny))
         allocate(now%mb_relax(nx,ny))
         allocate(now%mb_resid(nx,ny))
         allocate(now%mb_err(nx,ny))
@@ -1091,6 +1099,7 @@ end if
         now%rates%dHidt         = 0.0
         now%rates%dHidt_dyn     = 0.0
         now%rates%mb_applied    = 0.0
+        now%rates%bmb_applied   = 0.0
         now%rates%mb_relax      = 0.0
         now%rates%mb_resid      = 0.0
         now%rates%mb_err        = 0.0
@@ -1108,6 +1117,7 @@ end if
         now%dHidt       = 0.0
         now%dHidt_dyn   = 0.0
         now%mb_applied  = 0.0 
+        now%bmb_applied = 0.0 
         now%mb_relax    = 0.0
         now%mb_resid    = 0.0
         now%mb_err      = 0.0
@@ -1173,6 +1183,7 @@ end if
         if (allocated(now%rates%dHidt))         deallocate(now%rates%dHidt)
         if (allocated(now%rates%dHidt_dyn))     deallocate(now%rates%dHidt_dyn)
         if (allocated(now%rates%mb_applied))    deallocate(now%rates%mb_applied)
+        if (allocated(now%rates%bmb_applied))   deallocate(now%rates%bmb_applied)
         if (allocated(now%rates%mb_relax))      deallocate(now%rates%mb_relax)
         if (allocated(now%rates%mb_resid))      deallocate(now%rates%mb_resid)
         if (allocated(now%rates%mb_err))        deallocate(now%rates%mb_err)
@@ -1191,6 +1202,7 @@ end if
         if (allocated(now%dHidt))       deallocate(now%dHidt)
         if (allocated(now%dHidt_dyn))   deallocate(now%dHidt_dyn)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
+        if (allocated(now%bmb_applied)) deallocate(now%bmb_applied)
         if (allocated(now%mb_relax))    deallocate(now%mb_relax)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         if (allocated(now%mb_err))      deallocate(now%mb_err)
@@ -1260,6 +1272,7 @@ end if
         allocate(pc%H_ice(nx,ny))
         allocate(pc%dHidt_dyn(nx,ny))
         allocate(pc%mb_applied(nx,ny))
+        allocate(pc%bmb_applied(nx,ny))
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
@@ -1270,6 +1283,7 @@ end if
         pc%H_ice        = 0.0
         pc%dHidt_dyn    = 0.0
         pc%mb_applied   = 0.0
+        pc%bmb_applied  = 0.0
         pc%mb_relax     = 0.0
         pc%mb_resid     = 0.0
         pc%cmb          = 0.0      
@@ -1289,6 +1303,7 @@ end if
         if (allocated(pc%H_ice))       deallocate(pc%H_ice)
         if (allocated(pc%dHidt_dyn))   deallocate(pc%dHidt_dyn)
         if (allocated(pc%mb_applied))  deallocate(pc%mb_applied)
+        if (allocated(pc%bmb_applied)) deallocate(pc%bmb_applied)
         if (allocated(pc%mb_relax))    deallocate(pc%mb_relax)
         if (allocated(pc%mb_resid))    deallocate(pc%mb_resid)
         if (allocated(pc%cmb))         deallocate(pc%cmb)

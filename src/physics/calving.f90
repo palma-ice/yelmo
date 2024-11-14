@@ -34,7 +34,7 @@ module calving
 
 contains 
     
-    subroutine apply_calving_rate_thin(mb_calv,H_ice,f_ice,f_grnd,calv_thin,H_ref_calv_thin,boundaries)
+    subroutine apply_calving_rate_thin(mb_calv,H_ice,f_ice,f_grnd,calv_thin,Hc_ref_thin,boundaries)
         ! Adjust calving rate based on ice thickness 
         ! to ensure that thin ice (calv_thin*1yr=Xm) is removed
         ! following Pattyn (2017), Eq. 24. Typical parameters 
@@ -48,7 +48,7 @@ contains
         real(wp), intent(IN)    :: f_ice(:,:) 
         real(wp), intent(IN)    :: f_grnd(:,:) 
         real(wp), intent(IN)    :: calv_thin
-        real(wp), intent(IN)    :: H_ref_calv_thin
+        real(wp), intent(IN)    :: Hc_ref_thin      ! [m] Thickness below which to scale calving rate
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
@@ -56,9 +56,7 @@ contains
         integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_eff 
         real(wp) :: wt 
-
-        real(wp), parameter :: H_ref = 200.0_wp     ! [m] Thickness below which to scale calving rate
-
+        
         nx = size(mb_calv,1)
         ny = size(mb_calv,2) 
 
@@ -92,7 +90,7 @@ contains
                 call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                 ! Get weighting factor based on effective ice thickness 
-                wt = min(1.0_wp,H_eff/H_ref_calv_thin)
+                wt = min(1.0_wp,H_eff/Hc_ref_thin)
 
                 ! Calculate adjusted calving rate, weighted
                 ! between minimum rate and actual value 

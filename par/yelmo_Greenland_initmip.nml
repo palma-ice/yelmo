@@ -95,6 +95,7 @@
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
     Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean

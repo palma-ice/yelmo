@@ -1,5 +1,7 @@
 Makefile
 libyelmo
+libs/exlib
+libs/lis*
 ice_data
 tests/plots
 output
@@ -10,7 +12,7 @@ tests/.DS_Store
 *.vscode
 *.mypy_cache
 *.pytest_cache
-runylmo.js
+.runme_config
 tmp
 maps/scrip*.nc
 check_sim.x

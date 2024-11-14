@@ -1,0 +1,35 @@
+{
+
+    "exe_default" : "libyelmo/bin/yelmo_initmip.x",
+
+    "par_path_as_argument" : true,
+
+    "exe_aliases" : 
+        {   "benchmarks" : "libyelmo/bin/yelmo_benchmarks.x",
+            "mismip"     : "libyelmo/bin/yelmo_mismip.x",
+            "initmip"    : "libyelmo/bin/yelmo_initmip.x",
+            "opt"        : "libyelmo/bin/yelmo_opt.x",
+            "trough"     : "libyelmo/bin/yelmo_trough.x",
+            "ismiphom"   : "libyelmo/bin/yelmo_ismiphom.x",
+            "slab"       : "libyelmo/bin/yelmo_slab.x",
+            "regridding" : "libyelmo/bin/yelmo_test_regridding.x"
+        },
+    
+    "grp_aliases" : {},
+
+    "par_paths" :
+        {   "alias"  : "None"
+        },
+
+    "files" : 
+        ["None"], 
+
+    "dir-special" :
+    {
+        "None" : "target_dir_name"
+    },
+
+    "links" : 
+        ["input","ice_data","maps"]
+
+}

@@ -1,9 +1,12 @@
-FC  = ifort
+FC = ifx
 
-INC_NC  = -I/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/include
-LIB_NC  = -L/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/lib -lnetcdff -L/opt/ohpc/pub/libs/intel/impi/hdf5/1.10.5/lib -L/opt/ohpc/pub/libs/intel/impi/netcdf/4.6.3/lib -lnetcdf -lnetcdf -lhdf5_hl -lhdf5 -lz -lm
+NETCDFC_ROOT = /sw/spack-levante/netcdf-c-4.8.1-2k3cmu
+NETCDFFI_ROOT = /sw/spack-levante/netcdf-fortran-4.5.3-k6xq5g
+INC_NC  = -I${NETCDFFI_ROOT}/include
+LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
+# the -rpath options ensure that the same shared libraries are found at runtime
 
-LISROOT = ${HOME}/apps/lis/lis
+LISROOT = libs/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -11,12 +14,12 @@ PETSCROOT = /opt/local/lib/petsc
 INC_PETSC = -I $(PETSC_DIR)/include
 LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
-FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
+FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 
 ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = ${HOME}/apps/lis/lis-omp
+    LISROOT = libs/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -35,6 +38,7 @@ endif
 
 LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
 
-DFLAGS_NODEBUG = -O2 -fp-model precise
-DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
+#DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_NODEBUG = -Ofast -march=core-avx2 -mtune=core-avx2 -traceback #-recursive
+DFLAGS_DEBUG   = -C -O0 -traceback -ftrapuv -fpe0 -check all -fp-model precise -debug extended -gen-interfaces -warn interfaces -check arg_temp_created
 DFLAGS_PROFILE = -O2 -fp-model precise -pg

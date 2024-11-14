@@ -1,11 +1,12 @@
-FC  = ifort
+FC = ifx
 
-NETCDF_CROOT=/albedo/soft/sw/spack-sw/netcdf-c/4.8.1-vvxxdc3
-NETCDF_FORTRANROOT=/albedo/soft/sw/spack-sw/netcdf-fortran/4.5.4-uwfs3bu
-INC_NC  = -I${NETCDF_FORTRANROOT}/include
-LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf
+NETCDFC_ROOT = /albedo/soft/sw/spack-sw/netcdf-c/4.8.1-5ewdrxn
+NETCDFFI_ROOT = /albedo/soft/sw/spack-sw/netcdf-fortran/4.5.4-rujc52i
+INC_NC  = -I${NETCDFFI_ROOT}/include
+LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
+# the -rpath options ensure that the same shared libraries are found at runtime
 
-LISROOT = ${HOME}/apps/lis/lis
+LISROOT = libs/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -18,7 +19,7 @@ FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = ${HOME}/apps/lis/lis-omp
+    LISROOT = libs/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -37,6 +38,7 @@ endif
 
 LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
 
-DFLAGS_NODEBUG = -O2 -fp-model precise
-DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
+#DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_NODEBUG = -Ofast -march=core-avx2 -mtune=core-avx2 -traceback #-recursive
+DFLAGS_DEBUG   = -C -O0 -traceback -ftrapuv -fpe0 -check all -fp-model precise -debug extended -gen-interfaces -warn interfaces -check arg_temp_created
 DFLAGS_PROFILE = -O2 -fp-model precise -pg

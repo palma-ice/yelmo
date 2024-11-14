@@ -2,6 +2,7 @@
 module yelmo_defs
     
     use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+    use omp_lib
 
     use nml, only : nml_replace
 
@@ -20,6 +21,11 @@ module yelmo_defs
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: wp = sp 
 
+    ! Define a yelmo-specific kind parameter so that
+    ! external models can make use of the same precision
+    ! as needed. 
+    integer, parameter :: wp_yelmo = wp 
+    
     ! Define legacy deprecated kind parameter 'prec'
     ! ajr: slowly transition from 'prec' to 'wp' 
     integer,  parameter :: prec = wp 
@@ -101,6 +107,7 @@ module yelmo_defs
         character(len=12)  :: topo_rel_field  
         real(wp)           :: calv_tau  
         real(wp)           :: calv_thin
+        real(wp)           :: Hc_ref_thin
         real(wp)           :: H_min_grnd
         real(wp)           :: H_min_flt 
         real(wp)           :: sd_min 

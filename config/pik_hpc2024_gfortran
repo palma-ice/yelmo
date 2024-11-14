@@ -5,7 +5,7 @@ INC_NC  = -I${NETCDFF_ROOT}/include
 # the -rpath options ensure that the same shared libraries are found at runtime
 LIB_NC  = -L${NETCDFF_ROOT}/lib -Wl\,-rpath=${NETCDFF_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
 
-LISROOT = ../utils/lis_gfortran
+LISROOT = libs/lis_gfortran
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -15,10 +15,10 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = ../utils/lis_gfortran
+    LISROOT = libs/lis_gfortran
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

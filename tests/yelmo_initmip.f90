@@ -2,6 +2,8 @@
 
 program yelmo_test
 
+    use omp_lib
+
     use nml 
     use ncio 
     use yelmo 
@@ -10,9 +12,7 @@ program yelmo_test
     use yelmo_tools, only : gauss_values
     
     use ice_optimization 
-
-    use omp_lib
-
+    
     implicit none 
 
     type(yelmo_class)       :: yelmo1 
@@ -83,9 +83,6 @@ program yelmo_test
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     integer  :: perr 
 
-    ! Initialize MPI
-    call MPI_INIT(perr)
-    
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -489,9 +486,6 @@ program yelmo_test
 
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
-
-    ! Finalize MPI
-    call MPI_FINALIZE(perr)
 
 contains
 

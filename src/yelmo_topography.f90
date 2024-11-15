@@ -210,9 +210,11 @@ end if
                 case("predictor","corrector")
                     ! For either predictor or corrector step, also calculate all mass balance changes
 
-                    ! Diagnose mass balance (forcing) tendency on ice thickness from previous iteration
-                    call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice_n,tpo%now%f_grnd,mbal,dt)
-                    
+                    !! Diagnose mass balance (forcing) tendency on ice thickness from previous iteration
+                    !call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice_n,tpo%now%f_grnd,mbal,dt)
+                    ! Diagnose mass balance (forcing) tendency on current ice thickness
+                    call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice,tpo%now%f_grnd,mbal,dt)
+
                     ! Apply rate and update ice thickness
                     call apply_tendency(tpo%now%H_ice,tpo%now%mb_applied,dt,"mbal",adjust_mb=.TRUE.)
                     

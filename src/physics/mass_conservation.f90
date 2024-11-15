@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
+    use yelmo_defs, only : sp, dp, wp, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
     use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa
 
     use solver_advection, only : calc_advec2D  
@@ -146,7 +146,7 @@ contains
                 if (H_ice(i,j) .lt. 0.0) H_ice(i,j) = 0.0 
 
                 ! Ensure tiny numeric ice thicknesses are removed
-                if (abs(H_ice(i,j)) .lt. TOL_UNDERFLOW) H_ice(i,j) = 0.0
+                if (abs(H_ice(i,j)) .lt. TOL) H_ice(i,j) = 0.0
                 
                 ! Calculate actual current rate of change
                 dHdt = (H_ice(i,j) - H_prev) / dt 

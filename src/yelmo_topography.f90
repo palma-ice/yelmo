@@ -677,7 +677,6 @@ end if
         ! Calculate the ice-front mask (mainly for use in dynamics)
         call calc_ice_front(tpo%now%mask_frnt,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed,bnd%z_sl,tpo%par%boundaries)
 
-
         ! Determine ice thickness for use exclusively with the dynamics solver
         select case(trim(dyn%par%ssa_lat_bc))
 
@@ -690,7 +689,7 @@ end if
                 where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
                 
                 ! Calculate the ice fraction mask for use with the dynamics solver
-                call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+                call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                 bnd%c%rho_sw,tpo%par%boundaries,flt_subgrid=.FALSE.)
 
             case("slab-ext")
@@ -704,7 +703,7 @@ end if
                 call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd,H_slab=1.0_wp,n_ext=4)
 
                 ! Calculate the ice fraction mask for use with the dynamics solver
-                call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+                call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                 bnd%c%rho_sw,tpo%par%boundaries,flt_subgrid=.FALSE.)
 
             case DEFAULT 
@@ -715,7 +714,7 @@ end if
                 tpo%now%f_ice_dyn = tpo%now%f_ice 
 
         end select
-
+        
         return 
 
     end subroutine calc_ytopo_diagnostic

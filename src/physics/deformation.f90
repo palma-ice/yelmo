@@ -770,7 +770,7 @@ end if
         end do 
         !!$omp end parallel do
 
-        ! Set 2: Calculate all horizontal derivatives accounting for correction terms
+        ! Step 2: Calculate all horizontal derivatives accounting for correction terms
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
         !!$omp& private(c_x,c_y,dzbdx_acy,dzsdx_acy,c_x_acy,dzbdy_acx,dzsdy_acx,c_y_acx,dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa)

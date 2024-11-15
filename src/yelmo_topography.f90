@@ -286,27 +286,29 @@ end if
 
                     ! Save current predictor fields, 
                     ! proceed with predictor fields for calculating dynamics.
-                    tpo%now%pred%H_ice      = tpo%now%H_ice 
-                    tpo%now%pred%dHidt_dyn  = tpo%now%dHidt_dyn
-                    tpo%now%pred%mb_applied = tpo%now%mb_applied 
-                    tpo%now%pred%mb_relax   = tpo%now%mb_relax 
-                    tpo%now%pred%mb_resid   = tpo%now%mb_resid 
-                    tpo%now%pred%cmb        = tpo%now%cmb 
-                    tpo%now%pred%cmb_flt    = tpo%now%cmb_flt 
-                    tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd 
+                    tpo%now%pred%H_ice          = tpo%now%H_ice 
+                    tpo%now%pred%dHidt_dyn      = tpo%now%dHidt_dyn
+                    tpo%now%pred%mb_applied     = tpo%now%mb_applied 
+                    tpo%now%pred%bmb_applied    = tpo%now%bmb_applied 
+                    tpo%now%pred%mb_relax       = tpo%now%mb_relax 
+                    tpo%now%pred%mb_resid       = tpo%now%mb_resid 
+                    tpo%now%pred%cmb            = tpo%now%cmb 
+                    tpo%now%pred%cmb_flt        = tpo%now%cmb_flt 
+                    tpo%now%pred%cmb_grnd       = tpo%now%cmb_grnd 
                     
                 case("corrector")
                     ! Determine corrected ice thickness 
 
                     ! Save current corrector fields
-                    tpo%now%corr%H_ice      = tpo%now%H_ice 
-                    tpo%now%corr%dHidt_dyn  = tpo%now%dHidt_dyn
-                    tpo%now%corr%mb_applied = tpo%now%mb_applied 
-                    tpo%now%corr%mb_relax   = tpo%now%mb_relax 
-                    tpo%now%corr%mb_resid   = tpo%now%mb_resid 
-                    tpo%now%corr%cmb        = tpo%now%cmb 
-                    tpo%now%corr%cmb_flt    = tpo%now%cmb_flt 
-                    tpo%now%corr%cmb_grnd   = tpo%now%cmb_grnd 
+                    tpo%now%corr%H_ice          = tpo%now%H_ice 
+                    tpo%now%corr%dHidt_dyn      = tpo%now%dHidt_dyn
+                    tpo%now%corr%mb_applied     = tpo%now%mb_applied 
+                    tpo%now%corr%bmb_applied    = tpo%now%bmb_applied 
+                    tpo%now%corr%mb_relax       = tpo%now%mb_relax 
+                    tpo%now%corr%mb_resid       = tpo%now%mb_resid 
+                    tpo%now%corr%cmb            = tpo%now%cmb 
+                    tpo%now%corr%cmb_flt        = tpo%now%cmb_flt 
+                    tpo%now%corr%cmb_grnd       = tpo%now%cmb_grnd 
                     
                     ! Restore main ice thickness field to original 
                     ! value at the beginning of the timestep for 

@@ -759,7 +759,7 @@ contains
                 wt = (1.0 + (1.0+xn(k)) ) / 2.0 
             end if
 
-            ! Get left and right-side 
+            ! Get top and bottom-side 
             v0 = (1.0-wt)*vary(i0,jm1) + wt*vary(i1,jm1);
             v1 = (1.0-wt)*vary(i0,j)   + wt*vary(i1,j);
             

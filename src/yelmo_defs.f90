@@ -171,6 +171,7 @@ module yelmo_defs
         real(wp), allocatable :: H_ice(:,:)
         real(wp), allocatable :: dHidt_dyn(:,:)
         real(wp), allocatable :: mb_applied(:,:)
+        real(wp), allocatable :: bmb_applied(:,:)
         real(wp), allocatable :: mb_relax(:,:)
         real(wp), allocatable :: mb_resid(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
@@ -183,6 +184,7 @@ module yelmo_defs
         real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable :: dHidt_dyn(:,:)   ! Change in thickness due to dynamics only [m/yr]
         real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable :: bmb_applied(:,:) ! Actual basal mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_err(:,:)      ! Residual error in mass balance accounting 
@@ -208,6 +210,7 @@ module yelmo_defs
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: dHidt_dyn(:,:)
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable   :: bmb_applied(:,:) ! Actual basal mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable   :: mb_err(:,:)      ! Residual error in mass balance accounting 

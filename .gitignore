@@ -5,6 +5,7 @@ libs/lis*
 ice_data
 tests/plots
 output
+unit_tests
 tests/.DS_Store
 .DS_Store
 *.DS_Store

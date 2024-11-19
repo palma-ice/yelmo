@@ -933,9 +933,10 @@ end if
         real(wp), allocatable :: dzb(:,:)
         real(wp), allocatable :: dzb_restart(:,:)
         
-        ! Local copies of tpo and bnd
+        ! Local copies of tpo and bnd and tme
         type(ytopo_class)  :: tpo_restart 
         type(ybound_class) :: bnd_restart 
+        type(ytime_class)  :: tme_restart 
 
         ! Allocate local arrays
         allocate(H_ice(dom%grd%nx,dom%grd%ny))
@@ -1074,11 +1075,12 @@ end if
             ! Load variables from a restart file. Note: this will
             ! overwrite all information stored in yelmo object from above.
 
-            ! Intialize tpo and bnd objects locally 
+            ! Intialize tpo and bnd and tme objects locally 
             tpo_restart = dom%tpo 
             bnd_restart = dom%bnd 
+            tme_restart = dom%time 
 
-            call yelmo_restart_read_topo_bnd(tpo_restart,bnd_restart,dom%par%restart_interpolated, &
+            call yelmo_restart_read_topo_bnd(tpo_restart,bnd_restart,tme_restart,dom%par%restart_interpolated, &
                                              dom%grd,dom%par%domain,dom%par%grid_name,dom%par%restart,time)
 
             ! Now determine which values should be used from restart.
@@ -1158,8 +1160,9 @@ end if
             bnd_restart%region_mask = dom%bnd%region_mask 
             
             ! Finally populate the main dom object with the desired restart fields
-            dom%tpo = tpo_restart 
-            dom%bnd = bnd_restart 
+            dom%tpo  = tpo_restart 
+            dom%bnd  = bnd_restart 
+            dom%time = tme_restart
 
         end if 
 

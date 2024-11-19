@@ -355,8 +355,10 @@ contains
         ! to have these variables in the restart file, and potentially 
         ! others that do not depend on the grid.
         
-        ! call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
-        ! call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
+        ! ajr: writing these values is reactivated to see if it improves restart file performance
+
+        call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
+        call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
         
         ! == ytopo variables ===
         call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -405,10 +407,18 @@ contains
         call nc_write(filename,"pc_pred_H_ice",     dom%tpo%now%pred%H_ice,     units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_pred_dHidt_dyn", dom%tpo%now%pred%dHidt_dyn, units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_pred_mb_net",    dom%tpo%now%pred%mb_net,    units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_smb",       dom%tpo%now%pred%smb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_bmb",       dom%tpo%now%pred%bmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_fmb",       dom%tpo%now%pred%fmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_dmb",       dom%tpo%now%pred%dmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_pred_cmb",       dom%tpo%now%pred%cmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_H_ice",     dom%tpo%now%corr%H_ice,     units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_dHidt_dyn", dom%tpo%now%corr%dHidt_dyn, units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_mb_net",    dom%tpo%now%corr%mb_net,    units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_smb",       dom%tpo%now%corr%smb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_bmb",       dom%tpo%now%corr%bmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_fmb",       dom%tpo%now%corr%fmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_dmb",       dom%tpo%now%corr%dmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_cmb",       dom%tpo%now%corr%cmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
         ! == ydyn variables ===
@@ -656,7 +666,7 @@ contains
 
     end subroutine yelmo_read_interp_2D
 
-    subroutine yelmo_restart_read_topo_bnd(tpo,bnd,restart_interpolated,grd,domain,grid_name,filename,time)  
+    subroutine yelmo_restart_read_topo_bnd(tpo,bnd,tme,restart_interpolated,grd,domain,grid_name,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -664,6 +674,7 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo 
         type(ybound_class), intent(INOUT) :: bnd 
+        type(ytime_class),  intent(INOUT) :: tme
         integer,            intent(OUT)   :: restart_interpolated
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain
@@ -697,7 +708,7 @@ contains
             ! Restart file grid and yelmo grid are the same
 
             ! Load the data without interpolation (by not specifying mps argument)
-            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time)
+            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,tme,filename,time)
 
             ! Set yelmo flag too
             restart_interpolated = 0
@@ -709,7 +720,7 @@ contains
             call map_scrip_init(mps,restart_grid_name,grid_name,method="con",fldr="maps",load=.TRUE.)
 
             ! Load the data with interpolation
-            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time,mps) 
+            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,tme,filename,time,mps) 
 
             ! Determine whether interpolation is from low to high resolution (1)
             ! or from high to low resolution (-1)
@@ -788,7 +799,7 @@ contains
 
     end subroutine yelmo_restart_read
     
-    subroutine yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time,mps)  
+    subroutine yelmo_restart_read_topo_bnd_internal(tpo,bnd,tme,filename,time,mps)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -796,6 +807,7 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo 
         type(ybound_class), intent(INOUT) :: bnd 
+        type(ytime_class),  intent(INOUT) :: tme
         character(len=*),  intent(IN)    :: filename 
         real(wp),          intent(IN)    :: time 
         type(map_scrip_class), optional, intent(IN) :: mps 
@@ -823,8 +835,9 @@ contains
 
         ! == time variables ===
 
-        ! call nc_read(filename,"pc_dt",       dom%time%pc_dt, ncid=ncid)
-        ! call nc_read(filename,"pc_eta",      dom%time%pc_eta,ncid=ncid)
+        ! ajr: testing reading these variables too to improve restart file performance
+        call nc_read(filename,"pc_dt",       tme%pc_dt, ncid=ncid)
+        call nc_read(filename,"pc_eta",      tme%pc_eta,ncid=ncid)
         
         ! == ytopo variables ===
 
@@ -868,6 +881,25 @@ contains
         call nc_read_interp(filename,"H_ice_n",     tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_srf_n",     tpo%now%z_srf_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
+        ! = ytopo_pc variables ===
+        
+        call nc_read_interp(filename,"pc_pred_H_ice",    tpo%now%pred%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_dHidt_dyn",tpo%now%pred%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_mb_net",   tpo%now%pred%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_smb",      tpo%now%pred%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_bmb",      tpo%now%pred%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_fmb",      tpo%now%pred%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_dmb",      tpo%now%pred%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_cmb",      tpo%now%pred%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_H_ice",    tpo%now%corr%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_dHidt_dyn",tpo%now%corr%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_mb_net",   tpo%now%corr%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_smb",      tpo%now%corr%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_bmb",      tpo%now%corr%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_fmb",      tpo%now%corr%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_dmb",      tpo%now%corr%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_cmb",      tpo%now%corr%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+
         ! == ybound variables ===
 
         call nc_read_interp(filename,"z_bed",       bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 

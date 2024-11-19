@@ -1797,7 +1797,7 @@ end if
 
             case DEFAULT 
 
-                write(*,*) "calc_fmb_total:: Error: fmb_method not recongized."
+                write(*,*) "calc_fmb_total:: Error: fmb_method not recognized."
                 write(*,*) "fmb_method = ", fmb_method 
                 stop 
 

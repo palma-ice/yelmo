@@ -55,34 +55,6 @@ module yelmo_defs
      
     logical :: yelmo_use_omp                    ! Will be set when program is running
 
-    ! The constants below should be loaded using the global subroutine
-    ! defined below `yelmo_constants_load`.
-    ! Note: The key limitation imposed by defining the parameters defined 
-    ! globally is that these constants must be the same for all domains 
-    ! being run in the same program. 
-
-    ! Physical constants 
-    !real(wp)   :: sec_year       ! [s] seconds per year 
-    !real(wp)   :: g              ! [m s-2] Gravitational accel.  
-    !real(wp)   :: T0             ! [K] Reference freezing temperature  
-    !real(wp)   :: rho_ice        ! [kg m-3] Density ice           
-    !real(wp)   :: rho_w          ! [kg m-3] Density water          
-    !real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
-    !real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
-    !real(wp)   :: rho_rock       ! [kg m-3] Density bedrock (mantle/lithosphere) 
-    !real(wp)   :: L_ice          ! [J kg-1] Latent heat           
-    !real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
-
-    ! Internal parameters 
-    ! real(wp)   :: conv_we_ie            ! Conversion water equiv. => m/a ice equiv. 
-    ! real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
-    ! real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
-    ! real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
-    ! real(wp)   :: conv_km3_Gt           ! Conversion km^3 ice to Gt of ice 
-    ! real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
-    ! real(wp)   :: area_seasurf          ! Global present-day sea-surface area
-    ! real(wp)   :: conv_km3_sle          ! Conversion km^3 ice to m sle
-
     ! =========================================================================
     !
     ! YELMO objects: ytopo 
@@ -169,30 +141,34 @@ module yelmo_defs
     type ytopo_pc_class 
         real(wp), allocatable :: H_ice(:,:)
         real(wp), allocatable :: dHidt_dyn(:,:)
-        real(wp), allocatable :: mb_applied(:,:)
-        real(wp), allocatable :: bmb_applied(:,:)
+        real(wp), allocatable :: mb_net(:,:)
         real(wp), allocatable :: mb_relax(:,:)
         real(wp), allocatable :: mb_resid(:,:)
+        real(wp), allocatable :: smb(:,:)
+        real(wp), allocatable :: bmb(:,:)
+        real(wp), allocatable :: fmb(:,:)
+        real(wp), allocatable :: dmb(:,:)
+        real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
-        real(wp), allocatable :: cmb(:,:)
+        
     end type
 
     type ytopo_rates_class
         real(wp), allocatable :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable :: dHidt_dyn(:,:)   ! Change in thickness due to dynamics only [m/yr]
-        real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable :: bmb_applied(:,:) ! Actual basal mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable :: mb_net(:,:)      ! Net mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_err(:,:)      ! Residual error in mass balance accounting 
-        real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
-        real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable :: dmb(:,:)         ! Subgrid discharge
+        real(wp), allocatable :: smb(:,:)         ! Net smb applied
+        real(wp), allocatable :: bmb(:,:)         ! Net combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable :: fmb(:,:)         ! Net combined field of fmb_grnd and fmb_shlf 
+        real(wp), allocatable :: dmb(:,:)         ! Net subgrid discharge
         real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
-        real(wp), allocatable :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
-        real(wp), allocatable :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
+        real(wp), allocatable :: cmb_flt(:,:)     ! Calving rate, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_grnd(:,:)    ! Calving rate, grounded (applied) [m/a]
 
         real(wp) :: dt_tot
     end type
@@ -208,17 +184,22 @@ module yelmo_defs
         real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: dHidt_dyn(:,:)
-        real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: bmb_applied(:,:) ! Actual basal mass balance applied [m/a], for mass balance accounting
+
+        real(wp), allocatable   :: mb_net(:,:)      ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable   :: mb_err(:,:)      ! Residual error in mass balance accounting 
 
+        real(wp), allocatable   :: smb(:,:)         ! Actual smb applied [m/a]
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf    
         real(wp), allocatable   :: dmb(:,:)         ! Subgrid discharge mb rate
         real(wp), allocatable   :: cmb(:,:)         ! Calving mb rate
         
+        real(wp), allocatable   :: bmb_ref(:,:)     ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable   :: fmb_ref(:,:)     ! Combined field of fmb_grnd and fmb_shlf    
+        real(wp), allocatable   :: dmb_ref(:,:)     ! Subgrid discharge mb rate
+
         real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
         

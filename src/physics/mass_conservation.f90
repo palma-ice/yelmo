@@ -26,7 +26,7 @@ module mass_conservation
     
 contains 
     
-    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_applied,mb_calv,dHidt_dyn,smb,bmb,fmb,dmb, &
+    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_net,cmb,dHidt_dyn,smb,bmb,fmb,dmb, &
                                                                 mb_resid,dx,sec_year,time,dt,units,label)
 
         implicit none
@@ -35,8 +35,8 @@ contains
         real(wp), intent(IN) :: f_ice(:,:)
         real(wp), intent(IN) :: f_grnd(:,:)
         real(wp), intent(IN) :: dHidt(:,:)
-        real(wp), intent(IN) :: mb_applied(:,:)
-        real(wp), intent(IN) :: mb_calv(:,:)
+        real(wp), intent(IN) :: mb_net(:,:)
+        real(wp), intent(IN) :: cmb(:,:)
         real(wp), intent(IN) :: dHidt_dyn(:,:)
         real(wp), intent(IN) :: smb(:,:)
         real(wp), intent(IN) :: bmb(:,:)
@@ -54,8 +54,8 @@ contains
         integer  :: npts
         real(wp) :: tot_dHidt
         real(wp) :: tot_components
-        real(wp) :: tot_mb_applied
-        real(wp) :: tot_mb_calv
+        real(wp) :: tot_mb_net
+        real(wp) :: tot_cmb
         real(wp) :: tot_dHidt_dyn
         real(wp) :: conv
 
@@ -90,18 +90,18 @@ contains
         ! Calculate totals, initially [m^3/yr] => [units]
  
         tot_dHidt       = sum(dHidt)*dx*dx      * conv
-        tot_mb_applied  = sum(mb_applied)*dx*dx * conv
-        tot_mb_calv     = sum(mb_calv)*dx*dx    * conv
+        tot_mb_net      = sum(mb_net)*dx*dx     * conv
+        tot_cmb         = sum(cmb)*dx*dx        * conv
         tot_dHidt_dyn   = sum(dHidt_dyn)*dx*dx  * conv
 
         ! Get total of components and percent error
-        tot_components = tot_mb_applied + tot_mb_calv
+        tot_components = tot_mb_net + tot_cmb
         percent_error  = (tot_components - tot_dHidt) / (tot_dHidt+tol_mb) * 100.0 
 
         write(*,"(a8,a,2f9.3,a3,2g14.4,g10.3,a3,2g13.4,a3,g13.4)") &
                     trim(label), " mbcheck ["//trim(units)//"]: ", time, dt, " | ", &
                     tot_dHidt, tot_components, percent_error, " | ", &
-                    tot_mb_applied, tot_mb_calv !, " | ", tot_dHidt_dyn
+                    tot_mb_net, tot_cmb !, " | ", tot_dHidt_dyn
 
         return
 

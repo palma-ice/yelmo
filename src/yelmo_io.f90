@@ -392,7 +392,8 @@ contains
         call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
         call nc_write(filename,"mask_grz",    dom%tpo%now%mask_grz,    units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-            
+        call nc_write(filename,"lsf",         dom%tpo%now%lsf,         units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])    
+
         call nc_write(filename,"dHidt_dyn_n", dom%tpo%now%dHidt_dyn_n, units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"H_ice_n",     dom%tpo%now%H_ice_n,     units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_srf_n",     dom%tpo%now%z_srf_n,     units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -406,7 +407,8 @@ contains
         call nc_write(filename,"pc_corr_H_ice",     dom%tpo%now%corr%H_ice,     units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_dHidt_dyn", dom%tpo%now%corr%dHidt_dyn, units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_mb_applied",dom%tpo%now%corr%mb_applied,units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_write(filename,"pc_corr_cmb",       dom%tpo%now%corr%cmb,      units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_cmb",       dom%tpo%now%corr%cmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_lsf",       dom%tpo%now%pred%lsf,       units="1", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
         ! == ydyn variables ===
 
@@ -859,6 +861,7 @@ contains
         call nc_read_interp(filename,"dist_grline", tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"mask_bed",    tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"mask_grz",    tpo%now%mask_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"lsf",         tpo%now%lsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
 
         call nc_read_interp(filename,"dHidt_dyn_n", tpo%now%dHidt_dyn_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"H_ice_n",     tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

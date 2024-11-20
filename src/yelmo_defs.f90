@@ -177,6 +177,7 @@ module yelmo_defs
         real(wp), allocatable :: cmb_flt(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
         real(wp), allocatable :: cmb(:,:)
+        real(wp), allocatable :: lsf(:,:)
     end type
 
     type ytopo_rates_class
@@ -222,12 +223,13 @@ module yelmo_defs
         
         real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
-        
+        real(wp), allocatable   :: lsf(:,:)         ! LSF mask
+
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         
         integer,  allocatable   :: mask_adv(:,:)    ! Advection mask 
-        
+
         real(wp), allocatable   :: eps_eff(:,:)     ! Effective strain [1/yr]
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
         
@@ -821,7 +823,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
-        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd, lsf
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 

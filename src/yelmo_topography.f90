@@ -9,6 +9,7 @@ module yelmo_topography
     
     use mass_conservation
     use calving
+    use lsf_module
     use topography 
     use discharge
 
@@ -303,7 +304,8 @@ end if
                     tpo%now%pred%cmb            = tpo%now%cmb 
                     tpo%now%pred%cmb_flt        = tpo%now%cmb_flt 
                     tpo%now%pred%cmb_grnd       = tpo%now%cmb_grnd 
-                    
+                    tpo%now%pred%lsf            = tpo%now%lsf
+
                 case("corrector")
                     ! Determine corrected ice thickness 
 
@@ -317,7 +319,8 @@ end if
                     tpo%now%corr%cmb            = tpo%now%cmb 
                     tpo%now%corr%cmb_flt        = tpo%now%cmb_flt 
                     tpo%now%corr%cmb_grnd       = tpo%now%cmb_grnd 
-                    
+                    tpo%now%corr%lsf            = tpo%now%lsf
+
                     ! Restore main ice thickness field to original 
                     ! value at the beginning of the timestep for 
                     ! calculation of remaining quantities (thermo, material)
@@ -346,7 +349,8 @@ end if
                         tpo%now%cmb         = tpo%now%pred%cmb 
                         tpo%now%cmb_flt     = tpo%now%pred%cmb_flt 
                         tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd 
-                        
+                        tpo%now%lsf         = tpo%now%pred%lsf
+
                     else
                         ! Load corrector fields in current state variables
                         tpo%now%H_ice       = tpo%now%corr%H_ice 
@@ -358,7 +362,8 @@ end if
                         tpo%now%cmb         = tpo%now%corr%cmb 
                         tpo%now%cmb_flt     = tpo%now%corr%cmb_flt 
                         tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd 
-                        
+                        tpo%now%lsf         = tpo%now%corr%lsf
+
                     end if
                     
             end select
@@ -410,6 +415,8 @@ end if
         allocate(mbal_now(nx,ny)) 
         allocate(cmb_sd(nx,ny)) 
 
+        ! Initialize LSF map
+        call LSFinit(tpo%now%lsf,tpo%now%f_ice)
 
         ! Make sure current ice mask is correct
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -1062,6 +1069,7 @@ end if
         allocate(now%cmb(nx,ny))
         allocate(now%cmb_flt(nx,ny))
         allocate(now%cmb_grnd(nx,ny))
+        allocate(now%lsf(nx,ny))
         
         allocate(now%mask_adv(nx,ny))
         
@@ -1137,7 +1145,8 @@ end if
         now%cmb         = 0.0
         now%cmb_flt     = 0.0
         now%cmb_grnd    = 0.0
-        
+       
+        now%lsf         = 0.0 
         now%mask_adv    = 0
 
         now%eps_eff     = 0.0
@@ -1222,7 +1231,8 @@ end if
         if (allocated(now%cmb))         deallocate(now%cmb)
         if (allocated(now%cmb_flt))     deallocate(now%cmb_flt)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
-            
+           
+        if (allocated(now%lsf))         deallocate(now%lsf) 
         if (allocated(now%mask_adv))    deallocate(now%mask_adv)
         
         if (allocated(now%eps_eff))     deallocate(now%eps_eff)
@@ -1288,6 +1298,7 @@ end if
         allocate(pc%cmb_grnd(nx,ny))
         allocate(pc%mb_relax(nx,ny))
         allocate(pc%mb_resid(nx,ny))
+        allocate(pc%lsf(nx,ny))
 
         ! Initialize to zero
         pc%H_ice        = 0.0
@@ -1299,7 +1310,8 @@ end if
         pc%cmb          = 0.0      
         pc%cmb_flt      = 0.0
         pc%cmb_grnd     = 0.0
-        
+        pc%lsf          = 0.0
+
         return
 
     end subroutine ytopo_pc_alloc
@@ -1319,7 +1331,8 @@ end if
         if (allocated(pc%cmb))         deallocate(pc%cmb)
         if (allocated(pc%cmb_flt))     deallocate(pc%cmb_flt)
         if (allocated(pc%cmb_grnd))    deallocate(pc%cmb_grnd)
-        
+        if (allocated(pc%lsf))         deallocate(pc%lsf)
+
         return
 
     end subroutine ytopo_pc_dealloc

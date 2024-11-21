@@ -227,6 +227,8 @@ end if
                     
                     ! Calculate and apply calving
                     call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
+                    ! jablasco: lsf
+                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt)
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -415,8 +417,9 @@ end if
         allocate(mbal_now(nx,ny)) 
         allocate(cmb_sd(nx,ny)) 
 
+        ! jablasco
         ! Initialize LSF map
-        call LSFinit(tpo%now%lsf,tpo%now%f_ice)
+        !call LSFinit(tpo%now%lsf,tpo%now%f_ice)
 
         ! Make sure current ice mask is correct
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -589,6 +592,60 @@ end if
         return
 
     end subroutine calc_ytopo_calving
+
+    ! lsf jablasco
+    subroutine calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt)
+
+        implicit none 
+    
+        type(ytopo_class),  intent(INOUT) :: tpo
+        type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm  
+        type(ybound_class), intent(IN)    :: bnd 
+        real(wp),           intent(IN)    :: dt
+    
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(wp), allocatable :: var_dot(:,:) 
+        real(wp), allocatable :: LSFn(:,:)
+        real(wp), allocatable :: CR(:,:)
+
+        nx = size(tpo%now%H_ice,1) 
+        ny = size(tpo%now%H_ice,2) 
+    
+        allocate(var_dot(nx,ny))
+        allocate(LSFn(nx,ny))
+        allocate(CR(nx,ny)) 
+        var_dot = 0.0
+        LSFn    = 0.0    
+        CR      = 0.0
+
+        ! jablasco
+        ! Initialize LSF map
+        !call LSFinit(tpo%now%lsf,tpo%now%f_ice)
+    
+        ! === CALVING ===
+    
+        ! test only vm16 for now
+        !call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%tau_eff, &
+        !                                    tpo%par%dx,tau_max=1e6)
+    
+        !call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice, &
+        !               dyn%now%ux_bar,dyn%now%uy_bar,var_dot,tpo%par%dx,tpo%par%dy,dt,tpo%par%boundaries)
+
+        call LSFupdate(LSFn,tpo%now%lsf,CR,tpo%now%f_ice, &
+                       dyn%now%ux_bar,dyn%now%uy_bar,var_dot,tpo%par%dx,tpo%par%dy,dt,tpo%par%boundaries)
+    
+
+        tpo%now%lsf = LSFn
+
+        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%lsf = 1.0
+        where(tpo%now%lsf .le. 0.0_wp) tpo%now%lsf = -1.0
+
+        return
+  
+    end subroutine calc_ytopo_calving_lsf
 
     subroutine calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
         ! Calculate adjustments to surface elevation, bedrock elevation
@@ -1146,7 +1203,7 @@ end if
         now%cmb_flt     = 0.0
         now%cmb_grnd    = 0.0
        
-        now%lsf         = 0.0 
+        now%lsf         = 0 
         now%mask_adv    = 0
 
         now%eps_eff     = 0.0
@@ -1310,7 +1367,7 @@ end if
         pc%cmb          = 0.0      
         pc%cmb_flt      = 0.0
         pc%cmb_grnd     = 0.0
-        pc%lsf          = 0.0
+        pc%lsf          = 0
 
         return
 

@@ -9,6 +9,9 @@ module lsf_module
     implicit none 
 
     private 
+    
+    ! calving rates
+    public :: calc_calving_rate_vonmises_m16
 
     ! LSF routines
     public :: LSFinit
@@ -22,7 +25,49 @@ contains
 !
 ! ===================================================================
 
+subroutine calc_calving_rate_vonmises_m16(calv_rate,ubar,f_ice,f_grnd,tau_eff,dx,tau_max)
+    ! Calculate the calving rate [m/yr] based on the 
+    ! von Mises stress approach, as outlined by Morlighem et al. (2016)
+    ! tau_max=150-750 kPa w2=1?0?
+    
+    implicit none 
 
+    real(wp), intent(OUT) :: calv_rate(:,:)
+    real(wp), intent(IN)  :: ubar(:,:)  
+    real(wp), intent(IN)  :: f_ice(:,:),f_grnd(:,:)  
+    real(wp), intent(IN)  :: tau_eff(:,:)
+    real(wp), intent(IN)  :: dx
+    real(wp), intent(IN)  :: tau_max
+
+    ! Local variables 
+    integer  :: i, j, nx, ny 
+    !real(wp), parameter :: calv_lim = 1e6       ! To avoid really high calving values
+                                               ! jablasco: set to grid size dx? CHECK
+    nx = size(f_ice,1)
+    ny = size(f_ice,2)
+
+    ! Assume square grid cells 
+    do j = 1, ny
+    do i = 1, nx  
+        
+        ! Compute over the whole domain
+        ! Multiplication of eigenvectors
+        calv_rate(i,j) = max( ubar(i,j)*tau_eff(i,j)/tau_max, 0.0_wp )
+        
+        ! Ensure that ice free points do not exhibit calving
+        if ((f_ice(i,j) .eq. 0.0) .or. (f_grnd(i,j) .eq. 1.0)) then
+            calv_rate(i,j) = 0.0_wp
+        end if
+        
+        ! jablasco: Apply calving limit?
+        !calv_rate(i,j) = min(calv_rate(i,j),calv_lim)
+
+    end do
+    end do
+
+    return 
+
+end subroutine calc_calving_rate_vonmises_m16
 
 ! ===================================================================
 !
@@ -30,17 +75,18 @@ contains
 !
 ! ===================================================================
 
-subroutine LSFinit(LSF,f_ice)
+subroutine LSFinit(LSF,H_ice)
 
     implicit none
 
     real(wp), intent(OUT) :: LSF(:,:)   ! [m/yr] Calculated calving rate 
-    real(wp), intent(IN)  :: f_ice(:,:) ! [-] Ice area fraction
+    real(wp), intent(IN)  :: H_ice(:,:) ! [m] Ice tickness
      
-    ! Initialize LSF value at zero
-    LSF = -1.0  
+    ! Initialize LSF value at 0.0
+    LSF = 0.0  
     ! Assign values
-    where(f_ice .gt. 0.0) LSF = 1.0
+    where(H_ice .gt. 5.0) LSF = 1.0
+    where(H_ice .le. 5.0) LSF = -1.0
     
 end subroutine
 

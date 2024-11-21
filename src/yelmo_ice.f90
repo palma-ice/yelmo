@@ -23,6 +23,7 @@ module yelmo_ice
 
     use topography, only : remove_englacial_lakes
     use mass_conservation, only : calc_G_boundaries, check_mass_conservation, apply_tendency
+    use lsf_module
 
     !$  use omp_lib
 
@@ -1168,6 +1169,8 @@ end if
 
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        ! jablasco: init LSF
+        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice)
         call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for entire domain)

@@ -226,7 +226,8 @@ end if
                     call apply_tendency(tpo%now%H_ice,tpo%now%mb_applied,dt,"mbal",adjust_mb=.TRUE.)
                     
                     ! Calculate and apply calving
-                    call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
+                    ! jablasco: Avoid calving
+                    !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
                     ! jablasco: lsf
                     call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt)
 
@@ -609,33 +610,29 @@ end if
         integer :: i, j, nx, ny 
         real(wp), allocatable :: var_dot(:,:) 
         real(wp), allocatable :: LSFn(:,:)
-        real(wp), allocatable :: CR(:,:)
+        !real(wp), allocatable :: CR(:,:)
 
         nx = size(tpo%now%H_ice,1) 
         ny = size(tpo%now%H_ice,2) 
     
         allocate(var_dot(nx,ny))
         allocate(LSFn(nx,ny))
-        allocate(CR(nx,ny)) 
+        !allocate(CR(nx,ny)) 
         var_dot = 0.0
         LSFn    = 0.0    
-        CR      = 0.0
 
-        ! jablasco
-        ! Initialize LSF map
-        !call LSFinit(tpo%now%lsf,tpo%now%f_ice)
-    
         ! === CALVING ===
     
         ! test only vm16 for now
-        !call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%tau_eff, &
-        !                                    tpo%par%dx,tau_max=1e6)
+        call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
+        call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%tau_eff, &
+                                            tpo%par%dx,tau_max=1e5)
     
-        !call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice, &
-        !               dyn%now%ux_bar,dyn%now%uy_bar,var_dot,tpo%par%dx,tpo%par%dy,dt,tpo%par%boundaries)
+        call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
 
-        call LSFupdate(LSFn,tpo%now%lsf,CR,tpo%now%f_ice, &
-                       dyn%now%ux_bar,dyn%now%uy_bar,var_dot,tpo%par%dx,tpo%par%dy,dt,tpo%par%boundaries)
+        !call LSFupdate(LSFn,tpo%now%lsf,CR,tpo%now%f_ice, &
+        !               dyn%now%ux_bar,dyn%now%uy_bar,var_dot,tpo%par%dx,tpo%par%dy,dt,tpo%par%boundaries)
     
 
         tpo%now%lsf = LSFn

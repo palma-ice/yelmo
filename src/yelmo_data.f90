@@ -193,11 +193,10 @@ contains
             ! =========================================
             ! Load topography data from netcdf file 
             filename = dta%par%pd_topo_path
-            nms(1:5) = dta%par%pd_topo_names 
+            nms(1:4) = dta%par%pd_topo_names 
 
             call nc_read(filename,nms(1), dta%pd%H_ice, missing_value=mv)
             call nc_read(filename,nms(2), dta%pd%z_bed, missing_value=mv) 
-            call nc_read(filename,nms(5), dta%pd%mask, missing_value=mv) 
 
             ! If available read in bedrock standard deviation field
             if (trim(nms(3)) .ne. ""     .and. &
@@ -435,7 +434,6 @@ contains
         allocate(pd%z_srf(nx,ny))
         allocate(pd%z_bed(nx,ny))
         allocate(pd%H_grnd(nx,ny))
-        allocate(pd%mask(nx,ny))
 
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
@@ -498,7 +496,6 @@ contains
         if (allocated(pd%z_srf))            deallocate(pd%z_srf)
         if (allocated(pd%z_bed))            deallocate(pd%z_bed)
         if (allocated(pd%H_grnd))           deallocate(pd%H_grnd)
-        if (allocated(pd%mask))             deallocate(pd%mask)
         
         if (allocated(pd%T_srf))            deallocate(pd%T_srf)
         if (allocated(pd%smb))              deallocate(pd%smb)

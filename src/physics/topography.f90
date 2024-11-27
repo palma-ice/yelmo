@@ -5,7 +5,19 @@ module topography
 
     implicit none 
 
+    ! Key for matching bed types given by mask_bed 
+    integer, parameter :: mask_bed_ocean   = 0 
+    integer, parameter :: mask_bed_land    = 1
+    integer, parameter :: mask_bed_frozen  = 2
+    integer, parameter :: mask_bed_stream  = 3
+    integer, parameter :: mask_bed_grline  = 4
+    integer, parameter :: mask_bed_float   = 5
+    integer, parameter :: mask_bed_island  = 6
+    integer, parameter :: mask_bed_partial = 7
+
     private  
+
+    public :: gen_mask_bed
 
     public :: calc_ice_fraction
     public :: calc_ice_front
@@ -33,7 +45,84 @@ module topography
     
     public :: determine_grounded_fractions
 
+    ! Integers
+    public :: mask_bed_ocean  
+    public :: mask_bed_land  
+    public :: mask_bed_frozen
+    public :: mask_bed_stream
+    public :: mask_bed_grline
+    public :: mask_bed_float 
+    public :: mask_bed_island
+    
 contains 
+
+    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
+        ! Generate an output mask for model conditions at bed
+        ! based on input masks 
+        ! 0: ocean, 1: land, 2: sia, 3: streams, grline: 4, floating: 5, islands: 6
+        ! 7: partially-covered ice cell.
+
+        implicit none 
+
+        integer,  intent(OUT) :: mask 
+        real(wp), intent(IN)  :: f_ice, f_pmp, f_grnd
+        integer,  intent(IN)  :: mask_grz
+
+        if (mask_grz .eq. 0) then
+            ! Grounding line
+
+            mask = mask_bed_grline
+
+        else if (f_ice .eq. 0.0) then 
+            ! Ice-free points 
+
+            if (f_grnd .gt. 0.0) then
+                ! Ice-free land
+
+                mask = mask_bed_land
+
+            else
+                ! Ice-free ocean
+
+                mask = mask_bed_ocean
+
+            end if 
+
+        else if (f_ice .gt. 0.0 .and. f_ice .lt. 1.0) then 
+            ! Partially ice-covered points 
+
+            mask = mask_bed_partial
+
+        else
+            ! Fully ice-covered points 
+
+            if (f_grnd .gt. 0.0) then
+                ! Grounded ice-covered points 
+
+                if (f_pmp .gt. 0.5) then 
+                    ! Temperate points
+
+                    mask = mask_bed_stream 
+
+                else
+                    ! Frozen points 
+
+                    mask = mask_bed_frozen 
+
+                end if 
+
+            else
+                ! Floating ice-covered points 
+
+                mask = mask_bed_float
+
+            end if 
+
+        end if 
+
+        return 
+
+    end subroutine gen_mask_bed
 
     subroutine find_connected_mask(mask,mask_ref,mask_now)
         ! Brute-force routine to find all points 

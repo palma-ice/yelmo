@@ -790,6 +790,7 @@ module yelmo_defs
     type ydata_pd_class   ! pd = present-day
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(wp), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
+        integer,  allocatable :: mask_bed(:,:)
         real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
         real(wp), allocatable :: T_srf(:,:), smb(:,:)
         real(wp), allocatable :: depth_iso(:,:,:)  

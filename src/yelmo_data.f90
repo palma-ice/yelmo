@@ -254,6 +254,12 @@ contains
             ! (extracted from `calc_H_grnd` in topography)
             dta%pd%H_grnd = dta%pd%H_ice - (bnd%c%rho_sw/bnd%c%rho_ice)*max(z_sl_pd-dta%pd%z_bed,0.0_wp)
 
+            ! Define the mask to be consistent with internal mask_bed calculations
+            dta%pd%mask_bed = mask_bed_ocean
+            where(dta%pd%H_ice .eq. 0.0 .and. dta%pd%z_srf .gt. 0.0)  dta%pd%mask_bed = mask_bed_land
+            where(dta%pd%H_ice .gt. 0.0 .and. dta%pd%H_grnd .lt. 0.0) dta%pd%mask_bed = mask_bed_float
+            where(dta%pd%H_ice .gt. 0.0 .and. dta%pd%H_grnd .ge. 0.0) dta%pd%mask_bed = mask_bed_frozen
+
         end if 
 
         if (dta%par%pd_tsrf_load) then 
@@ -354,6 +360,7 @@ contains
         write(*,*) "ydata_load:: range(z_srf):     ",   minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
         write(*,*) "ydata_load:: range(z_bed):     ",   minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
         write(*,*) "ydata_load:: range(z_bed_sd):  ",   minval(z_bed_sd),       maxval(z_bed_sd)
+        write(*,*) "ydata_load:: range(mask_bed):  ",   minval(dta%pd%mask_bed),maxval(dta%pd%mask_bed)
         write(*,*) "ydata_load:: scaling fac z_bed_f_sd: ", z_bed_f_sd  
         write(*,*) "ydata_load:: range(T_srf):     ",   minval(dta%pd%T_srf),   maxval(dta%pd%T_srf)
         write(*,*) "ydata_load:: range(smb):       ",   minval(dta%pd%smb,dta%pd%smb .ne. mv), &
@@ -434,6 +441,7 @@ contains
         allocate(pd%z_srf(nx,ny))
         allocate(pd%z_bed(nx,ny))
         allocate(pd%H_grnd(nx,ny))
+        allocate(pd%mask_bed(nx,ny))
         
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
@@ -457,7 +465,8 @@ contains
         pd%z_srf         = 0.0 
         pd%z_bed         = 0.0 
         pd%H_grnd        = 0.0 
-        
+        pd%mask_bed      = 0
+
         pd%T_srf         = 0.0 
         pd%smb           = 0.0 
 
@@ -496,6 +505,7 @@ contains
         if (allocated(pd%z_srf))            deallocate(pd%z_srf)
         if (allocated(pd%z_bed))            deallocate(pd%z_bed)
         if (allocated(pd%H_grnd))           deallocate(pd%H_grnd)
+        if (allocated(pd%mask_bed))         deallocate(pd%mask_bed)
         
         if (allocated(pd%T_srf))            deallocate(pd%T_srf)
         if (allocated(pd%smb))              deallocate(pd%smb)

@@ -151,6 +151,9 @@ contains
                     tpo%now%dHidt_dyn_n = tpo%now%dHidt_dyn
                     tpo%now%H_ice_n     = tpo%now%H_ice 
                     tpo%now%z_srf_n     = tpo%now%z_srf 
+                    ! jablasco: LSF
+                    !tpo%now%lsf_n       = tpo%now%lsf
+                    !tpo%now%dlsf_n       = tpo%now%dlsf    
 
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -163,15 +166,22 @@ if (use_rk4) then
 else
                     call calc_G_advec_simple(dHidt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                  tpo%now%mask_adv,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
-                 
+                    ! update lsf
+                    !call calc_G_advec_simple(dlsfdt_now,tpo%now%lsf_n,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    !        tpo%now%mask_adv,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+
 end if 
                     
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
-                    tpo%now%dHidt_dyn = tpo%par%dt_beta(1)*dHidt_now + tpo%par%dt_beta(2)*tpo%now%dHidt_dyn_n 
+                    tpo%now%dHidt_dyn  = tpo%par%dt_beta(1)*dHidt_now  + tpo%par%dt_beta(2)*tpo%now%dHidt_dyn_n
+                    !tpo%now%dlsfdt_dyn = tpo%par%dt_beta(1)*dlsfdt_now + tpo%par%dt_beta(2)*tpo%now%dlsfdt_dyn_n
+
 
                     ! Apply rate and update ice thickness (predicted)
+                    ! jablasco: TO DO remove ice where LSF=-1
                     tpo%now%H_ice = tpo%now%H_ice_n
+                    !tpo%now%lsf   = tpo%now%lsf_n
                     call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.FALSE.)
 
                 case("corrector") 
@@ -229,7 +239,14 @@ end if
                     ! jablasco: Avoid calving
                     !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
                     ! jablasco: lsf
+                    ! define lsf based on f_ice?
+                    !call calc_ice_fraction(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+                    !    bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+                    !where(tpo%now%H_ice .eq. 0.0_wp) tpo%now%lsf   = -1.0_wp
                     call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt)
+                    ! jablasco: kill ice where lsf  less than 0.0
+                    where(tpo%now%lsf .lt. 0.0_wp)  tpo%now%H_ice = 0.0_wp
+                    where(tpo%now%H_ice .eq. 0.0_wp) tpo%now%lsf   = -1.0_wp
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -626,7 +643,7 @@ end if
         ! test only vm16 for now
         call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
         call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%tau_eff, &
-                                            tpo%par%dx,tau_max=1e5)
+                                            tpo%par%dx,tau_max=0.75e6)
     
         call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
                        var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
@@ -637,8 +654,9 @@ end if
 
         tpo%now%lsf = LSFn
 
-        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%lsf = 1.0
-        where(tpo%now%lsf .le. 0.0_wp) tpo%now%lsf = -1.0
+        ! jablasco: check limits here?
+        !where(tpo%now%lsf .ge. 1.0_wp) tpo%now%lsf = 1.0
+        !where(tpo%now%lsf .le. -1.0_wp) tpo%now%lsf = -1.0
 
         return
   

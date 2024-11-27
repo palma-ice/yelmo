@@ -1171,8 +1171,8 @@ end if
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         ! jablasco: init LSF
-        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
         call LSFinit(dom%tpo%now%lsf,dom%dta%pd%mask)
+        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for entire domain)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

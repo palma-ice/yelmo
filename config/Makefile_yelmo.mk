@@ -59,7 +59,8 @@ $(objdir)/grounding_line_flux.o: $(srcdir)/physics/grounding_line_flux.f90 $(obj
 $(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/lsf_module.o: $(srcdir)/physics/LSF/lsf_module.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o $(objdir)/solver_advection.o
+$(objdir)/lsf_module.o: $(srcdir)/physics/LSF/lsf_module.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o \
+	                                                $(objdir)/solver_advection.o $(objdir)/mass_conservation.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o $(objdir)/grid_calcs.o

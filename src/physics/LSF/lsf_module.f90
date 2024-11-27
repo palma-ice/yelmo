@@ -4,7 +4,8 @@ module lsf_module
     use yelmo_defs,       only : sp, dp, wp, prec, TOL_UNDERFLOW
     use yelmo_tools,      only : get_neighbor_indices
     use topography,       only : calc_H_eff
-    use solver_advection, only : calc_advec2D 
+    use solver_advection, only : calc_advec2D
+    use mass_conservation, only : calc_G_advec_simple 
 
     implicit none 
 
@@ -124,18 +125,22 @@ subroutine LSFupdate(LSFn,LSF,CR,f_ice,ux,uy,var_dot,mask_adv,dx,dy,dt,solver,bo
 
     ! Advection depends on ice velocity minus the calving rate
     dlsf = 0.0
-    wx = (ux + CR*ux/SQRT(ux**2.0 + uy**2.0))*1e3 ! factor 1e3 missing: where??
-    wy = (uy + CR*uy/SQRT(uy**2.0 + uy**2.0))*1e3 !
-    !wx = -5e4
-    !wy = -5e4
+    wx = (ux - CR*ux/SQRT(ux**2.0 + uy**2.0)) ! x-component calving rate
+    wy = (uy - CR*uy/SQRT(uy**2.0 + uy**2.0)) ! y-component calving rate
+    !wx = (ux - 100*ux)!*ux/SQRT(ux**2.0 + uy**2.0)) ! x-component calving rate
+    !wy = (uy - 100*uy)!*uy/SQRT(ux**2.0 + uy**2.0)) ! y-component calving rate
         
     ! Compute the advected LSF field
-    !call calc_adv2D_impl_upwind(lsf_now,wx,wy,var_dot,dx,dy,dt,boundaries,f_upwind=1.0_wp)
-    call calc_advec2D(dlsf,lsf,f_ice,wx,wy,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
+    call calc_G_advec_simple(dlsf,lsf,f_ice,wx,wy, &
+                             mask_adv,solver,boundaries,dx,dt)
+    !call calc_advec2D(dlsf,lsf,f_ice,wx,wy,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
     
     LSFn = dlsf*dt + lsf
     where(LSFn .gt. 1.0)  LSFn = 1.0
     where(LSFn .lt. -1.0) LSFn = -1.0
+    !where(LSFn .gt. 0.0)  LSFn = 1.0
+    !where(LSFn .lt. 0.0) LSFn = -1.0
+        
 
     return
 

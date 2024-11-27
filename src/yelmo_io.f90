@@ -15,6 +15,8 @@ module yelmo_io
 
     private 
     public :: yelmo_write_init
+    public :: yelmo_write_init_cropped
+    public :: yelmo_write_init_3D
     public :: yelmo_write_step
     public :: yelmo_write_var
     public :: yelmo_write_step_model_metrics
@@ -58,6 +60,53 @@ contains
         return
 
     end subroutine yelmo_write_init
+
+    subroutine yelmo_write_init_cropped(ylmo, filename, time_init, units, &
+        i1, i2, j1, j2)
+
+        implicit none
+
+        type(yelmo_class), intent(IN) :: ylmo 
+        character(len=*),  intent(IN) :: filename, units 
+        real(wp),          intent(IN) :: time_init
+        integer, intent(IN) :: i1, i2, j1, j2
+
+        call yelmo_grid_write_cropped(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, .TRUE., &
+            i1, i2, j1, j2)
+        call nc_write_dim(filename,"time", x=time_init, dx=1.0_prec, nx=1, units=trim(units), &
+            unlimited=.TRUE.)
+
+    end subroutine yelmo_write_init_cropped
+
+    subroutine yelmo_write_init_3D(ylmo, filename, time_init, units)
+
+        implicit none 
+
+        type(yelmo_class), intent(IN) :: ylmo 
+        character(len=*),  intent(IN) :: filename, units 
+        real(wp),          intent(IN) :: time_init
+
+        ! Local variables 
+        character(len=16)   :: xnm
+        character(len=16)   :: ynm
+        character(len=16)   :: znm
+
+        xnm = "xc"
+        ynm = "yc"
+        znm = "zc"
+
+        ! Create the empty netcdf file
+        call nc_create(filename)
+
+        ! Add grid axis variables to netcdf file
+        call nc_write_dim(filename,xnm,x=ylmo%grd%xc*1e-3,units="km")
+        call nc_write_dim(filename,ynm,x=ylmo%grd%yc*1e-3,units="km")
+        call nc_write_dim(filename,znm,x=ylmo%par%zeta_ac,units="1")
+        call nc_write_dim(filename, "time", x=time_init, dx=1.0_prec, nx=1, &
+            units=trim(units), unlimited=.TRUE.)
+        return
+
+    end subroutine yelmo_write_init_3D
 
     subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd)
 

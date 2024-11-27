@@ -28,6 +28,7 @@ module yelmo_grid
     public :: yelmo_init_grid_fromopt 
     public :: yelmo_init_grid_fromgrd
     public :: yelmo_grid_write
+    public :: yelmo_grid_write_cropped
 
 contains 
     
@@ -1018,6 +1019,82 @@ contains
         return
 
     end subroutine yelmo_grid_write
+
+    subroutine yelmo_grid_write_cropped(grid, fnm, domain, grid_name, create, &
+        i1, i2, j1, j2)
+        ! Write grid info to netcdf file respecting coordinate conventions
+        ! for easier interpretation/plotting etc. 
+
+        implicit none 
+        type(ygrid_class), intent(IN) :: grid 
+        character(len=*),  intent(IN) :: fnm
+        character(len=*),  intent(IN) :: domain
+        character(len=*),  intent(IN) :: grid_name
+        logical,           intent(IN) :: create  
+        integer,           intent(IN) :: i1, i2, j1, j2
+
+        ! Local variables 
+        character(len=16) :: xnm 
+        character(len=16) :: ynm 
+        character(len=16) :: grid_mapping_name
+
+        xnm = "xc"
+        ynm = "yc" 
+        grid_mapping_name = "crs" 
+
+        ! Create the netcdf file if desired
+        if (create) then 
+            
+            ! Create the empty netcdf file
+            call nc_create(fnm)
+
+            ! Write some general attributes that can be useful (e.g., for interpolation etc)
+            call nc_write_attr(fnm, "domain",    trim(domain))
+            call nc_write_attr(fnm, "grid_name", trim(grid_name))
+
+
+            ! Add grid axis variables to netcdf file
+            call nc_write_dim(fnm,xnm,x=grid%xc(i1:i2)*1e-3,units="km")
+            call nc_write_dim(fnm,ynm,x=grid%yc(j1:j2)*1e-3,units="km")
+            
+            if (grid%is_projection) then 
+                call nc_write_attr(fnm,xnm,"standard_name","projection_x_coordinate")
+                call nc_write_attr(fnm,ynm,"standard_name","projection_y_coordinate")
+            end if 
+
+        end if 
+
+        ! Add projection information if needed
+        if (grid%is_projection) then
+            call nc_write_map(fnm, grid%mtype, dble(grid%lambda), phi=dble(grid%phi), &
+                alpha=dble(grid%alpha), x_e=dble(grid%x_e), y_n=dble(grid%y_n), &
+                is_sphere=grid%is_sphere, semi_major_axis=dble(grid%semi_major_axis), &
+                inverse_flattening=dble(grid%inverse_flattening))
+        end if 
+
+        call nc_write(fnm, "x2D", grid%x(i1:i2, j1:j2)*1e-3, dim1=xnm, dim2=ynm, &
+            units="km", grid_mapping=grid_mapping_name)
+        call nc_write(fnm, "y2D", grid%y(i1:i2, j1:j2)*1e-3, dim1=xnm, dim2=ynm, &
+            units="km", grid_mapping=grid_mapping_name)
+
+        if (grid%is_projection) then 
+            call nc_write(fnm, "lon2D", grid%lon(i1:i2, j1:j2), dim1=xnm, dim2=ynm, &
+                grid_mapping=grid_mapping_name)
+            call nc_write_attr(fnm, "lon2D", "units", "degrees_east")
+            call nc_write(fnm, "lat2D", grid%lat(i1:i2, j1:j2), dim1=xnm,dim2=ynm, &
+                grid_mapping=grid_mapping_name)
+            call nc_write_attr(fnm,"lat2D","units","degrees_north")
+        end if 
+
+        call nc_write(fnm,"area",  grid%area(i1:i2, j1:j2)*1e-6, dim1=xnm,dim2=ynm, &
+            grid_mapping=grid_mapping_name,units="km^2")
+        if (grid%is_projection) call nc_write_attr(fnm,"area","coordinates","lat2D lon2D")
+        !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
+        !if (grid%is_projection) call nc_write_attr(fnm,"border","coordinates","lat2D lon2D")
+
+        return
+
+    end subroutine yelmo_grid_write_cropped
 
 end module yelmo_grid
 

@@ -758,7 +758,8 @@ end if
         call ydyn_par_load(dom%dyn%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ydyn_alloc(dom%dyn%now,dom%dyn%par%nx,dom%dyn%par%ny,dom%dyn%par%nz_aa,dom%dyn%par%nz_ac)
-        
+        dom%dyn%par%init_state_set = .FALSE. 
+
         write(*,*) "yelmo_init:: dynamics initialized."
         
         ! == material == 
@@ -1244,7 +1245,7 @@ end if
             ! Load variables from a restart file 
 
             call yelmo_restart_read(dom,trim(dom%par%restart),time)
-
+            
         else 
 
             ! Consistency check 
@@ -1304,12 +1305,11 @@ end if
             dom%thrm%par%method      = dom_thrm_method 
             dom%thrm%par%rock_method = dom_thrm_rock_method
 
+            ! Re-run topo again to make sure all fields are synchronized (masks, etc)
+            !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+
         end if 
-
-
-        ! Re-run topo again to make sure all fields are synchronized (masks, etc)
-        !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

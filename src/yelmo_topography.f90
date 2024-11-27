@@ -1325,6 +1325,7 @@ end if
         allocate(pc%smb(nx,ny))
         allocate(pc%bmb(nx,ny))
         allocate(pc%fmb(nx,ny))
+        allocate(pc%dmb(nx,ny))
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
@@ -1338,6 +1339,7 @@ end if
         pc%smb          = 0.0
         pc%bmb          = 0.0
         pc%fmb          = 0.0
+        pc%dmb          = 0.0
         pc%cmb          = 0.0      
         pc%cmb_flt      = 0.0
         pc%cmb_grnd     = 0.0

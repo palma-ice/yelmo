@@ -55,6 +55,34 @@ module yelmo_defs
      
     logical :: yelmo_use_omp                    ! Will be set when program is running
 
+    ! The constants below should be loaded using the global subroutine
+    ! defined below `yelmo_constants_load`.
+    ! Note: The key limitation imposed by defining the parameters defined 
+    ! globally is that these constants must be the same for all domains 
+    ! being run in the same program. 
+
+    ! Physical constants 
+    !real(wp)   :: sec_year       ! [s] seconds per year 
+    !real(wp)   :: g              ! [m s-2] Gravitational accel.  
+    !real(wp)   :: T0             ! [K] Reference freezing temperature  
+    !real(wp)   :: rho_ice        ! [kg m-3] Density ice           
+    !real(wp)   :: rho_w          ! [kg m-3] Density water          
+    !real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
+    !real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
+    !real(wp)   :: rho_rock       ! [kg m-3] Density bedrock (mantle/lithosphere) 
+    !real(wp)   :: L_ice          ! [J kg-1] Latent heat           
+    !real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
+
+    ! Internal parameters 
+    ! real(wp)   :: conv_we_ie            ! Conversion water equiv. => m/a ice equiv. 
+    ! real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
+    ! real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
+    ! real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
+    ! real(wp)   :: conv_km3_Gt           ! Conversion km^3 ice to Gt of ice 
+    ! real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
+    ! real(wp)   :: area_seasurf          ! Global present-day sea-surface area
+    ! real(wp)   :: conv_km3_sle          ! Conversion km^3 ice to m sle
+
     ! =========================================================================
     !
     ! YELMO objects: ytopo 
@@ -151,7 +179,7 @@ module yelmo_defs
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
-        
+
     end type
 
     type ytopo_rates_class
@@ -372,14 +400,12 @@ module yelmo_defs
         integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
         real(wp)   :: speed 
 
+        logical    :: init_state_set
     end type
 
     ! ydyn state variables
     type ydyn_state_class
         ! Model variables that the define the state of the domain 
-
-        real(wp), allocatable :: ux_bar_ab(:,:) 
-        real(wp), allocatable :: uy_bar_ab(:,:)
 
         real(wp), allocatable :: ux(:,:,:) 
         real(wp), allocatable :: uy(:,:,:) 

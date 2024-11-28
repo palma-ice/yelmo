@@ -22,10 +22,11 @@ contains
         select case(trim(domain))
 
             case("circular")
-                ! R0=800e3;
-                ! Bc=900; 
-                ! Bl=-2000;   
-                ! rc=0;
+                
+                R0=800e3;
+                Bc=900; 
+                Bl=-2000;   
+                rc=0;
                 
                 call define_bedrock_circular(z_bed,xx,yy,R0,Bc,Bl,rc)
 

@@ -10,8 +10,7 @@ program yelmo_calving
 
     type(yelmo_class)     :: yelmo1
     
-    type control_type
-        character(len=56)  :: domain    
+    type control_type    
         character(len=256) :: outfldr
         character(len=256) :: file2D, file1D
         character(len=256) :: file_restart
@@ -22,6 +21,13 @@ program yelmo_calving
         real(wp) :: dt2D_out, dt1D_out
 
         real(wp) :: dx
+
+        ! Internal parameters
+        character(len=56)  :: domain
+        character(len=56)  :: grid_name
+        real(wp) :: x0, x1
+        integer  :: nx
+        integer  :: ny
     end type
 
     type(control_type) :: ctl
@@ -56,18 +62,73 @@ program yelmo_calving
     call nml_read(ctl%path_par,"ctl","dt2D_out",    ctl%dt2D_out)       ! [yr] Frequency of 2D output 
     ctl%dt1D_out = ctl%dtt  ! Set 1D output to frequency of main loop timestep 
 
-    ! Define domain based on experiment
+    ! Now set internal parameters ===
+
+    ! Define domain and grid size based on experiment
     select case(trim(ctl%exp))
         case("exp1","exp2")
             ctl%domain = "circular"
+            ctl%x0 = -800.0
+            ctl%x1 =  800.0
         case("exp3","exp4","exp5")
             ctl%domain = "thule"
+            ctl%x0 = -1000.0
+            ctl%x1 =  1000.0
         case DEFAULT
             write(*,*) "ctl.exp = ",trim(ctl%domain), " not recognized."
             stop
     end select
 
+    ! Get grid size
+    ctl%nx = (ctl%x1-ctl%x0) / ctl%dx + 1
+    ctl%ny = ctl%nx
 
+    ! Get grid name
+    write(ctl%grid_name,"(a,i2,a2)") trim(ctl%domain)//"-",int(ctl%dx),"KM"
+    
+    ! === Initialize ice sheet model =====
+
+    ! First, define grid 
+    call yelmo_init_grid(yelmo1%grd,ctl%grid_name,units="km",dx=ctl%dx,nx=ctl%nx,dy=ctl%dx,ny=ctl%nx)
+
+    ! Initialize data objects (without loading topography, which will be defined inline below)
+    call yelmo_init(yelmo1,filename=ctl%path_par,grid_def="none",time=ctl%time_init, &
+                        load_topo=.FALSE.,domain=ctl%domain,grid_name=ctl%grid_name)
+    
+
+    ! === Define initial topography =====
+
+    call calvmip_init(yelmo1%bnd%z_bed,yelmo1%grd%x,yelmo1%grd%y,yelmo1%par%domain)
+
+    yelmo1%tpo%now%H_ice = 0.0
+    yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed 
+
+    ! === Define additional boundary conditions =====
+
+    yelmo1%bnd%z_sl     = 0.0
+    yelmo1%bnd%bmb_shlf = 0.0  
+    yelmo1%bnd%T_shlf   = yelmo1%bnd%c%T0  
+    yelmo1%bnd%H_sed    = 0.0 
+
+    yelmo1%bnd%T_srf    = 223.15 
+    yelmo1%bnd%Q_geo    = 42.0 
+    yelmo1%bnd%smb      = 0.3
+            
+    ! Check boundary values 
+    call yelmo_print_bound(yelmo1%bnd)
+
+    ! Initialize state variables (dyn,therm,mat)
+    call yelmo_init_state(yelmo1,time=ctl%time_init,thrm_method="robin")
+
+    ! == Write initial state ==
+     
+    ! 2D file 
+    call yelmo_write_init(yelmo1,ctl%file2D,time_init=ctl%time_init,units="years")
+    call yelmo_write_step(yelmo1,ctl%file2D,time=ctl%time_init)  
+    
+    ! 1D file 
+    call yelmo_write_reg_init(yelmo1,ctl%file1D,time_init=ctl%time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,ctl%file1D,time=ctl%time_init) 
 
 contains
 

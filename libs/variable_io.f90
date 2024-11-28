@@ -3,6 +3,7 @@ module variable_io
     implicit none
 
     type var_io_type
+        integer :: id
         character(len=32)  :: varname
         character(len=32)  :: dimnames
         character(len=32)  :: units
@@ -12,9 +13,44 @@ module variable_io
         character(len=32), allocatable :: dims(:)
     end type
 
-
-
+    private
+    public :: var_io_type
+    public :: load_variable_table
+    public :: find_variable_in_table
+    public :: var_io_print
+    
 contains
+
+    subroutine find_variable_in_table(var,var_table,varname)
+
+        implicit none
+        
+        type(var_io_type), intent(OUT) :: var
+        type(var_io_type), intent(IN)  :: var_table(:)
+        character(len=*),  intent(IN)  :: varname 
+
+        ! Local variables
+        integer :: n 
+        logical :: found
+
+        found = .FALSE.
+        do n = 1, size(var_table)
+            if (trim(var_table(n)%varname) .eq. trim(varname)) then
+                var = var_table(n)
+                found = .TRUE.
+                exit
+            end if
+        end do
+
+        if (.not. found) then
+            write(*,*) "find_variable_in_table:: Error: variable not found in variable table."
+            write(*,*) "varname = ", trim(varname)
+            stop 
+        end if
+
+        return
+
+    end subroutine find_variable_in_table
 
     subroutine load_variable_table(var_table,filename)
 
@@ -50,11 +86,14 @@ contains
                 ! Parse the line
                 call parse_line_to_variable(vt(n)%varname,vt(n)%dimnames,vt(n)%units,vt(n)%long_name,line)
                 
+                ! Store the id (variable number in table)
+                vt(n)%id = n 
+                
                 ! Parse the dimensions
                 call parse_dims(vt(n)%dims,vt(n)%dimnames)
-
+                vt(n)%ndims = size(vt(n)%dims)
                 ntot = ntot+1
-                write(*,"(i4,3a20,2x,a50)") ntot, trim(vt(n)%varname), trim(vt(n)%dimnames), trim(vt(n)%units), trim(vt(n)%long_name)
+                call var_io_print(vt(n))
             end if
 
             if (n .eq. nmax) then
@@ -170,5 +209,17 @@ contains
         return
 
     end subroutine parse_dims
+
+    subroutine var_io_print(var)
+
+        implicit none
+
+        type(var_io_type), intent(IN) :: var
+
+        write(*,"(i4,3a20,2x,a50)") var%id, trim(var%varname), trim(var%dimnames), trim(var%units), trim(var%long_name)
+
+        return
+
+    end subroutine var_io_print
 
 end module variable_io

@@ -195,7 +195,7 @@ $(objdir)/yelmo_regions.o: $(srcdir)/yelmo_regions.f90 $(objdir)/ncio.o $(objdir
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_io.o: $(srcdir)/yelmo_io.f90 $(objdir)/ncio.o $(objdir)/yelmo_defs.o $(objdir)/mapping_scrip.o \
-						$(objdir)/interp2D.o
+						$(objdir)/interp2D.o $(objdir)/variable_io.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/control.o: control.f90 $(objdir)/nml.o

@@ -7,6 +7,7 @@ module yelmo_io
     use yelmo_defs 
     use yelmo_grid 
 
+    use variable_io
     use interp2D
     use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
                                             gen_map_filename, nc_read_interp
@@ -39,13 +40,13 @@ contains
 
 
         ! Initialize netcdf file and dimensions
-        call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
-        call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
-        call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
-        call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
-        call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
-        call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
-        call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
+        call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,             units="month")
+        call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,         units="1")
+        call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,         units="1")
+        call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa, units="1")
+        call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso,     units="kyr")
+        call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,      units="kyr")
+        call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,              units="1")
         
         call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
 

@@ -234,6 +234,17 @@ contains
                 call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             
+            
+            case("ux")
+                call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/yr",long_name="Velocity, x-direction", &
+                                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+            case("uy")
+                call nc_write(filename,"uy",ylmo%dyn%now%ux,units="m/yr",long_name="Velocity, y-direction", &
+                                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+            case("uz")
+                call nc_write(filename,"uz",ylmo%dyn%now%ux,units="m/yr",long_name="Velocity, z-direction", &
+                                dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
+                                
             case DEFAULT 
 
                 write(io_unit_err,*) 

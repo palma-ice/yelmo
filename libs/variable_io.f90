@@ -93,12 +93,10 @@ contains
         ! Open the file for reading
         open(newunit=io, file=trim(filename), status='old', action='read')
 
-        ! Skip the header (finishes with second line starting with "---" )
-        ntot = 2
+        ! Skip the header (header finishes with first line starting with "---" )
         do n = 1, 50
             read(unit=io, fmt='(a)') line
-            if (line(1:3) .eq. "---") ntot = ntot - 1
-            if (ntot .eq. 0) exit
+            if (line(1:3) .eq. "|--") exit
         end do
 
         ntot = 0 
@@ -108,7 +106,7 @@ contains
             ! Exit at end of file
             if (check .eq. -1) exit 
 
-            if (line(1:1) .eq. "|") then
+            if (line(1:2) .eq. "| ") then
                 ! Parse the line
                 call parse_line_to_variable(vt(n)%varname,vt(n)%dimnames,vt(n)%units,vt(n)%long_name,line)
                 
@@ -185,7 +183,8 @@ contains
 
         ! Extract long_name
         temp_line = temp_line(pos2+2:)
-        long_name = adjustl(trim(temp_line))
+        pos2 = index(temp_line, '|') - 1
+        long_name = adjustl(trim(temp_line(:pos2)))
 
         return
 
@@ -245,7 +244,7 @@ contains
 
         type(var_io_type), intent(IN) :: var
 
-        write(*,"(i4,3a20,2x,a50)") var%id, trim(var%varname), trim(var%dimnames), trim(var%units), trim(var%long_name)
+        write(*,"(i4,3a20,2x,a35)") var%id, trim(var%varname), trim(var%dimnames), trim(var%units), trim(var%long_name)
 
         return
 

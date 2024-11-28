@@ -5,9 +5,9 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 1000.0               ! [yr] Ending time 
-    dtt          = 100.0                ! [yr] Main loop timestep 
-    dt2D_out     = 5000.0               ! [yr] Frequency of writing 2D output files 
+    time_end     = 50000.0              ! [yr] Ending time 
+    dtt          = 10.0                 ! [yr] Main loop timestep 
+    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
 
 /
 
@@ -42,8 +42,8 @@
 /
 
 &ytopo
-    solver              = "expl"            ! "expl", "impl-lis"
-    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    solver              = "impl-lis"        ! "expl", "impl-lis"
+    calv_flt_method     = "kill-pos"        ! "zero", "simple", "flux", "vm-l19", "kill", "kill-pos"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
@@ -57,7 +57,7 @@
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
     calv_tau            = 1.0               ! [a] Characteristic calving time
-    calv_thin           = 0.0               ! [m/yr] Calving rate to apply to very thin ice
+    calv_thin           = 30.0              ! [m/yr] Calving rate to apply to very thin ice
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
     H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
@@ -90,7 +90,7 @@
 /
 
 &ydyn
-    solver              = "sia"           ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb

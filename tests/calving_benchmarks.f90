@@ -4,6 +4,10 @@ module calving_benchmarks
 
     implicit none
 
+    private
+    public :: calvmip_init
+    public :: set_calving_mask
+
 contains
 
     subroutine calvmip_init(z_bed,xx,yy,domain)
@@ -107,5 +111,28 @@ contains
         return
 
     end subroutine define_bedrock_thule
+
+    elemental subroutine set_calving_mask(mask,xx,yy,r_lim)
+
+        implicit none
+
+        logical, intent(OUT) :: mask
+        real(wp), intent(IN)  :: xx
+        real(wp), intent(IN)  :: yy
+        real(wp), intent(IN)  :: r_lim 
+
+        real(wp) :: r
+        
+        r = sqrt(xx*xx+yy*yy);
+
+        if (r .gt. r_lim) then 
+            mask = .TRUE.
+        else
+            mask = .FALSE.
+        end if
+
+        return
+
+    end subroutine set_calving_mask
 
 end module calving_benchmarks

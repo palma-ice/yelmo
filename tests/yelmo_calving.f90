@@ -8,8 +8,9 @@ program yelmo_calving
     
     implicit none
 
-    type(yelmo_class)     :: yelmo1
-    
+    type(yelmo_class) :: yelmo1
+    type(yelmo_class) :: yelmo_ref
+
     type control_type    
         character(len=256) :: outfldr
         character(len=256) :: file2D, file1D
@@ -31,7 +32,8 @@ program yelmo_calving
     end type
 
     type(control_type) :: ctl
-
+    real(wp) :: time 
+    integer  :: n 
     
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -130,6 +132,52 @@ program yelmo_calving
     call yelmo_write_reg_init(yelmo1,ctl%file1D,time_init=ctl%time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,ctl%file1D,time=ctl%time_init) 
 
+    ! Store default parameters
+    yelmo_ref = yelmo1
+
+    ! Set calving mask if needed
+    if (trim(yelmo1%tpo%par%calv_flt_method) .eq. "kill-pos") then
+        call set_calving_mask(yelmo1%bnd%calv_mask,yelmo1%grd%x,yelmo1%grd%y,r_lim=750e3_wp)
+    end if
+
+    ! Advance timesteps
+    do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+
+        ! Get current time 
+        time = ctl%time_init + n*ctl%dtt
+        
+        ! if (time .lt. 10e3) then
+        !     yelmo1%dyn%par%solver = "sia"
+        ! else
+        !     yelmo1%dyn%par%solver = yelmo_ref%dyn%par%solver
+        ! end if
+
+        ! == Yelmo ice sheet ===================================================
+        call yelmo_update(yelmo1,time)
+        
+        ! == MODEL OUTPUT =======================================================
+        if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then 
+            call yelmo_write_step(yelmo1,ctl%file2D,time=time)   
+        end if 
+
+        if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
+            call yelmo_write_reg_step(yelmo1,ctl%file1D,time=time) 
+        end if 
+
+    end do
+
+    ! Write a restart file too
+    call yelmo_restart_write(yelmo1,ctl%file_restart,time=time)
+
+    ! Finalize program
+    call yelmo_end(yelmo1,time=time)
+
+    ! Stop timing 
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+    
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    
 contains
 
 

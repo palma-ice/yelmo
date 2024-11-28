@@ -16,7 +16,6 @@ module yelmo_io
     private 
     public :: yelmo_write_init
     public :: yelmo_write_init_cropped
-    public :: yelmo_write_init_3D
     public :: yelmo_write_step
     public :: yelmo_write_var
     public :: yelmo_write_step_model_metrics
@@ -61,52 +60,41 @@ contains
 
     end subroutine yelmo_write_init
 
-    subroutine yelmo_write_init_cropped(ylmo, filename, time_init, units, &
-        i1, i2, j1, j2)
-
-        implicit none
-
-        type(yelmo_class), intent(IN) :: ylmo 
-        character(len=*),  intent(IN) :: filename, units 
-        real(wp),          intent(IN) :: time_init
-        integer, intent(IN) :: i1, i2, j1, j2
-
-        call yelmo_grid_write_cropped(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, .TRUE., &
-            i1, i2, j1, j2)
-        call nc_write_dim(filename,"time", x=time_init, dx=1.0_prec, nx=1, units=trim(units), &
-            unlimited=.TRUE.)
-
-    end subroutine yelmo_write_init_cropped
-
-    subroutine yelmo_write_init_3D(ylmo, filename, time_init, units)
+    subroutine yelmo_write_init_cropped(ylmo,filename,time_init,units,i1,i2,j1,j2)
 
         implicit none 
 
         type(yelmo_class), intent(IN) :: ylmo 
-        character(len=*),  intent(IN) :: filename, units 
+        character(len=*),  intent(IN) :: filename
+        character(len=*),  intent(IN) :: units 
         real(wp),          intent(IN) :: time_init
+        integer,           intent(IN) :: i1, i2, j1, j2 
 
-        ! Local variables 
-        character(len=16)   :: xnm
-        character(len=16)   :: ynm
-        character(len=16)   :: znm
+        ! Initialize file by writing grid info
+        call yelmo_grid_write_cropped(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, create=.TRUE., &
+                                                                    i1=i1, i2=i2, j1=j1, j2=j2)
 
-        xnm = "xc"
-        ynm = "yc"
-        znm = "zc"
+        ! Initialize netcdf file and dimensions
+        call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
+        call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
+        call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
+        call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
+        call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
+        call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
+        call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
+        
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
 
-        ! Create the empty netcdf file
-        call nc_create(filename)
-
-        ! Add grid axis variables to netcdf file
-        call nc_write_dim(filename,xnm,x=ylmo%grd%xc*1e-3,units="km")
-        call nc_write_dim(filename,ynm,x=ylmo%grd%yc*1e-3,units="km")
-        call nc_write_dim(filename,znm,x=ylmo%par%zeta_ac,units="1")
-        call nc_write_dim(filename, "time", x=time_init, dx=1.0_prec, nx=1, &
-            units=trim(units), unlimited=.TRUE.)
+        ! Static information
+        call nc_write(filename,"basins",  ylmo%bnd%basins(i1:i2,j1:j2), dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
+        call nc_write(filename,"regions", ylmo%bnd%regions(i1:i2,j1:j2),dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions")
+        
+        ! Additional optional static information 
+        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd(i1:i2,j1:j2),dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
+        
         return
 
-    end subroutine yelmo_write_init_3D
+    end subroutine yelmo_write_init_cropped
 
     subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd)
 

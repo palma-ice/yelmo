@@ -14,4 +14,7 @@ module yelmo
     
     use basal_dragging, only : calc_cb_ref 
     
+    use topography, only : mask_bed_ocean, mask_bed_land, mask_bed_frozen, &
+                    mask_bed_stream, mask_bed_grline, mask_bed_float , mask_bed_island
+    
 end module yelmo

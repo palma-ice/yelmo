@@ -15,7 +15,9 @@ module yelmo_io
 
     private 
     public :: yelmo_write_init
+    public :: yelmo_write_init_cropped
     public :: yelmo_write_step
+    public :: yelmo_write_var
     public :: yelmo_write_step_model_metrics
     public :: yelmo_write_step_pd_metrics
     public :: yelmo_restart_write
@@ -58,6 +60,42 @@ contains
 
     end subroutine yelmo_write_init
 
+    subroutine yelmo_write_init_cropped(ylmo,filename,time_init,units,i1,i2,j1,j2)
+
+        implicit none 
+
+        type(yelmo_class), intent(IN) :: ylmo 
+        character(len=*),  intent(IN) :: filename
+        character(len=*),  intent(IN) :: units 
+        real(wp),          intent(IN) :: time_init
+        integer,           intent(IN) :: i1, i2, j1, j2 
+
+        ! Initialize file by writing grid info
+        call yelmo_grid_write_cropped(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, create=.TRUE., &
+                                                                    i1=i1, i2=i2, j1=j1, j2=j2)
+
+        ! Initialize netcdf file and dimensions
+        call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
+        call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
+        call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
+        call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
+        call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
+        call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
+        call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
+        
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+
+        ! Static information
+        call nc_write(filename,"basins",  ylmo%bnd%basins(i1:i2,j1:j2), dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
+        call nc_write(filename,"regions", ylmo%bnd%regions(i1:i2,j1:j2),dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions")
+        
+        ! Additional optional static information 
+        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd(i1:i2,j1:j2),dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
+        
+        return
+
+    end subroutine yelmo_write_init_cropped
+
     subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd)
 
         implicit none 
@@ -81,7 +119,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 13 
+            qtot = 15 
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -93,9 +131,11 @@ contains
             names(8)  = "visc_bar"
             names(9)  = "T_prime_b"
             names(10) = "H_w"
-            names(11) = "smb"
-            names(12) = "bmb"
-            names(13) = "z_sl"
+            names(11) = "mb_net"
+            names(12) = "smb"
+            names(13) = "bmb"
+            names(14) = "cmb"
+            names(15) = "z_sl"
 
         end if 
 
@@ -124,90 +164,89 @@ contains
         ! Determine number of variables to write 
         qtot = size(names) 
 
-        ! Loop over variables and apply the appropriate write statement
+        ! Loop over variables and write each variable
         do q = 1, qtot 
-
-            select case(trim(names(q)))
-
-                case("H_ice")
-                    call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("z_srf")
-                    call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("z_bed")
-                    call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
-                case("mask_bed")
-                    call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("uxy_b")
-                    call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/yr",long_name="Basal sliding velocity magnitude", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("uxy_s")
-                    call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/yr",long_name="Surface velocity magnitude", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("beta")
-                    call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa yr m-1",long_name="Basal friction coefficient", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("visc_bar")
-                    call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa yr",long_name="Vertically averaged viscosity", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("T_prime_b")
-                    call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("H_w")
-                    call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m water equiv.",long_name="Basal water layer thickness", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("smb")
-                    call nc_write(filename,"smb",ylmo%bnd%smb,units="m/yr ice equiv.",long_name="Surface mass balance", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("bmb")
-                    call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/yr ice equiv.",long_name="Basal mass balance", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                case("z_sl")
-                    call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                
-                case DEFAULT 
-
-                    write(io_unit_err,*) 
-                    write(io_unit_err,*) "yelmo_write_step:: Error: variable not yet supported."
-                    write(io_unit_err,*) "variable = ", trim(names(q))
-                    write(io_unit_err,*) "filename = ", trim(filename)
-                    stop 
-                    
-            end select
-
-
+            call yelmo_write_var(filename,names(q),ylmo,n,ncid)
         end do 
-            
-        ! External data
-        ! call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        ! call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
-        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
         ! Close the netcdf file
         call nc_close(ncid)
 
         return 
 
     end subroutine yelmo_write_step
+
+    subroutine yelmo_write_var(filename,varname,ylmo,n,ncid)
+
+        implicit none
+
+        character(len=*),  intent(IN) :: filename 
+        character(len=*),  intent(IN) :: varname
+        type(yelmo_class), intent(IN) :: ylmo 
+        integer                       :: n 
+        integer, optional             :: ncid 
+        
+        select case(trim(varname))
+
+            case("H_ice")
+                call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("z_srf")
+                call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("z_bed")
+                call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
+            case("mask_bed")
+                call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("uxy_b")
+                call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/yr",long_name="Basal sliding velocity magnitude", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("uxy_s")
+                call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/yr",long_name="Surface velocity magnitude", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("beta")
+                call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa yr m-1",long_name="Basal friction coefficient", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("visc_bar")
+                call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa yr",long_name="Vertically averaged viscosity", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("T_prime_b")
+                call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("H_w")
+                call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m water equiv.",long_name="Basal water layer thickness", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("mb_net")
+                call nc_write(filename,"mb_net",ylmo%tpo%now%mb_net,units="m/yr ice equiv.",long_name="Net applied mass balance", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("smb")
+                call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/yr ice equiv.",long_name="Net surface mass balance", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("bmb")
+                call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/yr ice equiv.",long_name="Basal mass balance", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("cmb")
+                call nc_write(filename,"cmb",ylmo%tpo%now%bmb,units="m/yr ice equiv.",long_name="Calving mass balance", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("z_sl")
+                call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            
+            case DEFAULT 
+
+                write(io_unit_err,*) 
+                write(io_unit_err,*) "yelmo_write_var:: Error: variable not yet supported."
+                write(io_unit_err,*) "variable = ", trim(varname)
+                write(io_unit_err,*) "filename = ", trim(filename)
+                stop 
+                
+        end select
+
+        return
+
+    end subroutine yelmo_write_var
 
     subroutine yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
         ! Write model performance metrics (speed, dt, eta) 
@@ -353,21 +392,24 @@ contains
         ! to have these variables in the restart file, and potentially 
         ! others that do not depend on the grid.
         
-        ! call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
-        ! call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
+        ! ajr: writing these values is reactivated to see if it improves restart file performance
+
+        call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
+        call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
         
         ! == ytopo variables ===
-        call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,       units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_write(filename,"z_base",      dom%tpo%now%z_base,      units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"z_base",      dom%tpo%now%z_base,      units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
         call nc_write(filename,"dzsdt",       dom%tpo%now%dzsdt,       units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dHidt",       dom%tpo%now%dHidt,       units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dHidt_dyn",   dom%tpo%now%dHidt_dyn,   units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_write(filename,"mb_applied",  dom%tpo%now%mb_applied,  units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"mb_net",      dom%tpo%now%mb_net,      units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"mb_relax",    dom%tpo%now%mb_relax,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"mb_resid",    dom%tpo%now%mb_resid,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"mb_err",      dom%tpo%now%mb_err,      units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"smb",         dom%tpo%now%smb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"bmb",         dom%tpo%now%bmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"fmb",         dom%tpo%now%fmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dmb",         dom%tpo%now%dmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -398,17 +440,33 @@ contains
         call nc_write(filename,"H_ice_n",     dom%tpo%now%H_ice_n,     units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_srf_n",     dom%tpo%now%z_srf_n,     units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
+        call nc_write(filename,"H_ice_dyn",   dom%tpo%now%H_ice_dyn,   units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"f_ice_dyn",   dom%tpo%now%f_ice_dyn,   units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        
         ! = ytopo_pc variables (just for diagnostic output) ===
         
         call nc_write(filename,"pc_pred_H_ice",     dom%tpo%now%pred%H_ice,     units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_pred_dHidt_dyn", dom%tpo%now%pred%dHidt_dyn, units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_write(filename,"pc_pred_mb_applied",dom%tpo%now%pred%mb_applied,units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_mb_net",    dom%tpo%now%pred%mb_net,    units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_smb",       dom%tpo%now%pred%smb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_bmb",       dom%tpo%now%pred%bmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_fmb",       dom%tpo%now%pred%fmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_pred_dmb",       dom%tpo%now%pred%dmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_pred_cmb",       dom%tpo%now%pred%cmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_H_ice",     dom%tpo%now%corr%H_ice,     units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_dHidt_dyn", dom%tpo%now%corr%dHidt_dyn, units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+<<<<<<< HEAD
         call nc_write(filename,"pc_corr_mb_applied",dom%tpo%now%corr%mb_applied,units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_corr_cmb",       dom%tpo%now%corr%cmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_pred_lsf",       dom%tpo%now%pred%lsf,       units="1", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+=======
+        call nc_write(filename,"pc_corr_mb_net",    dom%tpo%now%corr%mb_net,    units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_smb",       dom%tpo%now%corr%smb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_bmb",       dom%tpo%now%corr%bmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_fmb",       dom%tpo%now%corr%fmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_dmb",       dom%tpo%now%corr%dmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_corr_cmb",       dom%tpo%now%corr%cmb,       units="m/yr", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+>>>>>>> main
 
         ! == ydyn variables ===
 
@@ -454,6 +512,9 @@ contains
         call nc_write(filename,"taub_acy",      dom%dyn%now%taub_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"taub",          dom%dyn%now%taub,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
+        call nc_write(filename,"taul_int_acx",  dom%dyn%now%taul_int_acx,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"taul_int_acy",  dom%dyn%now%taul_int_acy,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        
         call nc_write(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
@@ -461,6 +522,7 @@ contains
         call nc_write(filename,"qq_acy",        dom%dyn%now%qq_acy,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"qq",            dom%dyn%now%qq,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
+        call nc_write(filename,"de_eff",        dom%dyn%now%de_eff,      units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
         call nc_write(filename,"visc_eff",      dom%dyn%now%visc_eff,    units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
         call nc_write(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
@@ -471,7 +533,6 @@ contains
         call nc_write(filename,"beta_acx",      dom%dyn%now%beta_acx, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"beta",          dom%dyn%now%beta,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-
         call nc_write(filename,"beta_eff",      dom%dyn%now%beta_eff, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
         call nc_write(filename,"f_vbvs",        dom%dyn%now%f_vbvs,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
@@ -480,6 +541,16 @@ contains
         call nc_write(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+
+        call nc_write(filename,"jvel_dxx",     dom%dyn%now%jvel%dxx,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"jvel_dxy",     dom%dyn%now%jvel%dxy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"jvel_dxz",     dom%dyn%now%jvel%dxz,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"jvel_dyx",     dom%dyn%now%jvel%dyx,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"jvel_dyy",     dom%dyn%now%jvel%dyy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"jvel_dyz",     dom%dyn%now%jvel%dyz,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"jvel_dzx",     dom%dyn%now%jvel%dzx,        units="",dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1]) 
+        call nc_write(filename,"jvel_dzy",     dom%dyn%now%jvel%dzy,        units="",dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1])
+        call nc_write(filename,"jvel_dzz",     dom%dyn%now%jvel%dzz,        units="",dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1]) 
 
         ! == ymat variables === 
 
@@ -558,17 +629,17 @@ contains
         call nc_write(filename,"T_rock",      dom%thrm%now%T_rock,     units="K",     dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
 
         ! == ybound variables ===
-
+        
         call nc_write(filename,"z_bed",       dom%bnd%z_bed,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_bed_sd",    dom%bnd%z_bed_sd,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_sl",        dom%bnd%z_sl,        units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"H_sed",       dom%bnd%H_sed,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_write(filename,"smb",         dom%bnd%smb,         units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"smb_ref",     dom%bnd%smb,         units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"T_srf",       dom%bnd%T_srf,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"bmb_shlf",    dom%bnd%bmb_shlf,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"fmb_shlf",    dom%bnd%fmb_shlf,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"T_shlf",      dom%bnd%T_shlf,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"Q_geo",       dom%bnd%Q_geo,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-
         call nc_write(filename,"enh_srf",     dom%bnd%enh_srf,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
         call nc_write(filename,"basins",      dom%bnd%basins,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -578,6 +649,7 @@ contains
 
         call nc_write(filename,"ice_allowed", dom%bnd%ice_allowed, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"calv_mask",   dom%bnd%calv_mask,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        
         call nc_write(filename,"H_ice_ref",   dom%bnd%H_ice_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_bed_ref",   dom%bnd%z_bed_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
@@ -655,7 +727,7 @@ contains
 
     end subroutine yelmo_read_interp_2D
 
-    subroutine yelmo_restart_read_topo_bnd(tpo,bnd,restart_interpolated,grd,domain,grid_name,filename,time)  
+    subroutine yelmo_restart_read_topo_bnd(tpo,bnd,tme,restart_interpolated,grd,domain,grid_name,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -663,6 +735,7 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo 
         type(ybound_class), intent(INOUT) :: bnd 
+        type(ytime_class),  intent(INOUT) :: tme
         integer,            intent(OUT)   :: restart_interpolated
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain
@@ -696,7 +769,7 @@ contains
             ! Restart file grid and yelmo grid are the same
 
             ! Load the data without interpolation (by not specifying mps argument)
-            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time)
+            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,tme,filename,time)
 
             ! Set yelmo flag too
             restart_interpolated = 0
@@ -708,7 +781,7 @@ contains
             call map_scrip_init(mps,restart_grid_name,grid_name,method="con",fldr="maps",load=.TRUE.)
 
             ! Load the data with interpolation
-            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time,mps) 
+            call yelmo_restart_read_topo_bnd_internal(tpo,bnd,tme,filename,time,mps) 
 
             ! Determine whether interpolation is from low to high resolution (1)
             ! or from high to low resolution (-1)
@@ -787,7 +860,7 @@ contains
 
     end subroutine yelmo_restart_read
     
-    subroutine yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time,mps)  
+    subroutine yelmo_restart_read_topo_bnd_internal(tpo,bnd,tme,filename,time,mps)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -795,6 +868,7 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo 
         type(ybound_class), intent(INOUT) :: bnd 
+        type(ytime_class),  intent(INOUT) :: tme
         character(len=*),  intent(IN)    :: filename 
         real(wp),          intent(IN)    :: time 
         type(map_scrip_class), optional, intent(IN) :: mps 
@@ -822,8 +896,9 @@ contains
 
         ! == time variables ===
 
-        ! call nc_read(filename,"pc_dt",       dom%time%pc_dt, ncid=ncid)
-        ! call nc_read(filename,"pc_eta",      dom%time%pc_eta,ncid=ncid)
+        ! ajr: testing reading these variables too to improve restart file performance
+        call nc_read(filename,"pc_dt",       tme%pc_dt, start=[1,n],count=[3,1],ncid=ncid)
+        call nc_read(filename,"pc_eta",      tme%pc_eta,start=[1,n],count=[3,1],ncid=ncid)
         
         ! == ytopo variables ===
 
@@ -833,10 +908,11 @@ contains
         call nc_read_interp(filename,"dzsdt",       tpo%now%dzsdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dHidt",       tpo%now%dHidt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dHidt_dyn",   tpo%now%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mb_applied",  tpo%now%mb_applied,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mb_net",      tpo%now%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"mb_relax",    tpo%now%mb_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"mb_resid",    tpo%now%mb_resid,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"mb_err",      tpo%now%mb_err,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"smb",         tpo%now%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"bmb",         tpo%now%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"fmb",         tpo%now%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dmb",         tpo%now%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -867,23 +943,40 @@ contains
         call nc_read_interp(filename,"H_ice_n",     tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_srf_n",     tpo%now%z_srf_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
+        call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        
+        ! = ytopo_pc variables ===
+        
+        call nc_read_interp(filename,"pc_pred_H_ice",    tpo%now%pred%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_dHidt_dyn",tpo%now%pred%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_mb_net",   tpo%now%pred%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_smb",      tpo%now%pred%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_bmb",      tpo%now%pred%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_fmb",      tpo%now%pred%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_dmb",      tpo%now%pred%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_pred_cmb",      tpo%now%pred%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_H_ice",    tpo%now%corr%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_dHidt_dyn",tpo%now%corr%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_mb_net",   tpo%now%corr%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_smb",      tpo%now%corr%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_bmb",      tpo%now%corr%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_fmb",      tpo%now%corr%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_dmb",      tpo%now%corr%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_corr_cmb",      tpo%now%corr%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+
         ! == ybound variables ===
 
         call nc_read_interp(filename,"z_bed",       bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_bed_sd",    bnd%z_bed_sd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_sl",        bnd%z_sl,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"H_sed",       bnd%H_sed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"ice_allowed", bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"calv_mask",   bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"H_ice_ref",   bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"z_bed_ref",   bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"smb",         bnd%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"smb_ref",     bnd%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"T_srf",       bnd%T_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"bmb_shlf",    bnd%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"fmb_shlf",    bnd%fmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"T_shlf",      bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"Q_geo",       bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
         call nc_read_interp(filename,"enh_srf",     bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
 
         call nc_read_interp(filename,"basins",      bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
@@ -891,6 +984,12 @@ contains
         call nc_read_interp(filename,"regions",     bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"region_mask", bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         
+        call nc_read_interp(filename,"ice_allowed", bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"calv_mask",   bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        
+        call nc_read_interp(filename,"H_ice_ref",   bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"z_bed_ref",   bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
         ! Close the netcdf file
         call nc_close(ncid)
         
@@ -982,6 +1081,9 @@ contains
         call nc_read_interp(filename,"taub_acy",      dom%dyn%now%taub_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"taub",          dom%dyn%now%taub,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
 
+        call nc_read_interp(filename,"taul_int_acx",  dom%dyn%now%taul_int_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"taul_int_acy",  dom%dyn%now%taul_int_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
         call nc_read_interp(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         
@@ -989,6 +1091,7 @@ contains
         call nc_read_interp(filename,"qq_acy",        dom%dyn%now%qq_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"qq",            dom%dyn%now%qq,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
 
+        call nc_read_interp(filename,"de_eff",        dom%dyn%now%de_eff,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
         call nc_read_interp(filename,"visc_eff",      dom%dyn%now%visc_eff,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
         call nc_read_interp(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
 
@@ -999,7 +1102,6 @@ contains
         call nc_read_interp(filename,"beta_acx",      dom%dyn%now%beta_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"beta_acy",      dom%dyn%now%beta_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"beta",          dom%dyn%now%beta,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
         call nc_read_interp(filename,"beta_eff",      dom%dyn%now%beta_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
 
         call nc_read_interp(filename,"f_vbvs",        dom%dyn%now%f_vbvs,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
@@ -1008,6 +1110,16 @@ contains
         call nc_read_interp(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        
+        call nc_read_interp(filename,"jvel_dxx",      dom%dyn%now%jvel%dxx, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dxy",      dom%dyn%now%jvel%dxy, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dxz",      dom%dyn%now%jvel%dxz, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dyx",      dom%dyn%now%jvel%dyx, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dyy",      dom%dyn%now%jvel%dyy, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dyz",      dom%dyn%now%jvel%dyz, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dzx",      dom%dyn%now%jvel%dzx, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1],mps=mps) 
+        call nc_read_interp(filename,"jvel_dzy",      dom%dyn%now%jvel%dzy, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1],mps=mps)
+        call nc_read_interp(filename,"jvel_dzz",      dom%dyn%now%jvel%dzz, ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1],mps=mps) 
 
         ! == ymat variables ===
 

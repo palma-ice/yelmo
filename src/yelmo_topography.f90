@@ -19,16 +19,6 @@ module yelmo_topography
 
     implicit none
     
-    ! Key for matching bed types given by mask_bed 
-    integer, parameter :: mask_bed_ocean   = 0 
-    integer, parameter :: mask_bed_land    = 1
-    integer, parameter :: mask_bed_frozen  = 2
-    integer, parameter :: mask_bed_stream  = 3
-    integer, parameter :: mask_bed_grline  = 4
-    integer, parameter :: mask_bed_float   = 5
-    integer, parameter :: mask_bed_island  = 6
-    integer, parameter :: mask_bed_partial = 7
-
     private
     public :: calc_ytopo_pc 
     public :: calc_ytopo_diagnostic 
@@ -36,7 +26,6 @@ module yelmo_topography
     public :: ytopo_par_load
     public :: ytopo_alloc
     public :: ytopo_dealloc
-    
     
     ! Integers
     public :: mask_bed_ocean  
@@ -67,7 +56,6 @@ contains
         ! Local variables 
         integer  :: i, j, nx, ny
         real(wp) :: dt  
-        real(wp), allocatable :: mbal(:,:) 
         real(wp), allocatable :: dHidt_now(:,:) 
         real(wp), allocatable :: H_prev(:,:)
 
@@ -76,7 +64,6 @@ contains
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
-        allocate(mbal(nx,ny))
         allocate(dHidt_now(nx,ny))
         allocate(H_prev(nx,ny))
 
@@ -98,6 +85,7 @@ contains
         ! Get ice thickness entering routine
         H_prev = tpo%now%H_ice 
 
+<<<<<<< HEAD
         ! Calculate grounded fraction on aa-nodes
         ! (only to be used with basal mass balance, later all
         !  f_grnd arrays will be calculated according to use choices)
@@ -134,6 +122,8 @@ contains
         end if
 
 
+=======
+>>>>>>> main
         ! Step 1: Go through predictor-corrector-advance steps
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
@@ -227,14 +217,68 @@ end if
                 case("predictor","corrector")
                     ! For either predictor or corrector step, also calculate all mass balance changes
 
-                    !! Diagnose mass balance (forcing) tendency on ice thickness from previous iteration
-                    !call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice_n,tpo%now%f_grnd,mbal,dt)
-                    ! Diagnose mass balance (forcing) tendency on current ice thickness
-                    call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice,tpo%now%f_grnd,mbal,dt)
+                    ! === smb =====
+
+                    call calc_G_mbal(tpo%now%smb,tpo%now%H_ice,tpo%now%f_grnd,bnd%smb,dt)
 
                     ! Apply rate and update ice thickness
-                    call apply_tendency(tpo%now%H_ice,tpo%now%mb_applied,dt,"mbal",adjust_mb=.TRUE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%smb,dt,"smb",adjust_mb=.TRUE.)
                     
+                    ! === bmb =====
+
+                    ! Calculate grounded fraction on aa-nodes
+                    ! (only to be used with basal mass balance, later all
+                    !  f_grnd arrays will be calculated according to use choices)
+                    call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
+                    
+                    ! Combine basal mass balance into one field accounting for 
+                    ! grounded/floating fraction of grid cells 
+                    call calc_bmb_total(tpo%now%bmb_ref,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice, &
+                                        tpo%now%H_grnd,tpo%now%f_grnd_bmb,tpo%par%gz_Hg0,tpo%par%gz_Hg1, &
+                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%boundaries)
+
+                    if (tpo%par%use_bmb) then
+                        call calc_G_mbal(tpo%now%bmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%bmb_ref,dt)
+                    else
+                        ! Mainly for when running EISMINT1
+                        tpo%now%bmb = 0.0
+                    end if
+
+                    ! Apply rate and update ice thickness
+                    call apply_tendency(tpo%now%H_ice,tpo%now%bmb,dt,"bmb",adjust_mb=.TRUE.)
+
+                    ! === fmb =====
+
+                    ! Calculate frontal mass balance
+                    call calc_fmb_total(tpo%now%fmb_ref,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
+                                    tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale, &
+                                    bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%dx)
+
+                    if (tpo%par%use_bmb) then
+                        call calc_G_mbal(tpo%now%fmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%fmb_ref,dt)
+                    else
+                        ! Mainly for when running EISMINT1
+                        tpo%now%fmb = 0.0
+                    end if
+
+                    ! Apply rate and update ice thickness
+                    call apply_tendency(tpo%now%H_ice,tpo%now%fmb,dt,"fmb",adjust_mb=.TRUE.)
+                    
+                    ! === dmb =====
+
+                    call calc_mb_discharge(tpo%now%dmb_ref,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed_sd,tpo%now%dist_grline, &
+                                tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dmb_method,tpo%par%dx,tpo%par%dmb_alpha_max, &
+                                tpo%par%dmb_tau,tpo%par%dmb_sigma_ref,tpo%par%dmb_m_d,tpo%par%dmb_m_r)
+                    
+                    call calc_G_mbal(tpo%now%dmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%dmb_ref,dt)
+
+                    ! Apply rate and update ice thickness
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dmb,dt,"dmb",adjust_mb=.TRUE.)
+                    
+                    ! === mb_net =====
+
+                    tpo%now%mb_net = tpo%now%smb + tpo%now%bmb + tpo%now%fmb + tpo%now%dmb 
+
                     ! Calculate and apply calving
                     ! jablasco: Avoid calving
                     !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
@@ -282,8 +326,8 @@ end if
                         ! Apply rate and update ice thickness
                         call apply_tendency(tpo%now%H_ice,tpo%now%mb_relax,dt,"relax",adjust_mb=.TRUE.)
 
-                        ! Add relaxation tendency to mb_applied for proper accounting of mass change
-                        tpo%now%mb_applied = tpo%now%mb_applied + tpo%now%mb_relax
+                        ! Add relaxation tendency to mb_net for proper accounting of mass change
+                        tpo%now%mb_net = tpo%now%mb_net + tpo%now%mb_relax
 
                         ! Get ice-fraction mask for ice thickness  
                         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -300,8 +344,8 @@ end if
                     ! Apply rate and update ice thickness
                     call apply_tendency(tpo%now%H_ice,tpo%now%mb_resid,dt,"resid",adjust_mb=.TRUE.)
 
-                    ! Add residual tendency to mb_applied for proper accounting of mass change
-                    tpo%now%mb_applied = tpo%now%mb_applied + tpo%now%mb_resid
+                    ! Add residual tendency to mb_net for proper accounting of mass change
+                    tpo%now%mb_net = tpo%now%mb_net + tpo%now%mb_resid
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -315,6 +359,7 @@ end if
 
                     ! Save current predictor fields, 
                     ! proceed with predictor fields for calculating dynamics.
+<<<<<<< HEAD
                     tpo%now%pred%H_ice          = tpo%now%H_ice 
                     tpo%now%pred%dHidt_dyn      = tpo%now%dHidt_dyn
                     tpo%now%pred%mb_applied     = tpo%now%mb_applied 
@@ -326,10 +371,26 @@ end if
                     tpo%now%pred%cmb_grnd       = tpo%now%cmb_grnd 
                     tpo%now%pred%lsf            = tpo%now%lsf
 
+=======
+                    tpo%now%pred%H_ice      = tpo%now%H_ice 
+                    tpo%now%pred%dHidt_dyn  = tpo%now%dHidt_dyn
+                    tpo%now%pred%mb_net     = tpo%now%mb_net 
+                    tpo%now%pred%mb_relax   = tpo%now%mb_relax 
+                    tpo%now%pred%mb_resid   = tpo%now%mb_resid 
+                    tpo%now%pred%smb        = tpo%now%smb
+                    tpo%now%pred%bmb        = tpo%now%bmb
+                    tpo%now%pred%fmb        = tpo%now%fmb
+                    tpo%now%pred%dmb        = tpo%now%dmb
+                    tpo%now%pred%cmb        = tpo%now%cmb 
+                    tpo%now%pred%cmb_flt    = tpo%now%cmb_flt 
+                    tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd 
+                    
+>>>>>>> main
                 case("corrector")
                     ! Determine corrected ice thickness 
 
                     ! Save current corrector fields
+<<<<<<< HEAD
                     tpo%now%corr%H_ice          = tpo%now%H_ice 
                     tpo%now%corr%dHidt_dyn      = tpo%now%dHidt_dyn
                     tpo%now%corr%mb_applied     = tpo%now%mb_applied 
@@ -341,6 +402,21 @@ end if
                     tpo%now%corr%cmb_grnd       = tpo%now%cmb_grnd 
                     tpo%now%corr%lsf            = tpo%now%lsf
 
+=======
+                    tpo%now%corr%H_ice      = tpo%now%H_ice 
+                    tpo%now%corr%dHidt_dyn  = tpo%now%dHidt_dyn
+                    tpo%now%corr%mb_net     = tpo%now%mb_net 
+                    tpo%now%corr%mb_relax   = tpo%now%mb_relax 
+                    tpo%now%corr%mb_resid   = tpo%now%mb_resid 
+                    tpo%now%corr%smb        = tpo%now%smb
+                    tpo%now%corr%bmb        = tpo%now%bmb
+                    tpo%now%corr%fmb        = tpo%now%fmb
+                    tpo%now%corr%dmb        = tpo%now%dmb
+                    tpo%now%corr%cmb        = tpo%now%cmb 
+                    tpo%now%corr%cmb_flt    = tpo%now%cmb_flt 
+                    tpo%now%corr%cmb_grnd   = tpo%now%cmb_grnd
+                    
+>>>>>>> main
                     ! Restore main ice thickness field to original 
                     ! value at the beginning of the timestep for 
                     ! calculation of remaining quantities (thermo, material)
@@ -362,10 +438,13 @@ end if
                         ! Load predictor fields in current state variables
                         tpo%now%H_ice       = tpo%now%pred%H_ice 
                         tpo%now%dHidt_dyn   = tpo%now%pred%dHidt_dyn
-                        tpo%now%mb_applied  = tpo%now%pred%mb_applied 
-                        tpo%now%bmb_applied = tpo%now%pred%bmb_applied 
+                        tpo%now%mb_net      = tpo%now%pred%mb_net 
                         tpo%now%mb_relax    = tpo%now%pred%mb_relax 
                         tpo%now%mb_resid    = tpo%now%pred%mb_resid 
+                        tpo%now%smb         = tpo%now%pred%smb 
+                        tpo%now%bmb         = tpo%now%pred%bmb 
+                        tpo%now%fmb         = tpo%now%pred%fmb 
+                        tpo%now%dmb         = tpo%now%pred%dmb 
                         tpo%now%cmb         = tpo%now%pred%cmb 
                         tpo%now%cmb_flt     = tpo%now%pred%cmb_flt 
                         tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd 
@@ -375,10 +454,13 @@ end if
                         ! Load corrector fields in current state variables
                         tpo%now%H_ice       = tpo%now%corr%H_ice 
                         tpo%now%dHidt_dyn   = tpo%now%corr%dHidt_dyn
-                        tpo%now%mb_applied  = tpo%now%corr%mb_applied 
-                        tpo%now%bmb_applied = tpo%now%corr%bmb_applied 
+                        tpo%now%mb_net      = tpo%now%corr%mb_net 
                         tpo%now%mb_relax    = tpo%now%corr%mb_relax 
                         tpo%now%mb_resid    = tpo%now%corr%mb_resid 
+                        tpo%now%smb         = tpo%now%corr%smb 
+                        tpo%now%bmb         = tpo%now%corr%bmb 
+                        tpo%now%fmb         = tpo%now%corr%fmb 
+                        tpo%now%dmb         = tpo%now%corr%dmb 
                         tpo%now%cmb         = tpo%now%corr%cmb 
                         tpo%now%cmb_flt     = tpo%now%corr%cmb_flt 
                         tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd 
@@ -393,7 +475,7 @@ end if
             tpo%now%dzsdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
 
             ! Determine mass balance error by comparing mass_in - mass_out to dHidt
-            tpo%now%mb_err = tpo%now%dHidt - (tpo%now%mb_applied + tpo%now%cmb)
+            tpo%now%mb_err = tpo%now%dHidt - (tpo%now%mb_net + tpo%now%cmb)
 
         end if 
 
@@ -827,11 +909,11 @@ end if
                 tpo%now%rates%dzsdt         = 0.0
                 tpo%now%rates%dHidt         = 0.0
                 tpo%now%rates%dHidt_dyn     = 0.0
-                tpo%now%rates%mb_applied    = 0.0
-                tpo%now%rates%bmb_applied   = 0.0
+                tpo%now%rates%mb_net        = 0.0
                 tpo%now%rates%mb_relax      = 0.0
                 tpo%now%rates%mb_resid      = 0.0
                 tpo%now%rates%mb_err        = 0.0
+                tpo%now%rates%smb           = 0.0
                 tpo%now%rates%bmb           = 0.0
                 tpo%now%rates%fmb           = 0.0
                 tpo%now%rates%dmb           = 0.0
@@ -847,11 +929,11 @@ end if
                 tpo%now%rates%dzsdt         = tpo%now%rates%dzsdt       + tpo%now%dzsdt*dt
                 tpo%now%rates%dHidt         = tpo%now%rates%dHidt       + tpo%now%dHidt*dt
                 tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn   + tpo%now%dHidt_dyn*dt
-                tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied  + tpo%now%mb_applied*dt
-                tpo%now%rates%bmb_applied   = tpo%now%rates%bmb_applied + tpo%now%bmb_applied*dt
+                tpo%now%rates%mb_net        = tpo%now%rates%mb_net      + tpo%now%mb_net*dt
                 tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax    + tpo%now%mb_relax*dt
                 tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid    + tpo%now%mb_resid*dt
                 tpo%now%rates%mb_err        = tpo%now%rates%mb_err      + tpo%now%mb_err*dt
+                tpo%now%rates%smb           = tpo%now%rates%smb         + tpo%now%smb*dt
                 tpo%now%rates%bmb           = tpo%now%rates%bmb         + tpo%now%bmb*dt
                 tpo%now%rates%fmb           = tpo%now%rates%fmb         + tpo%now%fmb*dt
                 tpo%now%rates%dmb           = tpo%now%rates%dmb         + tpo%now%dmb*dt
@@ -869,11 +951,11 @@ end if
                     tpo%now%rates%dzsdt         = tpo%now%rates%dzsdt / tpo%now%rates%dt_tot
                     tpo%now%rates%dHidt         = tpo%now%rates%dHidt / tpo%now%rates%dt_tot
                     tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn / tpo%now%rates%dt_tot
-                    tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied / tpo%now%rates%dt_tot
-                    tpo%now%rates%bmb_applied   = tpo%now%rates%bmb_applied / tpo%now%rates%dt_tot
+                    tpo%now%rates%mb_net        = tpo%now%rates%mb_net / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_err        = tpo%now%rates%mb_err / tpo%now%rates%dt_tot
+                    tpo%now%rates%smb           = tpo%now%rates%smb / tpo%now%rates%dt_tot
                     tpo%now%rates%bmb           = tpo%now%rates%bmb / tpo%now%rates%dt_tot
                     tpo%now%rates%fmb           = tpo%now%rates%fmb / tpo%now%rates%dt_tot
                     tpo%now%rates%dmb           = tpo%now%rates%dmb / tpo%now%rates%dt_tot
@@ -895,11 +977,11 @@ end if
                         tpo%now%dzsdt       = tpo%now%rates%dzsdt
                         tpo%now%dHidt       = tpo%now%rates%dHidt
                         tpo%now%dHidt_dyn   = tpo%now%rates%dHidt_dyn
-                        tpo%now%mb_applied  = tpo%now%rates%mb_applied
-                        tpo%now%bmb_applied = tpo%now%rates%bmb_applied
+                        tpo%now%mb_net      = tpo%now%rates%mb_net
                         tpo%now%mb_relax    = tpo%now%rates%mb_relax
                         tpo%now%mb_resid    = tpo%now%rates%mb_resid
                         tpo%now%mb_err      = tpo%now%rates%mb_err
+                        tpo%now%smb         = tpo%now%rates%smb
                         tpo%now%bmb         = tpo%now%rates%bmb
                         tpo%now%fmb         = tpo%now%rates%fmb
                         tpo%now%dmb         = tpo%now%rates%dmb
@@ -922,7 +1004,7 @@ end if
             ! Perform mass balance check to make sure that mass is conserved
 
             call check_mass_conservation(tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%dHidt, &
-                        tpo%now%mb_applied,tpo%now%cmb,tpo%now%dHidt_dyn,bnd%smb,tpo%now%bmb, &
+                        tpo%now%mb_net,tpo%now%cmb,tpo%now%dHidt_dyn,tpo%now%smb,tpo%now%bmb, &
                         tpo%now%fmb,tpo%now%dmb,tpo%now%mb_resid,tpo%par%dx,bnd%c%sec_year,time,dt, &
                         units="km^3/yr",label=step)
                         
@@ -932,74 +1014,6 @@ end if
 
     end subroutine calc_ytopo_rates
     
-    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
-        ! Generate an output mask for model conditions at bed
-        ! based on input masks 
-        ! 0: ocean, 1: land, 2: sia, 3: streams, grline: 4, floating: 5, islands: 6
-        ! 7: partially-covered ice cell.
-
-        implicit none 
-
-        integer,    intent(OUT) :: mask 
-        real(wp), intent(IN)  :: f_ice, f_pmp, f_grnd
-        integer,    intent(IN)  :: mask_grz
-
-        if (mask_grz .eq. 0) then
-            ! Grounding line
-
-            mask = mask_bed_grline
-
-        else if (f_ice .eq. 0.0) then 
-            ! Ice-free points 
-
-            if (f_grnd .gt. 0.0) then
-                ! Ice-free land
-
-                mask = mask_bed_land
-
-            else
-                ! Ice-free ocean
-
-                mask = mask_bed_ocean
-
-            end if 
-
-        else if (f_ice .gt. 0.0 .and. f_ice .lt. 1.0) then 
-            ! Partially ice-covered points 
-
-            mask = mask_bed_partial
-
-        else
-            ! Fully ice-covered points 
-
-            if (f_grnd .gt. 0.0) then
-                ! Grounded ice-covered points 
-
-                if (f_pmp .gt. 0.5) then 
-                    ! Temperate points
-
-                    mask = mask_bed_stream 
-
-                else
-                    ! Frozen points 
-
-                    mask = mask_bed_frozen 
-
-                end if 
-
-            else
-                ! Floating ice-covered points 
-
-                mask = mask_bed_float
-
-            end if 
-
-        end if 
-
-        return 
-
-    end subroutine gen_mask_bed
-
     subroutine ytopo_par_load(par,filename,nx,ny,dx,init)
 
         type(ytopo_param_class), intent(OUT) :: par
@@ -1109,11 +1123,11 @@ end if
         allocate(now%rates%dzsdt(nx,ny))
         allocate(now%rates%dHidt(nx,ny))
         allocate(now%rates%dHidt_dyn(nx,ny))
-        allocate(now%rates%mb_applied(nx,ny))
-        allocate(now%rates%bmb_applied(nx,ny))
+        allocate(now%rates%mb_net(nx,ny))
         allocate(now%rates%mb_relax(nx,ny))
         allocate(now%rates%mb_resid(nx,ny))
         allocate(now%rates%mb_err(nx,ny))
+        allocate(now%rates%smb(nx,ny))
         allocate(now%rates%bmb(nx,ny))
         allocate(now%rates%fmb(nx,ny))
         allocate(now%rates%dmb(nx,ny))
@@ -1130,11 +1144,11 @@ end if
         allocate(now%dzsdt(nx,ny))
         allocate(now%dHidt(nx,ny))
         allocate(now%dHidt_dyn(nx,ny))
-        allocate(now%mb_applied(nx,ny))
-        allocate(now%bmb_applied(nx,ny))
+        allocate(now%mb_net(nx,ny))
         allocate(now%mb_relax(nx,ny))
         allocate(now%mb_resid(nx,ny))
         allocate(now%mb_err(nx,ny))
+        allocate(now%smb(nx,ny))
         allocate(now%bmb(nx,ny))
         allocate(now%fmb(nx,ny))
         allocate(now%dmb(nx,ny))
@@ -1143,6 +1157,10 @@ end if
         allocate(now%cmb_grnd(nx,ny))
         allocate(now%lsf(nx,ny))
         
+        allocate(now%bmb_ref(nx,ny))
+        allocate(now%fmb_ref(nx,ny))
+        allocate(now%dmb_ref(nx,ny))
+
         allocate(now%mask_adv(nx,ny))
         
         allocate(now%eps_eff(nx,ny))
@@ -1188,11 +1206,11 @@ end if
         now%rates%dzsdt         = 0.0
         now%rates%dHidt         = 0.0
         now%rates%dHidt_dyn     = 0.0
-        now%rates%mb_applied    = 0.0
-        now%rates%bmb_applied   = 0.0
+        now%rates%mb_net        = 0.0
         now%rates%mb_relax      = 0.0
         now%rates%mb_resid      = 0.0
         now%rates%mb_err        = 0.0
+        now%rates%smb           = 0.0
         now%rates%bmb           = 0.0
         now%rates%fmb           = 0.0
         now%rates%dmb           = 0.0
@@ -1206,19 +1224,27 @@ end if
         now%dzsdt       = 0.0 
         now%dHidt       = 0.0
         now%dHidt_dyn   = 0.0
-        now%mb_applied  = 0.0 
-        now%bmb_applied = 0.0 
+        now%mb_net      = 0.0 
         now%mb_relax    = 0.0
         now%mb_resid    = 0.0
         now%mb_err      = 0.0
+        now%smb         = 0.0 
         now%bmb         = 0.0  
         now%fmb         = 0.0
         now%dmb         = 0.0
         now%cmb         = 0.0
         now%cmb_flt     = 0.0
         now%cmb_grnd    = 0.0
+<<<<<<< HEAD
        
         now%lsf         = 0 
+=======
+        
+        now%bmb_ref     = 0.0  
+        now%fmb_ref     = 0.0
+        now%dmb_ref     = 0.0
+        
+>>>>>>> main
         now%mask_adv    = 0
 
         now%eps_eff     = 0.0
@@ -1273,11 +1299,11 @@ end if
         if (allocated(now%rates%dzsdt))         deallocate(now%rates%dzsdt)
         if (allocated(now%rates%dHidt))         deallocate(now%rates%dHidt)
         if (allocated(now%rates%dHidt_dyn))     deallocate(now%rates%dHidt_dyn)
-        if (allocated(now%rates%mb_applied))    deallocate(now%rates%mb_applied)
-        if (allocated(now%rates%bmb_applied))   deallocate(now%rates%bmb_applied)
+        if (allocated(now%rates%mb_net))        deallocate(now%rates%mb_net)
         if (allocated(now%rates%mb_relax))      deallocate(now%rates%mb_relax)
         if (allocated(now%rates%mb_resid))      deallocate(now%rates%mb_resid)
         if (allocated(now%rates%mb_err))        deallocate(now%rates%mb_err)
+        if (allocated(now%rates%smb))           deallocate(now%rates%smb)
         if (allocated(now%rates%bmb))           deallocate(now%rates%bmb)
         if (allocated(now%rates%fmb))           deallocate(now%rates%fmb)
         if (allocated(now%rates%dmb))           deallocate(now%rates%dmb)
@@ -1292,19 +1318,27 @@ end if
         if (allocated(now%dzsdt))       deallocate(now%dzsdt)
         if (allocated(now%dHidt))       deallocate(now%dHidt)
         if (allocated(now%dHidt_dyn))   deallocate(now%dHidt_dyn)
-        if (allocated(now%mb_applied))  deallocate(now%mb_applied)
-        if (allocated(now%bmb_applied)) deallocate(now%bmb_applied)
+        if (allocated(now%mb_net))      deallocate(now%mb_net)
         if (allocated(now%mb_relax))    deallocate(now%mb_relax)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         if (allocated(now%mb_err))      deallocate(now%mb_err)
+        if (allocated(now%smb))         deallocate(now%smb)
         if (allocated(now%bmb))         deallocate(now%bmb)
         if (allocated(now%fmb))         deallocate(now%fmb)
         if (allocated(now%dmb))         deallocate(now%dmb)
         if (allocated(now%cmb))         deallocate(now%cmb)
         if (allocated(now%cmb_flt))     deallocate(now%cmb_flt)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
+<<<<<<< HEAD
            
         if (allocated(now%lsf))         deallocate(now%lsf) 
+=======
+        
+        if (allocated(now%bmb_ref))     deallocate(now%bmb_ref)
+        if (allocated(now%fmb_ref))     deallocate(now%fmb_ref)
+        if (allocated(now%dmb_ref))     deallocate(now%dmb_ref)
+        
+>>>>>>> main
         if (allocated(now%mask_adv))    deallocate(now%mask_adv)
         
         if (allocated(now%eps_eff))     deallocate(now%eps_eff)
@@ -1363,22 +1397,34 @@ end if
         ! Allocate fields 
         allocate(pc%H_ice(nx,ny))
         allocate(pc%dHidt_dyn(nx,ny))
-        allocate(pc%mb_applied(nx,ny))
-        allocate(pc%bmb_applied(nx,ny))
+        allocate(pc%mb_net(nx,ny))
+        allocate(pc%mb_relax(nx,ny))
+        allocate(pc%mb_resid(nx,ny))
+        allocate(pc%smb(nx,ny))
+        allocate(pc%bmb(nx,ny))
+        allocate(pc%fmb(nx,ny))
+        allocate(pc%dmb(nx,ny))
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
+<<<<<<< HEAD
         allocate(pc%mb_relax(nx,ny))
         allocate(pc%mb_resid(nx,ny))
         allocate(pc%lsf(nx,ny))
 
+=======
+        
+>>>>>>> main
         ! Initialize to zero
         pc%H_ice        = 0.0
         pc%dHidt_dyn    = 0.0
-        pc%mb_applied   = 0.0
-        pc%bmb_applied  = 0.0
+        pc%mb_net       = 0.0
         pc%mb_relax     = 0.0
         pc%mb_resid     = 0.0
+        pc%smb          = 0.0
+        pc%bmb          = 0.0
+        pc%fmb          = 0.0
+        pc%dmb          = 0.0
         pc%cmb          = 0.0      
         pc%cmb_flt      = 0.0
         pc%cmb_grnd     = 0.0
@@ -1394,6 +1440,7 @@ end if
 
         type(ytopo_pc_class), intent(INOUT) :: pc 
         
+<<<<<<< HEAD
         if (allocated(pc%H_ice))       deallocate(pc%H_ice)
         if (allocated(pc%dHidt_dyn))   deallocate(pc%dHidt_dyn)
         if (allocated(pc%mb_applied))  deallocate(pc%mb_applied)
@@ -1405,6 +1452,20 @@ end if
         if (allocated(pc%cmb_grnd))    deallocate(pc%cmb_grnd)
         if (allocated(pc%lsf))         deallocate(pc%lsf)
 
+=======
+        if (allocated(pc%H_ice))        deallocate(pc%H_ice)
+        if (allocated(pc%dHidt_dyn))    deallocate(pc%dHidt_dyn)
+        if (allocated(pc%mb_net))       deallocate(pc%mb_net)
+        if (allocated(pc%mb_relax))     deallocate(pc%mb_relax)
+        if (allocated(pc%mb_resid))     deallocate(pc%mb_resid)
+        if (allocated(pc%smb))          deallocate(pc%smb)
+        if (allocated(pc%bmb))          deallocate(pc%bmb)
+        if (allocated(pc%fmb))          deallocate(pc%fmb)
+        if (allocated(pc%cmb))          deallocate(pc%cmb)
+        if (allocated(pc%cmb_flt))      deallocate(pc%cmb_flt)
+        if (allocated(pc%cmb_grnd))     deallocate(pc%cmb_grnd)
+        
+>>>>>>> main
         return
 
     end subroutine ytopo_pc_dealloc

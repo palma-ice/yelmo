@@ -7,8 +7,8 @@ module yelmo_dynamics
     use yelmo_defs
     use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D
 
-    use deformation, only : calc_jacobian_vel_3D, calc_strain_rate_tensor_jac, &
-                                                calc_strain_rate_tensor_jac_quad3D
+    use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
+                            calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
 
     use velocity_general
 
@@ -155,44 +155,50 @@ contains
         ! For the rest of Yelmo, at least these variables should be populated:
         ! ux, uy, ux_bar, uy_bar, ux_b, uy_b, taub_acx, taub_acy, beta 
 
-        select case(dyn%par%solver)
+        if (abs(dt) .gt. TOL .or. (.not. dyn%par%init_state_set)) then
+            ! Only solve velocity if time is advancing (important for starting from a restart file)
 
-            case("fixed") 
-                ! Do nothing - dynamics is fixed 
+            select case(dyn%par%solver)
 
-            case("sia") 
-                ! SIA only 
+                case("fixed") 
+                    ! Do nothing - dynamics is fixed 
 
-                call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.FALSE.)
+                case("sia") 
+                    ! SIA only 
 
-            case("ssa") 
-                ! SSA only 
+                    call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.FALSE.)
 
-                call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.FALSE.,use_ssa=.TRUE.)
+                case("ssa") 
+                    ! SSA only 
 
-            case("hybrid") 
-                ! SIA+SSA
+                    call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.FALSE.,use_ssa=.TRUE.)
 
-                call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.TRUE.)
+                case("hybrid") 
+                    ! SIA+SSA
 
-            case("diva","diva-noslip") 
-                ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
+                    call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.TRUE.)
 
-                call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
-            
-            case("l1l2","l1l2-noslip")
-                ! L1L2 solver
+                case("diva","diva-noslip") 
+                    ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
 
-                call calc_ydyn_l1l2(dyn,tpo,mat,thrm,bnd)
-            
-            case DEFAULT 
+                    call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
+                
+                case("l1l2","l1l2-noslip")
+                    ! L1L2 solver
 
-                write(*,*) "calc_ydyn:: Error: ydyn solver not recognized." 
-                write(*,*) "solver should be one of: ['fixed','hybrid','diva']"
-                write(*,*) "solver = ", trim(dyn%par%solver) 
-                stop 
+                    call calc_ydyn_l1l2(dyn,tpo,mat,thrm,bnd)
+                
+                case DEFAULT 
 
-        end select 
+                    write(*,*) "calc_ydyn:: Error: ydyn solver not recognized." 
+                    write(*,*) "solver should be one of: ['fixed','hybrid','diva']"
+                    write(*,*) "solver = ", trim(dyn%par%solver) 
+                    stop 
+
+            end select 
+
+            if (.not. dyn%par%init_state_set) dyn%par%init_state_set = .TRUE.
+        end if 
 
         ! Limit velocity values to avoid potential underflow errors 
         where (abs(dyn%now%ux) .lt. TOL_UNDERFLOW) dyn%now%ux = 0.0_wp 
@@ -204,9 +210,9 @@ contains
         ! ===== Calculate the velocity Jacobian ===============================================
         ! (note uses uz from previous iteration)
 
-        call calc_jacobian_vel_3D(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice_dyn, tpo%now%f_ice_dyn, &
-                                    tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
-                                    dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
+        call calc_jacobian_vel_3D_uxyterms(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice_dyn, tpo%now%f_ice_dyn, &
+                                            tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
+                                            dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
 
         ! ===== Calculate the vertical velocity through continuity ============================
         ! (using the Jacobian by default, most robust formulation) 
@@ -221,6 +227,12 @@ contains
         !                     tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
         !                     tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
         
+        ! ===== Finish calculating velocity Jacobian (uz-dependent terms) ================
+
+        call calc_jacobian_vel_3D_uzterms(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice_dyn, tpo%now%f_ice_dyn, &
+                                            tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
+                                            dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
+
         ! ===== Strain rate tensor ===========================
         ! (using the Jacobian)
 
@@ -260,7 +272,7 @@ contains
         dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
 
         ! Finally, determine rate of velocity change 
-        if (dt .ne. 0.0_wp) then 
+        if (abs(dt) .gt. TOL) then
             dyn%now%duxydt = (dyn%now%uxy_bar - uxy_prev) / dt 
         else 
             dyn%now%duxydt = 0.0_wp 
@@ -509,19 +521,7 @@ contains
                                 tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
                                 tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%mask_frnt,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
-        ! call calc_velocity_diva_ab(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
-        !                         dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
-        !                         dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
-        !                         dyn%now%beta_acy, &
-        !                         dyn%now%ux_bar_ab,dyn%now%uy_bar_ab, &
-        !                         dyn%now%beta_eff,dyn%now%de_eff,dyn%now%visc_eff, &
-        !                         dyn%now%visc_eff_int,    &
-        !                         dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
-        !                         dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-        !                         dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
-        !                         tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
-        !                         dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
-         
+
         ! Integrate from 3D shear velocity field to get depth-averaged field
         dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
         dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
@@ -1016,9 +1016,6 @@ contains
 
         call ydyn_dealloc(now)
 
-        allocate(now%ux_bar_ab(nx,ny)) 
-        allocate(now%uy_bar_ab(nx,ny))
-
         allocate(now%ux(nx,ny,nz_aa)) 
         allocate(now%uy(nx,ny,nz_aa)) 
         allocate(now%uxy(nx,ny,nz_aa)) 
@@ -1126,10 +1123,6 @@ contains
         allocate(now%strn2D%eps_eig_1(nx,ny))
         allocate(now%strn2D%eps_eig_2(nx,ny))
         
-        ! Set all variables to zero intially
-        now%ux_bar_ab         = 0.0 
-        now%uy_bar_ab         = 0.0
-
         now%ux                = 0.0 
         now%uy                = 0.0 
         now%uxy               = 0.0 
@@ -1245,9 +1238,6 @@ contains
 
         type(ydyn_state_class), intent(INOUT) :: now
 
-        if (allocated(now%ux_bar_ab))       deallocate(now%ux_bar_ab) 
-        if (allocated(now%uy_bar_ab))       deallocate(now%uy_bar_ab)
-        
         if (allocated(now%ux))              deallocate(now%ux) 
         if (allocated(now%uy))              deallocate(now%uy) 
         if (allocated(now%uxy))             deallocate(now%uxy) 

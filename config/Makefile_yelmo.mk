@@ -222,6 +222,9 @@ $(objdir)/yelmo.o: $(srcdir)/yelmo.f90 $(objdir)/yelmo_ice.o
 $(objdir)/ice_benchmarks.o: $(testdir)/ice_benchmarks.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/calving_benchmarks.o: $(testdir)/calving_benchmarks.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/mismip3D.o: $(testdir)/mismip3D.f90 $(objdir)/ncio.o $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -288,6 +291,7 @@ yelmo_base = 		   $(objdir)/yelmo_defs.o \
 	         		   $(objdir)/yelmo.o
 
 yelmo_tests = 		   $(objdir)/ice_benchmarks.o \
+					   $(objdir)/calving_benchmarks.o \
 					   $(objdir)/mismip3D.o
 
 # Extras for testing 

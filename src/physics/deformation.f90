@@ -31,7 +31,8 @@ module deformation
     public :: scale_rate_factor_water
     public :: calc_rate_factor_integrated
 
-    public :: calc_jacobian_vel_3D
+    public :: calc_jacobian_vel_3D_uxyterms
+    public :: calc_jacobian_vel_3D_uzterms
     public :: calc_strain_rate_tensor_jac
     public :: calc_strain_rate_tensor_jac_quad3D
     public :: calc_strain_rate_tensor_2D
@@ -500,7 +501,7 @@ contains
     end function calc_rate_factor_integrated
     
 
-    subroutine calc_jacobian_vel_3D(jvel, ux, uy, uz, H_ice, f_ice, f_grnd, dzsdx, dzsdy,  &
+    subroutine calc_jacobian_vel_3D_uxyterms(jvel, ux, uy, uz, H_ice, f_ice, f_grnd, dzsdx, dzsdy,  &
                                                 dzbdx, dzbdy, zeta_aa, zeta_ac, dx, dy, boundaries)
 
         ! -------------------------------------------------------------------------------
@@ -555,7 +556,7 @@ contains
         ! ajr: 0.05 is too restrictive! See comments below. For now,
         ! set to very high value and disabled.
         real(wp), parameter :: corr_grad_lim = 0.2
-
+        
         ! Determine sizes and allocate local variables 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -701,6 +702,277 @@ else
             
 end if 
 
+        end do
+        end do 
+        !!$omp end parallel do
+
+        ! Step 2: Calculate all horizontal derivatives accounting for correction terms
+
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
+        !!$omp& private(c_x,c_y,dzbdx_acy,dzsdx_acy,c_x_acy,dzbdy_acx,dzsdy_acx,c_y_acx,dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa)
+        do j = 1, ny 
+        do i = 1, nx 
+            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+
+            do k = 1, nz_aa 
+
+                ! === Calculate derivatives , no sigma-correction terms yet ===
+
+                ! Second-order, centered derivatives
+                jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(im1,j,k))/(2.0*dx)
+                jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,jm1,k))/(2.0*dy)
+                
+                jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(im1,j,k))/(2.0*dx)
+                jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,jm1,k))/(2.0*dy)
+
+
+                ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+                ! Second-order, one-sided derivatives
+
+                ! jvel%dxx
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
+                    if (f_ice(im1,j) .eq. 1.0 .and. im1-1 .gt. 0) then
+                        im2 = im1-1  
+                        jvel%dxx(i,j,k) = (1.0*ux(im2,j,k)-4.0*ux(im1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
+                    else 
+                        jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
+                    end if
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                    if (ip1 .lt. nx) then
+                        ip2 = ip1+1
+                        if (f_ice(ip2,j) .eq. 1.0) then
+                            jvel%dxx(i,j,k) = -(1.0*ux(ip2,j,k)-4.0*ux(ip1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
+                        else
+                            jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
+                        end if
+                    else
+                        jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
+                    end if
+                end if 
+
+                ! jvel%dxy
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                    jvel%dxy(i,j,k) = 0.0
+                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
+                    if (jm1 .gt. 1) then 
+                        jm2 = jm1-1
+                        if (f_ice(i,jm2) .eq. 1.0) then 
+                            jvel%dxy(i,j,k) = (1.0*ux(i,jm2,k)-4.0*ux(i,jm1,k)+3.0*ux(i,j,k))/(2.0*dy)
+                        else 
+                            jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
+                        end if
+                    else 
+                        jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
+                    end if
+                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                    if (jp1 .lt. ny) then 
+                        jp2 = jp1+1
+                        if (f_ice(i,jp2) .eq. 1.0) then 
+                            jvel%dxy(i,j,k) = -(1.0*ux(i,jp2,k)-4.0*ux(i,jp1,k)+3.0*ux(i,j,k))/(2.0*dy)
+                        else
+                            jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
+                        end if
+                    else
+                        jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
+                    end if
+                end if 
+
+                ! jvel%dyy
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
+                    if (f_ice(i,jm1) .eq. 1.0 .and. jm1-1 .gt. 0) then 
+                        jm2 = jm1-1  
+                        jvel%dyy(i,j,k) = (1.0*uy(i,jm2,k)-4.0*uy(i,jm1,k)+3.0*uy(i,j,k))/(2.0*dy)
+                    else
+                        jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
+                    end if
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
+                    if (jp1 .lt. ny) then
+                        jp2 = jp1+1
+                        if (f_ice(i,jp2) .eq. 1.0) then
+                            jvel%dyy(i,j,k) = -(1.0*uy(i,jp2,k)-4.0*uy(i,jp1,k)+3.0*uy(i,j,k))/(2.0*dy)
+                        else
+                            jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
+                        end if 
+                    end if
+                end if 
+
+                ! jvel%dyx
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                    jvel%dyx(i,j,k) = 0.0
+                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                    if (im1 .gt. 1) then 
+                        im2 = im1-1
+                        if (f_ice(im2,j) .eq. 1.0) then 
+                            jvel%dyx(i,j,k) = (1.0*uy(im2,j,k)-4.0*uy(im1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
+                        else 
+                            jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
+                        end if
+                    else 
+                        jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
+                    end if
+                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
+                    if (ip1 .lt. nx) then 
+                        ip2 = ip1+1
+                        if (f_ice(ip2,j) .eq. 1.0) then 
+                            jvel%dyx(i,j,k) = -(1.0*uy(ip2,j,k)-4.0*uy(ip1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
+                        else
+                            jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
+                        end if
+                    else
+                        jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
+                    end if 
+                end if
+
+                ! === Calculate and apply the sigma-transformation correction terms ===
+
+                ! First, calculate sigma-coordinate derivative correction factors for this layer
+                ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, also shown in 1D with Eq. 5.145)
+                ! Note: these factors can be calculated with different combinations of terms using
+                ! the gradients (dzbdx,dzsdx), (dzbdx,dHidx) or (dHidx,dzsdx), with the same result. 
+                ! (dzbdx,dzsdx) is used for convenience, since dzsdx and dzbdx are needed elsewhere.
+
+                ! Note that this factor should normally include H_ice in the denominator. It
+                ! is not included here, because the vertical derivative is in z-coordinates
+                ! not sigma-coordinates (zeta), so the H has already been accounted for, 
+                ! e.g.: d/dz = d/(dzeta*H)
+
+                c_x = - ( (1.0-zeta_aa(k))*dzbdx(i,j) + zeta_aa(k)*dzsdx(i,j))
+                c_y = - ( (1.0-zeta_aa(k))*dzbdy(i,j) + zeta_aa(k)*dzsdy(i,j))
+
+                ! Get cross correction terms too 
+                dzbdx_acy = 0.25*(dzbdx(i,j)+dzbdx(i,jp1)+dzbdx(im1,j)+dzbdx(im1,jp1))
+                dzsdx_acy = 0.25*(dzsdx(i,j)+dzsdx(i,jp1)+dzsdx(im1,j)+dzsdx(im1,jp1))
+                c_x_acy = - ( (1.0-zeta_aa(k))*dzbdx_acy + zeta_aa(k)*dzsdx_acy)
+
+                dzbdy_acx = 0.25*(dzbdy(i,j)+dzbdy(ip1,j)+dzbdy(i,jm1)+dzbdy(ip1,jm1))
+                dzsdy_acx = 0.25*(dzsdy(i,j)+dzsdy(ip1,j)+dzsdy(i,jm1)+dzsdy(ip1,jm1))
+                c_y_acx = - ( (1.0-zeta_aa(k))*dzbdy_acx + zeta_aa(k)*dzsdy_acx)
+
+if (.FALSE.) then
+    ! ajr: so far, this wasn't helpful. But I only tested a value of corr_grad_lim=0.05,
+    ! which could be quite restrictive. In ANT-32KM, c_x and c_y show values up to 0.12.
+    ! Consider for future testing: 
+
+                ! Limit the corrective factor to avoid extremes
+                ! (e.g., in the case of very steep ice base gradient)
+                if (c_x .gt. corr_grad_lim) c_x =  corr_grad_lim
+                if (c_x .lt. corr_grad_lim) c_x = -corr_grad_lim
+                if (c_y .gt. corr_grad_lim) c_y =  corr_grad_lim
+                if (c_y .lt. corr_grad_lim) c_y = -corr_grad_lim
+                if (c_x_acy .gt. corr_grad_lim) c_x_acy =  corr_grad_lim
+                if (c_x_acy .lt. corr_grad_lim) c_x_acy = -corr_grad_lim
+                if (c_y_acx .gt. corr_grad_lim) c_y_acx =  corr_grad_lim
+                if (c_y_acx .lt. corr_grad_lim) c_y_acx = -corr_grad_lim
+end if 
+
+                ! Apply the correction 
+
+                jvel%dxx(i,j,k) = jvel%dxx(i,j,k) + c_x*jvel%dxz(i,j,k)
+                jvel%dxy(i,j,k) = jvel%dxy(i,j,k) + c_y_acx*jvel%dxz(i,j,k)
+                
+                jvel%dyx(i,j,k) = jvel%dyx(i,j,k) + c_x_acy*jvel%dyz(i,j,k)
+                jvel%dyy(i,j,k) = jvel%dyy(i,j,k) + c_y*jvel%dyz(i,j,k)
+                
+            end do
+
+        end do 
+        end do 
+        !!$omp end parallel do
+        
+        ! Step X: fill in partially filled margin points with neighbor strain-rate values
+        
+        ! To do....?
+        
+        return 
+
+    end subroutine calc_jacobian_vel_3D_uxyterms
+
+    subroutine calc_jacobian_vel_3D_uzterms(jvel, ux, uy, uz, H_ice, f_ice, f_grnd, dzsdx, dzsdy,  &
+                                                dzbdx, dzbdy, zeta_aa, zeta_ac, dx, dy, boundaries)
+
+        ! -------------------------------------------------------------------------------
+        !  Computation of all components of the Jacobian of the velocity vector:
+        !  (ux,uy,uz) == (u,v,w)
+        !
+        ! ------------------------------------------------------------------------------
+
+        ! Note: vx, vy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
+        ! in the vertical. vz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
+        ! in the vertical. 
+
+        ! All tensor components are calculated in the same location as the velocity components. 
+        
+        implicit none
+        
+        type(jacobian_3D_class), intent(INOUT) :: jvel          ! [yr^-1] on ac-nodes (3D)
+        real(wp), intent(IN) :: ux(:,:,:)                       ! nx,ny,nz_aa
+        real(wp), intent(IN) :: uy(:,:,:)                       ! nx,ny,nz_aa
+        real(wp), intent(IN) :: uz(:,:,:)                       ! nx,ny,nz_ac
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: dzsdx(:,:) 
+        real(wp), intent(IN) :: dzsdy(:,:) 
+        real(wp), intent(IN) :: dzbdx(:,:) 
+        real(wp), intent(IN) :: dzbdy(:,:) 
+        real(wp), intent(IN) :: zeta_aa(:) 
+        real(wp), intent(IN) :: zeta_ac(:) 
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN) :: dy
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, k
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: im2, ip2, jm2, jp2
+        integer  :: nx, ny, nz_aa, nz_ac
+        real(wp) :: H_now, H_now_acx, H_now_acy 
+        real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
+        real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
+        real(wp) :: c_x, c_y, c_x_acy, c_y_acx
+        real(wp) :: h1, h2 
+        
+        real(wp), allocatable :: c_x_tmp(:,:,:)
+        real(wp), allocatable :: c_y_tmp(:,:,:)
+        
+        ! Parameter to limit sigma-coordinate corrective factor
+        ! to reasonable slope values. Maybe could help avoid
+        ! getting strange results in thermodynamics, including
+        ! highly negative bmb_grnd values (high basal melt for grounded ice)
+        ! ajr: 0.05 is too restrictive! See comments below. For now,
+        ! set to very high value and disabled.
+        real(wp), parameter :: corr_grad_lim = 0.2
+
+        ! Determine sizes and allocate local variables 
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)
+        
+        allocate(c_x_tmp(nx,ny,nz_aa))
+        allocate(c_y_tmp(nx,ny,nz_aa))
+
+        !-------- Initialisation --------
+
+        jvel%dzx          = 0.0_wp
+        jvel%dzy          = 0.0_wp
+        jvel%dzz          = 0.0_wp
+
+        !-------- Computation --------
+
+        ! Step 1: Calculate all vertical derivatives, some of which are used 
+        ! as correction terms for the horizontal derivatives w.r.t. sigma-coordinate transformation. 
+
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_now_acx,H_now_acy,k,h1,h2,H_now)
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Next, calculate dzz on ac-nodes vertically, aa-nodes horizontally
 
             if (f_ice(i,j) .eq. 1.0) then
@@ -779,168 +1051,6 @@ end if
             
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-
-                do k = 1, nz_aa 
-
-                    ! === Calculate derivatives , no sigma-correction terms yet ===
-
-                    ! Second-order, centered derivatives
-                    jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(im1,j,k))/(2.0*dx)
-                    jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,jm1,k))/(2.0*dy)
-                    
-                    jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(im1,j,k))/(2.0*dx)
-                    jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,jm1,k))/(2.0*dy)
-
-
-                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
-                    ! Second-order, one-sided derivatives
-
-                    ! jvel%dxx
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
-                        if (f_ice(im1,j) .eq. 1.0 .and. im1-1 .gt. 0) then
-                            im2 = im1-1  
-                            jvel%dxx(i,j,k) = (1.0*ux(im2,j,k)-4.0*ux(im1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
-                        else 
-                            jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
-                        end if
-                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
-                        if (ip1 .lt. nx) then
-                            ip2 = ip1+1
-                            if (f_ice(ip2,j) .eq. 1.0) then
-                                jvel%dxx(i,j,k) = -(1.0*ux(ip2,j,k)-4.0*ux(ip1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
-                            else
-                                jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
-                            end if
-                        else
-                            jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
-                        end if
-                    end if 
-
-                    ! jvel%dxy
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                        jvel%dxy(i,j,k) = 0.0
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
-                        if (jm1 .gt. 1) then 
-                            jm2 = jm1-1
-                            if (f_ice(i,jm2) .eq. 1.0) then 
-                                jvel%dxy(i,j,k) = (1.0*ux(i,jm2,k)-4.0*ux(i,jm1,k)+3.0*ux(i,j,k))/(2.0*dy)
-                            else 
-                                jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
-                            end if
-                        else 
-                            jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
-                        end if
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                        if (jp1 .lt. ny) then 
-                            jp2 = jp1+1
-                            if (f_ice(i,jp2) .eq. 1.0) then 
-                                jvel%dxy(i,j,k) = -(1.0*ux(i,jp2,k)-4.0*ux(i,jp1,k)+3.0*ux(i,j,k))/(2.0*dy)
-                            else
-                                jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
-                            end if
-                        else
-                            jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
-                        end if
-                    end if 
-
-                    ! jvel%dyy
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
-                        if (f_ice(i,jm1) .eq. 1.0 .and. jm1-1 .gt. 0) then 
-                            jm2 = jm1-1  
-                            jvel%dyy(i,j,k) = (1.0*uy(i,jm2,k)-4.0*uy(i,jm1,k)+3.0*uy(i,j,k))/(2.0*dy)
-                        else
-                            jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
-                        end if
-                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
-                        if (jp1 .lt. ny) then
-                            jp2 = jp1+1
-                            if (f_ice(i,jp2) .eq. 1.0) then
-                                jvel%dyy(i,j,k) = -(1.0*uy(i,jp2,k)-4.0*uy(i,jp1,k)+3.0*uy(i,j,k))/(2.0*dy)
-                            else
-                                jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
-                            end if 
-                        end if
-                    end if 
-
-                    ! jvel%dyx
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                        jvel%dyx(i,j,k) = 0.0
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                        if (im1 .gt. 1) then 
-                            im2 = im1-1
-                            if (f_ice(im2,j) .eq. 1.0) then 
-                                jvel%dyx(i,j,k) = (1.0*uy(im2,j,k)-4.0*uy(im1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
-                            else 
-                                jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
-                            end if
-                        else 
-                            jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
-                        end if
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
-                        if (ip1 .lt. nx) then 
-                            ip2 = ip1+1
-                            if (f_ice(ip2,j) .eq. 1.0) then 
-                                jvel%dyx(i,j,k) = -(1.0*uy(ip2,j,k)-4.0*uy(ip1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
-                            else
-                                jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
-                            end if
-                        else
-                            jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
-                        end if 
-                    end if
-
-                    ! === Calculate and apply the sigma-transformation correction terms ===
-
-                    ! First, calculate sigma-coordinate derivative correction factors for this layer
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, also shown in 1D with Eq. 5.145)
-                    ! Note: these factors can be calculated with different combinations of terms using
-                    ! the gradients (dzbdx,dzsdx), (dzbdx,dHidx) or (dHidx,dzsdx), with the same result. 
-                    ! (dzbdx,dzsdx) is used for convenience, since dzsdx and dzbdx are needed elsewhere.
-
-                    ! Note that this factor should normally include H_ice in the denominator. It
-                    ! is not included here, because the vertical derivative is in z-coordinates
-                    ! not sigma-coordinates (zeta), so the H has already been accounted for, 
-                    ! e.g.: d/dz = d/(dzeta*H)
-
-                    c_x = - ( (1.0-zeta_aa(k))*dzbdx(i,j) + zeta_aa(k)*dzsdx(i,j))
-                    c_y = - ( (1.0-zeta_aa(k))*dzbdy(i,j) + zeta_aa(k)*dzsdy(i,j))
-
-                    ! Get cross correction terms too 
-                    dzbdx_acy = 0.25*(dzbdx(i,j)+dzbdx(i,jp1)+dzbdx(im1,j)+dzbdx(im1,jp1))
-                    dzsdx_acy = 0.25*(dzsdx(i,j)+dzsdx(i,jp1)+dzsdx(im1,j)+dzsdx(im1,jp1))
-                    c_x_acy = - ( (1.0-zeta_aa(k))*dzbdx_acy + zeta_aa(k)*dzsdx_acy)
-
-                    dzbdy_acx = 0.25*(dzbdy(i,j)+dzbdy(ip1,j)+dzbdy(i,jm1)+dzbdy(ip1,jm1))
-                    dzsdy_acx = 0.25*(dzsdy(i,j)+dzsdy(ip1,j)+dzsdy(i,jm1)+dzsdy(ip1,jm1))
-                    c_y_acx = - ( (1.0-zeta_aa(k))*dzbdy_acx + zeta_aa(k)*dzsdy_acx)
-
-if (.FALSE.) then
-    ! ajr: so far, this wasn't helpful. But I only tested a value of corr_grad_lim=0.05,
-    ! which could be quite restrictive. In ANT-32KM, c_x and c_y show values up to 0.12.
-    ! Consider for future testing: 
-
-                    ! Limit the corrective factor to avoid extremes
-                    ! (e.g., in the case of very steep ice base gradient)
-                    if (c_x .gt. corr_grad_lim) c_x =  corr_grad_lim
-                    if (c_x .lt. corr_grad_lim) c_x = -corr_grad_lim
-                    if (c_y .gt. corr_grad_lim) c_y =  corr_grad_lim
-                    if (c_y .lt. corr_grad_lim) c_y = -corr_grad_lim
-                    if (c_x_acy .gt. corr_grad_lim) c_x_acy =  corr_grad_lim
-                    if (c_x_acy .lt. corr_grad_lim) c_x_acy = -corr_grad_lim
-                    if (c_y_acx .gt. corr_grad_lim) c_y_acx =  corr_grad_lim
-                    if (c_y_acx .lt. corr_grad_lim) c_y_acx = -corr_grad_lim
-end if 
-
-                    ! Apply the correction 
-
-                    jvel%dxx(i,j,k) = jvel%dxx(i,j,k) + c_x*jvel%dxz(i,j,k)
-                    jvel%dxy(i,j,k) = jvel%dxy(i,j,k) + c_y_acx*jvel%dxz(i,j,k)
-                    
-                    jvel%dyx(i,j,k) = jvel%dyx(i,j,k) + c_x_acy*jvel%dyz(i,j,k)
-                    jvel%dyy(i,j,k) = jvel%dyy(i,j,k) + c_y*jvel%dyz(i,j,k)
-                    
-                end do
 
             if (f_ice(i,j) .eq. 1.0) then 
                 ! Ice present at this point
@@ -1039,13 +1149,9 @@ end if
         end do 
         !!$omp end parallel do
         
-        ! Step X: fill in partially filled margin points with neighbor strain-rate values
-        
-        ! To do....?
-        
         return 
 
-    end subroutine calc_jacobian_vel_3D
+    end subroutine calc_jacobian_vel_3D_uzterms
 
     subroutine calc_strain_rate_tensor_jac(strn, strn2D, jvel, H_ice, f_ice, f_grnd,  &
                                                     zeta_aa, zeta_ac, dx, dy, de_max, boundaries)
@@ -1279,7 +1385,12 @@ end if
         ! Perhaps it deserves further investigation, but for production runs, the routine
         ! above calc_jacobian_vel_3D is recommended! 
 
-
+        ! ajr, 2024-11-18: instability may lie in the fact that Gaussian Quadrature is not
+        ! performed properly in 3D due to the uneven nature of the sigma-coordinates in the vertical.
+        ! In this case, including the det|J| term is important to rescale quantities properly.
+        ! An example of this done well is in CISM2.1. See Eq. 6.25 of the documentation and
+        ! surrounding text and equations. This should be implemented here, eventually, if
+        ! this routine will be used.
 
         implicit none
         

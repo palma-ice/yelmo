@@ -170,31 +170,39 @@ module yelmo_defs
     type ytopo_pc_class 
         real(wp), allocatable :: H_ice(:,:)
         real(wp), allocatable :: dHidt_dyn(:,:)
-        real(wp), allocatable :: mb_applied(:,:)
-        real(wp), allocatable :: bmb_applied(:,:)
+        real(wp), allocatable :: mb_net(:,:)
         real(wp), allocatable :: mb_relax(:,:)
         real(wp), allocatable :: mb_resid(:,:)
+        real(wp), allocatable :: smb(:,:)
+        real(wp), allocatable :: bmb(:,:)
+        real(wp), allocatable :: fmb(:,:)
+        real(wp), allocatable :: dmb(:,:)
+        real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
+<<<<<<< HEAD
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable  :: lsf(:,:)
+=======
+
+>>>>>>> main
     end type
 
     type ytopo_rates_class
         real(wp), allocatable :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable :: dHidt_dyn(:,:)   ! Change in thickness due to dynamics only [m/yr]
-        real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable :: bmb_applied(:,:) ! Actual basal mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable :: mb_net(:,:)      ! Net mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_err(:,:)      ! Residual error in mass balance accounting 
-        real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
-        real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable :: dmb(:,:)         ! Subgrid discharge
+        real(wp), allocatable :: smb(:,:)         ! Net smb applied
+        real(wp), allocatable :: bmb(:,:)         ! Net combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable :: fmb(:,:)         ! Net combined field of fmb_grnd and fmb_shlf 
+        real(wp), allocatable :: dmb(:,:)         ! Net subgrid discharge
         real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
-        real(wp), allocatable :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
-        real(wp), allocatable :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
+        real(wp), allocatable :: cmb_flt(:,:)     ! Calving rate, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_grnd(:,:)    ! Calving rate, grounded (applied) [m/a]
 
         real(wp) :: dt_tot
     end type
@@ -210,17 +218,22 @@ module yelmo_defs
         real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: dHidt_dyn(:,:)
-        real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: bmb_applied(:,:) ! Actual basal mass balance applied [m/a], for mass balance accounting
+
+        real(wp), allocatable   :: mb_net(:,:)      ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable   :: mb_err(:,:)      ! Residual error in mass balance accounting 
 
+        real(wp), allocatable   :: smb(:,:)         ! Actual smb applied [m/a]
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf    
         real(wp), allocatable   :: dmb(:,:)         ! Subgrid discharge mb rate
         real(wp), allocatable   :: cmb(:,:)         ! Calving mb rate
         
+        real(wp), allocatable   :: bmb_ref(:,:)     ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable   :: fmb_ref(:,:)     ! Combined field of fmb_grnd and fmb_shlf    
+        real(wp), allocatable   :: dmb_ref(:,:)     ! Subgrid discharge mb rate
+
         real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
         real(wp), allocatable   :: lsf(:,:)         ! LSF mask
@@ -394,14 +407,12 @@ module yelmo_defs
         integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
         real(wp)   :: speed 
 
+        logical    :: init_state_set
     end type
 
     ! ydyn state variables
     type ydyn_state_class
         ! Model variables that the define the state of the domain 
-
-        real(wp), allocatable :: ux_bar_ab(:,:) 
-        real(wp), allocatable :: uy_bar_ab(:,:)
 
         real(wp), allocatable :: ux(:,:,:) 
         real(wp), allocatable :: uy(:,:,:) 
@@ -786,7 +797,12 @@ module yelmo_defs
     type ydata_pd_class   ! pd = present-day
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(wp), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
+<<<<<<< HEAD
         real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:), mask(:,:) 
+=======
+        integer,  allocatable :: mask_bed(:,:)
+        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
+>>>>>>> main
         real(wp), allocatable :: T_srf(:,:), smb(:,:)
         real(wp), allocatable :: depth_iso(:,:,:)  
         

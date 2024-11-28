@@ -1,5 +1,7 @@
 module variable_io
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     implicit none
 
     type var_io_type
@@ -16,19 +18,41 @@ module variable_io
     private
     public :: var_io_type
     public :: load_variable_table
+    public :: find_variable_in_file
     public :: find_variable_in_table
     public :: var_io_print
     
 contains
 
-    subroutine find_variable_in_table(var,var_table,varname)
+    subroutine find_variable_in_file(var,varname,filename)
+
+        implicit none
+
+        type(var_io_type), intent(OUT) :: var
+        character(len=*),  intent(IN)  :: varname
+        character(len=*),  intent(IN)  :: filename
+
+        ! Local variables 
+        type(var_io_type), allocatable :: var_table(:)
+        
+        ! Load the variable table
+        call load_variable_table(var_table,filename)
+
+        ! Find the current variable in the table
+        call find_variable_in_table(var,varname,var_table)
+
+        return
+
+    end subroutine find_variable_in_file
+
+    subroutine find_variable_in_table(var,varname,var_table)
 
         implicit none
         
         type(var_io_type), intent(OUT) :: var
-        type(var_io_type), intent(IN)  :: var_table(:)
         character(len=*),  intent(IN)  :: varname 
-
+        type(var_io_type), intent(IN)  :: var_table(:)
+        
         ! Local variables
         integer :: n 
         logical :: found
@@ -43,8 +67,8 @@ contains
         end do
 
         if (.not. found) then
-            write(*,*) "find_variable_in_table:: Error: variable not found in variable table."
-            write(*,*) "varname = ", trim(varname)
+            write(error_unit,*) "find_variable_in_table:: Error: variable not found in variable table."
+            write(error_unit,*) "varname = ", trim(varname)
             stop 
         end if
 
@@ -63,50 +87,55 @@ contains
         integer, parameter :: nmax = 1000
         type(var_io_type) :: vt(nmax)       ! Max 1000 variables
         integer :: n, ntot 
-        character(len=1024) :: line 
-        integer, parameter :: io = 55
-
-        ntot = 0
+        character(len=1024) :: line
+        integer :: io, check
 
         ! Open the file for reading
-        open(unit=io, file=trim(filename), status='old', action='read')
+        open(newunit=io, file=trim(filename), status='old', action='read')
 
-        ! Skip the first three header lines
-        read(unit=io, fmt='(a)') line
-        read(unit=io, fmt='(a)') line
-        read(unit=io, fmt='(a)') line
-
-        do n = 1, nmax
+        ! Skip the header (finishes with second line starting with "---" )
+        ntot = 2
+        do n = 1, 50
             read(unit=io, fmt='(a)') line
+            if (line(1:3) .eq. "---") ntot = ntot - 1
+            if (ntot .eq. 0) exit
+        end do
 
-            if (line(1:1) .eq. "+") then
-                ! End of table reached, exit 
-                exit
-            else
+        ntot = 0 
+        do n = 1, nmax
+            read(unit=io, fmt='(a)',iostat=check) line
+
+            ! Exit at end of file
+            if (check .eq. -1) exit 
+
+            if (line(1:1) .eq. "|") then
                 ! Parse the line
                 call parse_line_to_variable(vt(n)%varname,vt(n)%dimnames,vt(n)%units,vt(n)%long_name,line)
                 
                 ! Store the id (variable number in table)
                 vt(n)%id = n 
-                
+
                 ! Parse the dimensions
                 call parse_dims(vt(n)%dims,vt(n)%dimnames)
                 vt(n)%ndims = size(vt(n)%dims)
                 ntot = ntot+1
-                call var_io_print(vt(n))
+                !call var_io_print(vt(n))
             end if
 
             if (n .eq. nmax) then
-                write(*,*) "load_var_table:: Error: maximum number of variables read in, but &
+                write(error_unit,*) "load_var_table:: Error: maximum number of variables read in, but &
                 &end of the table was not reached. Increase value of nmax in this routine to be safe."
-                write(*,*) "nmax = ", nmax 
-                write(*,*) "filename = ", trim(filename)
-                write(*,*) "Last line read in: "
-                write(*,*) trim(line)
+                write(error_unit,*) "nmax = ", nmax 
+                write(error_unit,*) "filename = ", trim(filename)
+                write(error_unit,*) "Last line read in: "
+                write(error_unit,*) trim(line)
                 stop
             end if
 
         end do
+
+        ! Close the file
+        close(io)
 
         if (allocated(var_table)) deallocate(var_table)
         allocate(var_table(ntot))

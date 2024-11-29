@@ -17,14 +17,14 @@ module variable_io
 
     private
     public :: var_io_type
-    public :: load_variable_table
-    public :: find_variable_in_file
-    public :: find_variable_in_table
+    public :: find_var_io_in_file
+    public :: find_var_io_in_table
+    public :: load_var_io_table
     public :: var_io_print
     
 contains
 
-    subroutine find_variable_in_file(var,varname,filename)
+    subroutine find_var_io_in_file(var,varname,filename)
 
         implicit none
 
@@ -36,16 +36,16 @@ contains
         type(var_io_type), allocatable :: var_table(:)
         
         ! Load the variable table
-        call load_variable_table(var_table,filename)
+        call load_var_io_table(var_table,filename)
 
         ! Find the current variable in the table
-        call find_variable_in_table(var,varname,var_table)
+        call find_var_io_in_table(var,varname,var_table)
 
         return
 
-    end subroutine find_variable_in_file
+    end subroutine find_var_io_in_file
 
-    subroutine find_variable_in_table(var,varname,var_table)
+    subroutine find_var_io_in_table(var,varname,var_table)
 
         implicit none
         
@@ -67,16 +67,16 @@ contains
         end do
 
         if (.not. found) then
-            write(error_unit,*) "find_variable_in_table:: Error: variable not found in variable table."
+            write(error_unit,*) "find_var_io_in_table:: Error: variable not found in variable table."
             write(error_unit,*) "varname = ", trim(varname)
             stop 
         end if
 
         return
 
-    end subroutine find_variable_in_table
+    end subroutine find_var_io_in_table
 
-    subroutine load_variable_table(var_table,filename)
+    subroutine load_var_io_table(var_table,filename)
 
         implicit none
 
@@ -117,7 +117,7 @@ contains
                 call parse_dims(vt(n)%dims,vt(n)%dimnames)
                 vt(n)%ndims = size(vt(n)%dims)
                 ntot = ntot+1
-                !call var_io_print(vt(n))
+                call var_io_print(vt(n))
             end if
 
             if (n .eq. nmax) then
@@ -141,7 +141,7 @@ contains
 
         return
 
-    end subroutine load_variable_table
+    end subroutine load_var_io_table
 
     subroutine parse_line_to_variable(varname,dimnames,units,long_name,line)
 

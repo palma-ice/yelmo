@@ -5,7 +5,7 @@ module yelmo_defs
     use omp_lib
 
     use nml, only : nml_replace
-
+    
     implicit none 
 
     ! =========================================================================
@@ -971,7 +971,7 @@ module yelmo_defs
         logical :: pc_active 
 
     end type 
-
+    
     ! Define the overall yelmo_class, which is a container for
     ! all information needed to model a given domain (eg, Greenland, Antarctica, NH)
     type yelmo_class

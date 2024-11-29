@@ -520,8 +520,7 @@ contains
         type(bueler_test_type), intent(IN), optional :: buel 
 
         ! Local variables
-        integer    :: ncid, n, i, j, nx, ny  
-        real(prec) :: time_prev 
+        integer    :: ncid, n, i, j, nx, ny   
         real(prec), allocatable :: sym(:,:) 
 
         nx = ylmo%tpo%par%nx 
@@ -533,9 +532,7 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -604,7 +601,7 @@ contains
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"omega",ylmo%thrm%now%omega,units="--",long_name="Ice water content", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+        call nc_write(filename,"T_prime",ylmo%thrm%now%T_prime,units="deg C",long_name="Homologous ice temperature", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 !         call nc_write(filename,"T_pmp",ylmo%thrm%now%T_pmp,units="K",long_name="Ice pressure melting point (pmp)", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -853,7 +850,6 @@ contains
         
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny  
-        real(prec) :: time_prev 
 
         nx = ylmo%tpo%par%nx 
         ny = ylmo%tpo%par%ny 
@@ -862,9 +858,7 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)

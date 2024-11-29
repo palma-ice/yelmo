@@ -119,7 +119,6 @@ contains
 
         ! Local variables
         integer    :: ncid, n, q, qtot
-        real(prec) :: time_prev 
         character(len=56), allocatable :: names(:) 
         logical ::  write_pd_metrics 
 
@@ -160,15 +159,13 @@ contains
         call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
         call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
         call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
-        stop
+
         
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)

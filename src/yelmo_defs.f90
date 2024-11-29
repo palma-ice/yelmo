@@ -651,6 +651,7 @@ module yelmo_defs
         real(wp), allocatable :: T_ice(:,:,:)     ! [K]     Ice temp. 
         real(wp), allocatable :: omega(:,:,:)     ! [--]    Ice water content
         real(wp), allocatable :: T_pmp(:,:,:)     ! Pressure-corrected melting point
+        real(wp), allocatable :: T_prime(:,:,:)   ! Pressure-corrected temperature
         
         real(wp), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
         real(wp), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 
@@ -971,7 +972,7 @@ module yelmo_defs
         logical :: pc_active 
 
     end type 
-    
+
     ! Define the overall yelmo_class, which is a container for
     ! all information needed to model a given domain (eg, Greenland, Antarctica, NH)
     type yelmo_class

@@ -40,7 +40,7 @@ contains
         ny = thrm%par%ny
 
         allocate(H_w_now(nx,ny)) 
-        H_w_now = 0.0_prec 
+        H_w_now = 0.0_wp
 
         ! Initialize time if necessary 
         if (thrm%par%time .gt. dble(time)) then 
@@ -143,7 +143,7 @@ end select
 
             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%f_ice,tpo%now%f_grnd, &
-                                    -thrm%now%bmb_grnd*(bnd%c%rho_ice/bnd%c%rho_w),dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+                                    -thrm%now%bmb_grnd*(bnd%c%rho_ice/bnd%c%rho_w),dt*0.5_wp,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 
@@ -256,8 +256,9 @@ end select
 
         end if 
 
-        ! Calculate homologous temperature at the base 
-        thrm%now%T_prime_b = thrm%now%T_ice(:,:,1) - thrm%now%T_pmp(:,:,1) 
+        ! Calculate homologous temperature eveerywhere and at the base 
+        thrm%now%T_prime   = thrm%now%T_ice - thrm%now%T_pmp 
+        thrm%now%T_prime_b = thrm%now%T_prime(:,:,1)
         
         ! Calculate gridpoint fraction at the pressure melting point
         call calc_f_pmp(thrm%now%f_pmp,thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1), &
@@ -404,11 +405,11 @@ end select
                 end if 
 
                 T_ice(i,j,:)  = define_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
-                omega(i,j,:)  = 0.0_prec 
+                omega(i,j,:)  = 0.0_wp 
                 call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
-                bmb_grnd(i,j) = 0.0_prec
-                Q_ice_b(i,j)  = 0.0_prec 
-                H_cts(i,j)    = 0.0_prec
+                bmb_grnd(i,j) = 0.0_wp
+                Q_ice_b(i,j)  = 0.0_wp 
+                H_cts(i,j)    = 0.0_wp
 
             end if 
 
@@ -596,8 +597,8 @@ end select
 
         ! In case of method=="temp", prescribe some parameters
         if (trim(par%method) .eq. "temp") then  
-            par%enth_cr   = 1.0_prec 
-            par%omega_max = 0.0_prec 
+            par%enth_cr   = 1.0_wp 
+            par%omega_max = 0.0_wp 
         end if 
 
         ! Set internal parameters
@@ -659,6 +660,7 @@ end select
         allocate(now%T_ice(nx,ny,nz_aa))
         allocate(now%omega(nx,ny,nz_aa))
         allocate(now%T_pmp(nx,ny,nz_aa))
+        allocate(now%T_prime(nx,ny,nz_aa))
         allocate(now%bmb_grnd(nx,ny))
         allocate(now%f_pmp(nx,ny))
         allocate(now%Q_strn(nx,ny,nz_aa))
@@ -682,6 +684,7 @@ end select
         now%T_ice       = 0.0
         now%omega       = 0.0  
         now%T_pmp       = 0.0
+        now%T_prime     = 0.0
         now%bmb_grnd    = 0.0 
         now%f_pmp       = 0.0 
         now%Q_strn      = 0.0 
@@ -715,6 +718,7 @@ end select
         if (allocated(now%T_ice))       deallocate(now%T_ice)
         if (allocated(now%omega))       deallocate(now%omega)
         if (allocated(now%T_pmp))       deallocate(now%T_pmp)
+        if (allocated(now%T_prime))     deallocate(now%T_prime)
         if (allocated(now%bmb_grnd))    deallocate(now%bmb_grnd)
         if (allocated(now%f_pmp))       deallocate(now%f_pmp)
         if (allocated(now%Q_strn))      deallocate(now%Q_strn)

@@ -29,17 +29,17 @@ contains
         type(ydyn_class),   intent(IN)    :: dyn 
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd     
-        real(prec),         intent(IN)    :: time    ! Current time (for age tracing)
+        real(wp),           intent(IN)    :: time    ! Current time (for age tracing)
 
         ! Local variables
-        integer    :: k, nz_aa
-        real(prec) :: dt
+        integer  :: k, nz_aa
+        real(wp) :: dt
 
-        real(prec), allocatable :: X_srf(:,:) 
-        logical,    allocatable :: mask_tracers(:,:) 
+        real(wp), allocatable :: X_srf(:,:) 
+        logical,  allocatable :: mask_tracers(:,:) 
 
-        real(prec), parameter   :: enh_min = 0.1_wp       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
-        real(prec), parameter   :: enh_max = 10.0_wp      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(wp), parameter   :: enh_min = 0.1_wp       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(wp), parameter   :: enh_max = 10.0_wp      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
 
         nz_aa = mat%par%nz_aa
 
@@ -277,15 +277,15 @@ contains
 
         type(ymat_param_class), intent(OUT) :: par
         character(len=*),       intent(IN)  :: filename
-        real(prec),             intent(IN)  :: zeta_aa(:)
-        real(prec),             intent(IN)  :: zeta_ac(:)
+        real(wp),               intent(IN)  :: zeta_aa(:)
+        real(wp),               intent(IN)  :: zeta_ac(:)
         integer,                intent(IN)  :: nx, ny 
-        real(prec),             intent(IN)  :: dx  
+        real(wp),               intent(IN)  :: dx  
         logical, optional,      intent(IN)  :: init 
 
         ! Local variables 
-        logical :: init_pars 
-        real(prec) :: age_iso(10) 
+        logical  :: init_pars 
+        real(wp) :: age_iso(10) 
 
         age_iso = 0.0 
         

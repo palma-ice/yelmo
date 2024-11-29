@@ -14,8 +14,6 @@ module velocity_diva
                         picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
 
-    use grid_calcs 
-
     implicit none 
 
     type diva_param_class

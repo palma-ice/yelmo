@@ -12,9 +12,6 @@ $(objdir)/ncio.o: $(libdir)/ncio.f90
 $(objdir)/nml.o: $(libdir)/nml.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/grid_calcs.o: $(libdir)/grid_calcs.f90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
 $(objdir)/gaussian_filter.o: $(libdir)/coordinates-light/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -63,14 +60,14 @@ $(objdir)/grounding_line_flux.o: $(srcdir)/physics/grounding_line_flux.f90 $(obj
 $(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o $(objdir)/grid_calcs.o
+$(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/discharge.o: $(srcdir)/physics/discharge.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/thermodynamics.o : $(srcdir)/physics/thermodynamics.f90 $(objdir)/yelmo_defs.o \
-						$(objdir)/gaussian_filter.o $(objdir)/grid_calcs.o
+						$(objdir)/gaussian_filter.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/ice_tracer.o : $(srcdir)/physics/ice_tracer.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
@@ -131,8 +128,7 @@ $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o \
-						  	$(objdir)/grid_calcs.o
+						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
@@ -163,7 +159,7 @@ $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_def
  							  $(objdir)/mass_conservation.o $(objdir)/calving.o \
 							  $(objdir)/discharge.o \
  							  $(objdir)/runge_kutta.o \
- 							  $(objdir)/topography.o $(objdir)/grid_calcs.o
+ 							  $(objdir)/topography.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o \
@@ -239,7 +235,6 @@ yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 					   $(objdir)/ice_enhancement.o \
 					   $(objdir)/ice_optimization.o \
 					   $(objdir)/grid_to_cdo.o \
-					   $(objdir)/grid_calcs.o \
 					   $(objdir)/index.o \
 					   $(objdir)/interp1D.o \
 					   $(objdir)/interp2D.o \

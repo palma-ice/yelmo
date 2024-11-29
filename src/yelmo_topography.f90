@@ -13,9 +13,7 @@ module yelmo_topography
     use discharge
 
     use runge_kutta 
-
-    use grid_calcs 
-
+    
     implicit none
     
     private

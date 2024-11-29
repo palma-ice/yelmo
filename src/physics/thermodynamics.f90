@@ -9,8 +9,6 @@ module thermodynamics
     use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                             set_boundaries_3D_aa
     
-    use grid_calcs 
-
     implicit none 
 
     private  

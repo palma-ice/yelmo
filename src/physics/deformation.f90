@@ -14,9 +14,7 @@ module deformation
     use yelmo_tools, only : get_neighbor_indices, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
                     acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, acz_to_nodes_3D
-                    
-    use grid_calcs 
-
+    
     implicit none 
     
     private

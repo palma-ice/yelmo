@@ -38,8 +38,8 @@ contains
         real(prec), allocatable :: X_srf(:,:) 
         logical,    allocatable :: mask_tracers(:,:) 
 
-        real(prec), parameter   :: enh_min = 0.1_prec       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
-        real(prec), parameter   :: enh_max = 10.0_prec      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(prec), parameter   :: enh_min = 0.1_wp       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(prec), parameter   :: enh_max = 10.0_wp      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
 
         nz_aa = mat%par%nz_aa
 
@@ -67,7 +67,7 @@ contains
             ! (avoid very fast-flowing ice, as they are not interesting here)
             ! Surface value will be imposed in these places 
             mask_tracers = .TRUE. 
-            where (dyn%now%uxy_bar .gt. 500.0_prec) mask_tracers = .FALSE. 
+            where (dyn%now%uxy_bar .gt. 500.0_wp) mask_tracers = .FALSE. 
 
             call calc_tracer_3D(mat%now%dep_time,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                 tpo%now%H_ice,tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method, &
@@ -183,8 +183,8 @@ contains
                 where (mat%now%enh_bnd .gt. enh_max) mat%now%enh_bnd = enh_max
                 
                 ! Additionally update field to impose a value of one in streaming/floating regimes 
-                call modify_enhancement_factor_bnd(mat%now%enh_bnd,tpo%now%f_grnd,dyn%now%uxy_bar,enh_stream=1.0_prec, &
-                                enh_shlf=1.0_prec,umin=mat%par%enh_umin,umax=mat%par%enh_umax)
+                call modify_enhancement_factor_bnd(mat%now%enh_bnd,tpo%now%f_grnd,dyn%now%uxy_bar,enh_stream=1.0_wp, &
+                                enh_shlf=1.0_wp,umin=mat%par%enh_umin,umax=mat%par%enh_umax)
 
         
                 ! Finally scale enh by enh_bnd 

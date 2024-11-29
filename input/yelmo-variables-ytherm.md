@@ -6,6 +6,7 @@
 | T_ice             | xc, yc, zeta     | K            | Ice temperature                               |
 | omega             | xc, yc, zeta     | -            | Ice water content                             |
 | T_pmp             | xc, yc, zeta     | K            | Pressure-corrected melting point              |
+| T_prime           | xc, yc, zeta     | deg C        | Homologous ice temperature                    |
 | f_pmp             | xc, yc           | -            | Fraction of cell at pressure melting point    |
 | bmb_grnd          | xc, yc           | m/yr         | Grounded basal mass balance                   |
 | Q_strn            | xc, yc, zeta     | W m^-3       | Internal strain heatction                     |

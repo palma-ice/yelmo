@@ -760,9 +760,9 @@ contains
         end select
         
         ! Determine rate of mass balance related to changes applied here
-
+        ! (10% higher for safety - this will be adjusted by apply_tendency later anyway)
         if (dt .ne. 0.0) then 
-            mb_resid = (H_ice_new - H_ice) / dt 
+            mb_resid = 1.1 * (H_ice_new - H_ice) / dt 
         else 
             mb_resid = 0.0
         end if

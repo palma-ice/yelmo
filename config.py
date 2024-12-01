@@ -6,6 +6,39 @@ configuration for a given machine.
 from subprocess import *
 import argparse
 import sys
+import re
+
+def parse_makefile(filename="Makefile"):
+    """
+    Parses a Makefile and prints a list of available `make` commands (targets).
+    
+    Args:
+        filename (str): The path to the Makefile. Defaults to "Makefile".
+    """
+    try:
+        with open(filename, 'r') as file:
+            lines = file.readlines()
+            
+        targets = []
+        for line in lines:
+            # Strip comments and whitespace
+            line = line.split('#')[0].strip()
+            
+            # Match lines with targets (e.g., target: dependencies)
+            match = re.match(r'^([a-zA-Z0-9_-]+)\s*:\s*(.*)', line)
+            if match and not line.startswith('\t'):
+                target = match.group(1)
+                targets.append(target)
+        
+        print("Available `make` commands (targets):")
+        for target in targets:
+            print(f"  - {target}")
+        print("")
+        
+    except FileNotFoundError:
+        print(f"Error: File '{filename}' not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 # Manage command-line arguments to load compiler option
 parser = argparse.ArgumentParser()
@@ -41,23 +74,26 @@ print(
     )
 )
 
-instructions = """==== How to run yelmo ====\n
-# Make a link to the ice_data path, if available.
-ln -s path/to/ice_data ice_data 
+# instructions = """==== How to run yelmo ====\n
+# # Make a link to the ice_data path, if available.
+# ln -s path/to/ice_data ice_data 
 
-# Compile a test program
-make clean 
-make benchmarks      # makes executable libyelmo/bin/yelmo_benchmarks.x 
+# # Compile a test program
+# make clean 
+# make benchmarks      # makes executable libyelmo/bin/yelmo_benchmarks.x 
 
-# Run the program using runylmo (see runylmo -h for details) 
-./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml 
+# # Run the program using runylmo (see runylmo -h for details) 
+# ./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml 
 
-# Check the output 
-cd output/test 
-ncview yelmo2D.nc 
-"""
+# # Check the output 
+# cd output/test 
+# ncview yelmo2D.nc 
+# """
 
-print(instructions)
+# print(instructions)
+
+# Print usage
+parse_makefile("Makefile")
 
 
 ### Old script commands to automatically determine the config_path from host + compiler:

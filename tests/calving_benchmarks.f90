@@ -125,7 +125,7 @@ contains
         
         r = sqrt(xx*xx+yy*yy);
 
-        if (r .gt. r_lim) then 
+        if (r .ge. r_lim) then 
             mask = .TRUE.
         else
             mask = .FALSE.

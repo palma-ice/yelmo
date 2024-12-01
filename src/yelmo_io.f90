@@ -131,7 +131,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 15 
+            qtot = 18 
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -139,15 +139,18 @@ contains
             names(4)  = "mask_bed"
             names(5)  = "uxy_b"
             names(6)  = "uxy_s"
-            names(7)  = "beta"
-            names(8)  = "visc_bar"
-            names(9)  = "T_prime_b"
-            names(10) = "H_w"
-            names(11) = "mb_net"
-            names(12) = "smb"
-            names(13) = "bmb"
-            names(14) = "cmb"
-            names(15) = "z_sl"
+            names(7)  = "uxy_bar"
+            names(8)  = "ux_bar"
+            names(9)  = "uy_bar"
+            names(10) = "beta"
+            names(11) = "visc_bar"
+            names(12) = "T_prime_b"
+            names(13) = "H_w"
+            names(14) = "mb_net"
+            names(15) = "smb"
+            names(16) = "bmb"
+            names(17) = "cmb"
+            names(18) = "z_sl"
 
         end if 
 
@@ -160,7 +163,7 @@ contains
         call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
         call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
 
-        
+
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -182,15 +185,19 @@ contains
         qtot = size(names) 
 
         ! Loop over variables and write each variable
+if (.FALSE.) then
+        ! Use variable_io
         do q = 1, qtot 
-            !if (trim(names(q)) .eq. "H_ice") then
                 call find_var_io_in_table(io%v,names(q),io%tpo)
                 call yelmo_write_var_io(filename,io%v,ylmo,n,ncid)
-            !else
-            !    call yelmo_write_var(filename,names(q),ylmo,n,ncid)
-            !end if
+        end do
+else
+        ! Use hard-coded variable writing
+        do q = 1, qtot 
+               call yelmo_write_var(filename,names(q),ylmo,n,ncid)
         end do 
-        
+end if
+
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -227,6 +234,9 @@ contains
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("uxy_s")
                 call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("uxy_bar")
+                call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("beta")
                 call nc_write(filename,"beta",ylmo%dyn%now%beta,start=[1,1,n], &
@@ -310,6 +320,15 @@ contains
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             case("uxy_s")
                 call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/yr",long_name="Surface velocity magnitude", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("uxy_bar")
+                call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/yr",long_name="Depth-averaged velocity magnitude", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("ux_bar")
+                call nc_write(filename,"ux_bar",ylmo%dyn%now%ux_bar,units="m/yr",long_name="Depth-averaged x-velocity", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("uy_bar")
+                call nc_write(filename,"uy_bar",ylmo%dyn%now%uy_bar,units="m/yr",long_name="Depth-averaged y-velocity", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             case("beta")
                 call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa yr m-1",long_name="Basal friction coefficient", &

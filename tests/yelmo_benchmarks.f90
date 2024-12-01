@@ -383,14 +383,6 @@ program yelmo_benchmarks
             yelmo1%bnd%enh_srf = 1.0 
         end if 
 
-        if (time .le. 50e3) then 
-            yelmo1%thrm%par%method      = "temp"
-            yelmo1%thrm%par%rock_method = "equil"
-        else 
-            yelmo1%thrm%par%method      = trim(thrm_method_default)
-            yelmo1%thrm%par%rock_method = trim(rock_method_default)
-        end if 
-
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
         
@@ -676,6 +668,10 @@ contains
             call nc_write(filename,"div2D",ylmo%mat%now%strn2D%div,units="yr^-1",long_name="Divergence strain rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"te2D",ylmo%mat%now%strs2D%te,units="Pa",long_name="Effective stress", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            
+            sym = ylmo%mat%now%strn2D%de(nx:1:-1,:) - ylmo%mat%now%strn2D%de
+            call nc_write(filename,"de2D_sym",sym,units="yr^-1",long_name="Effective strain rate symmetry resid.", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             
             call nc_write(filename,"eps_eig_1",ylmo%mat%now%strn2D%eps_eig_1,units="1/yr",long_name="Eigen strain 1", &

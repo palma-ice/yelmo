@@ -216,11 +216,9 @@ contains
             do j = 1, ny 
             do i = 1, nx 
             
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                
                 fact_ac = 0.5_wp*(fact_ab(i,j)+fact_ab(i,jm1))
                 ux(i,j,k) = ux(i,j,k-1) &
                             + fact_ac*0.5_wp*(tau_xz(i,j,k)+tau_xz(i,j,k-1))

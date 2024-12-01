@@ -116,6 +116,11 @@ jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab/stro
 jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab-sd0.1/weak   -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=1000 ctrl.H_stdev=0.1 ydyn.visc_const=1e5 ydyn.beta_const=1e3 ydyn.solver="diva","hybrid","l1l2","ssa","sia"
 jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab-sd0.1/strong -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=500  ctrl.H_stdev=0.1 ydyn.visc_const=4e5 ydyn.beta_const=30  ydyn.solver="diva","hybrid","l1l2","ssa","sia"
 
+### CalvingMIP ###
+#runopt='-rs  -q 12h -w 05:00:00'
+#output/bench-2024-12-01
+
+./runme ${runopt} -e calving -n par/yelmo_calving.nml -o ${fldr}/calvmip-exp01 -p ctl.exp="exp1" ctl.dt2D_out=100 ctl.time_end=4100
 
 ### AGE TESTS ###
 

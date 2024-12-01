@@ -4,7 +4,7 @@ module thermodynamics
     ! Note: once icetemp is working well, this module could be 
     ! remerged into icetemp as one module. 
 
-    use yelmo_defs, only : prec, wp, pi, TOL_UNDERFLOW 
+    use yelmo_defs, only : wp, pi, TOL_UNDERFLOW 
 
     use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                             set_boundaries_3D_aa
@@ -50,17 +50,17 @@ contains
 
         implicit none 
         
-        real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
-        real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
-        real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Ice basal heat flux (positive up)
-        real(prec), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating
-        real(prec), intent(IN)  :: Q_rock_now        ! [J a-1 m-2] Geothermal heat flux 
-        real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
-        real(prec), intent(IN)  :: L_ice
+        real(wp), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
+        real(wp), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
+        real(wp), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Ice basal heat flux (positive up)
+        real(wp), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating
+        real(wp), intent(IN)  :: Q_rock_now        ! [J a-1 m-2] Geothermal heat flux 
+        real(wp), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
+        real(wp), intent(IN)  :: L_ice
 
         ! Local variables
-        real(prec) :: Q_net  
-        real(prec), parameter :: tol = 1e-5  
+        real(wp) :: Q_net  
+        real(wp), parameter :: tol = 1e-5  
 
         ! Calculate the grounded basal mass balance following 
         ! Cuffey and Patterson (2010), Eq. 9.38 (Page 420)
@@ -70,16 +70,16 @@ contains
         
         bmb_grnd = -Q_net /(rho_ice*L_ice)
 
-        if (T_prime_b .lt. -1.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
+        if (T_prime_b .lt. -1.0_wp .and. bmb_grnd .lt. 0.0_wp) then 
             ! Only allow melting for a near-temperate base 
             ! This is a safety-check to prevent strange things from
             ! happening, mainly during initialization when temperatures
             ! are not well defined.
-            bmb_grnd = 0.0_prec 
+            bmb_grnd = 0.0_wp 
         end if 
 
         ! Limit small values to avoid underflow errors 
-        if (abs(bmb_grnd) .lt. tol) bmb_grnd = 0.0_prec 
+        if (abs(bmb_grnd) .lt. tol) bmb_grnd = 0.0_wp 
                   
         return 
 
@@ -93,15 +93,15 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT)   :: advecz(:)      ! nz_aa: bottom, cell centers, top 
-        real(prec), intent(INOUT) :: Q(:)           ! nz_aa: bottom, cell centers, top 
-        real(prec), intent(IN)    :: uz(:)          ! nz_ac: cell boundaries
-        real(prec), intent(IN)    :: H_ice          ! Ice thickness 
-        real(prec), intent(IN)    :: zeta_aa(:)    ! nz_aa, cell centers
+        real(wp), intent(OUT)   :: advecz(:)      ! nz_aa: bottom, cell centers, top 
+        real(wp), intent(INOUT) :: Q(:)           ! nz_aa: bottom, cell centers, top 
+        real(wp), intent(IN)    :: uz(:)          ! nz_ac: cell boundaries
+        real(wp), intent(IN)    :: H_ice          ! Ice thickness 
+        real(wp), intent(IN)    :: zeta_aa(:)    ! nz_aa, cell centers
         
         ! Local variables
         integer :: k, nz_aa   
-        real(prec) :: u_aa, dx  
+        real(wp) :: u_aa, dx  
 
         nz_aa = size(zeta_aa,1)
 
@@ -110,7 +110,7 @@ contains
         ! Loop over internal cell centers and perform upwind advection 
         do k = 2, nz_aa-1 
             
-            u_aa = 0.5_prec*(uz(k-1)+uz(k))
+            u_aa = 0.5_wp*(uz(k-1)+uz(k))
             
             if (u_aa < 0.0) then 
                 ! Upwind negative
@@ -135,25 +135,25 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: advecxy(:)       ! nz_aa 
-        real(prec), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
-        real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz
-        real(prec), intent(IN)  :: dx  
+        real(wp), intent(OUT) :: advecxy(:)       ! nz_aa 
+        real(wp), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(wp), intent(IN)  :: H_ice(:,:)       ! nx,ny 
+        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz
+        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz
+        real(wp), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
 
         ! Local variables 
         integer :: k, nx, ny, nz_aa 
-        real(prec) :: ux_aa, uy_aa 
-        real(prec) :: dx_inv, dx_inv2
-        real(prec) :: advecx, advecy 
+        real(wp) :: ux_aa, uy_aa 
+        real(wp) :: dx_inv, dx_inv2
+        real(wp) :: advecx, advecy 
 
-        real(prec) :: var_w, var_e, var_s, var_n 
+        real(wp) :: var_w, var_e, var_s, var_n 
 
         ! Define some constants 
-        dx_inv  = 1.0_prec / dx 
-        dx_inv2 = 1.0_prec / (2.0_prec*dx)
+        dx_inv  = 1.0_wp / dx 
+        dx_inv2 = 1.0_wp / (2.0_wp*dx)
 
         nx  = size(var_ice,1)
         ny  = size(var_ice,2)
@@ -167,8 +167,8 @@ contains
         do k = 1, nz_aa 
 
             ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
-            ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
-            uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+            ux_aa = 0.5_wp*(ux(i,j,k)+ux(i-1,j,k))
+            uy_aa = 0.5_wp*(uy(i,j,k)+uy(i,j-1,k))
             
             ! Explicit form (to test different order approximations)
             if (ux(i,j,k) .gt. 0.0 .and. ux(i-1,j,k) .gt. 0.0 .and. i .ge. 3 .and. i .le. nx-1) then  
@@ -256,26 +256,26 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: advecxy(:)       ! nz_aa 
-        real(prec), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
-        real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
-        real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa 
-        real(prec), intent(IN)  :: dx  
+        real(wp), intent(OUT) :: advecxy(:)       ! nz_aa 
+        real(wp), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(wp), intent(IN)  :: H_ice(:,:)       ! nx,ny 
+        real(wp), intent(IN)  :: z_srf(:,:)       ! nx,ny 
+        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa 
+        real(wp), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: k, nx, ny, nz_aa 
         integer :: im1, ip1, jm1, jp1
-        real(prec) :: ux_aa, uy_aa 
-        real(prec) :: dx_inv, dx_inv2
-        real(prec) :: advecx, advecy, advec_rev 
+        real(wp) :: ux_aa, uy_aa 
+        real(wp) :: dx_inv, dx_inv2
+        real(wp) :: advecx, advecy, advec_rev 
 
         ! Define some constants 
-        dx_inv  = 1.0_prec / dx 
-        dx_inv2 = 1.0_prec / (2.0_prec*dx)
+        dx_inv  = 1.0_wp / dx 
+        dx_inv2 = 1.0_wp / (2.0_wp*dx)
 
         nx  = size(var_ice,1)
         ny  = size(var_ice,2)
@@ -292,11 +292,11 @@ contains
         do k = 1, nz_aa 
 
             ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
-            ux_aa = 0.5_prec*(ux(i,j,k)+ux(im1,j,k))
-            uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,jm1,k))
+            ux_aa = 0.5_wp*(ux(i,j,k)+ux(im1,j,k))
+            uy_aa = 0.5_wp*(uy(i,j,k)+uy(i,jm1,k))
             
             ! Explicit form (to test different order approximations)
-            if (ux(im1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
+            if (ux(im1,j,k) .gt. 0.0_wp .and. ux(i,j,k) .lt. 0.0_wp .and. i .ge. 3 .and. i .le. nx-2) then 
                 ! Convergent flow - take the mean 
 
                 ! 2nd order
@@ -307,7 +307,7 @@ contains
                 advecx    = dx_inv * ux(im1,j,k)*(-(var_ice(im1,j,k)-var_ice(i,j,k)))
                 advec_rev = dx_inv * ux(i,j,k)*((var_ice(ip1,j,k)-var_ice(i,j,k)))
                 
-                advecx    = 0.5_prec * (advecx + advec_rev) 
+                advecx    = 0.5_wp * (advecx + advec_rev) 
 
             else if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
                 ! Flow to the right - inner points
@@ -346,7 +346,7 @@ contains
 
             end if 
 
-            if (uy(i,j-1,k) .gt. 0.0_prec .and. uy(i,j,k) .lt. 0.0_prec .and. j .ge. 3 .and. j .le. ny-2) then 
+            if (uy(i,j-1,k) .gt. 0.0_wp .and. uy(i,j,k) .lt. 0.0_wp .and. j .ge. 3 .and. j .le. ny-2) then 
                 ! Convergent flow - take the mean 
 
                 ! 2nd order
@@ -357,7 +357,7 @@ contains
                 advecy    = dx_inv * uy(i,jm1,k)*(-(var_ice(i,jm1,k)-var_ice(i,j,k)))
                 advec_rev = dx_inv * uy(i,j,k)*((var_ice(i,jp1,k)-var_ice(i,j,k)))
                 
-                advecy    = 0.5_prec * (advecy + advec_rev) 
+                advecy    = 0.5_wp * (advecy + advec_rev) 
 
             else if (uy_aa .gt. 0.0 .and. j .ge. 3) then   
                 ! Flow to the right  - inner points
@@ -408,23 +408,23 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: advecxy(:,:,:)     ! nz_aa 
-        real(prec), intent(IN)    :: var(:,:,:)         ! nx,ny,nz_aa  Enth, T, age, etc...
-        real(prec), intent(IN)    :: H_ice(:,:)         ! nx,ny 
-        real(prec), intent(IN)    :: z_srf(:,:)         ! nx,ny 
-        real(prec), intent(IN)    :: ux(:,:,:)          ! nx,ny,nz_aa
-        real(prec), intent(IN)    :: uy(:,:,:)          ! nx,ny,nz_aa
-        real(prec), intent(IN)    :: zeta_aa(:)         ! nz_aa 
-        real(prec), intent(IN)    :: dx  
-        real(prec), intent(IN)    :: beta1              ! Weighting term for multistep advection scheme
-        real(prec), intent(IN)    :: beta2              ! Weighting term for multistep advection scheme
+        real(wp), intent(INOUT) :: advecxy(:,:,:)     ! nz_aa 
+        real(wp), intent(IN)    :: var(:,:,:)         ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(wp), intent(IN)    :: H_ice(:,:)         ! nx,ny 
+        real(wp), intent(IN)    :: z_srf(:,:)         ! nx,ny 
+        real(wp), intent(IN)    :: ux(:,:,:)          ! nx,ny,nz_aa
+        real(wp), intent(IN)    :: uy(:,:,:)          ! nx,ny,nz_aa
+        real(wp), intent(IN)    :: zeta_aa(:)         ! nz_aa 
+        real(wp), intent(IN)    :: dx  
+        real(wp), intent(IN)    :: beta1              ! Weighting term for multistep advection scheme
+        real(wp), intent(IN)    :: beta2              ! Weighting term for multistep advection scheme
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j 
         integer :: nx, ny, nz  
 
-        real(prec), allocatable   :: advecxy_nm1(:,:,:) ! nz_aa, advective term from previous timestep
+        real(wp), allocatable   :: advecxy_nm1(:,:,:) ! nz_aa, advective term from previous timestep
 
         nx = size(advecxy,1)
         ny = size(advecxy,2) 
@@ -436,7 +436,7 @@ contains
         advecxy_nm1 = advecxy 
 
         ! Reset current solution to zero 
-        advecxy = 0.0_prec 
+        advecxy = 0.0_wp 
          
         do j = 2, ny-1
         do i = 2, nx-1 
@@ -482,13 +482,13 @@ contains
 
         implicit none
 
-        real(prec), intent(INOUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
-        real(prec), intent(IN)    :: de(:,:,:)          ! nx,ny,nz_aa [a-1] Effective strain rate 
-        real(prec), intent(IN)    :: visc(:,:,:)        ! nx,ny,nz_aa [Pa a-1] Viscosity
-        real(prec), intent(IN)    :: cp(:,:,:)          ! nx,ny,nz_aa [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)    :: rho_ice            ! [kg m-3] Ice density 
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        real(wp), intent(INOUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
+        real(wp), intent(IN)    :: de(:,:,:)          ! nx,ny,nz_aa [a-1] Effective strain rate 
+        real(wp), intent(IN)    :: visc(:,:,:)        ! nx,ny,nz_aa [Pa a-1] Viscosity
+        real(wp), intent(IN)    :: cp(:,:,:)          ! nx,ny,nz_aa [J kg-1 K-1] Specific heat capacity
+        real(wp), intent(IN)    :: rho_ice            ! [kg m-3] Ice density 
+        real(wp), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(wp), intent(IN)    :: beta2              ! Timestepping weighting parameter
         
         ! Local variables
         integer :: nz_aa 
@@ -500,7 +500,7 @@ contains
         Q_strn = beta1*(4.0*visc * de**2) + beta2*Q_strn 
         
         ! Ensure Q_strn is strictly positive 
-        where (Q_strn .lt. 0.0_prec) Q_strn = 0.0_prec 
+        where (Q_strn .lt. 0.0_wp) Q_strn = 0.0_wp 
 
         return 
 
@@ -519,28 +519,28 @@ contains
 
         implicit none
 
-        real(prec), intent(INOUT) :: Q_strn(:,:,:)    ! nx,ny,nz_aa  [Pa m a-1 ??] Heat production
-        real(prec), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity x-direction
-        real(prec), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity y-direction
-        real(prec), intent(IN)    :: dzsdx(:,:)       ! nx,ny        [m m-1] Surface slope x-direction
-        real(prec), intent(IN)    :: dzsdy(:,:)       ! nx,ny        [m m-1] Surface slope y-direction
-        real(prec), intent(IN)    :: cp(:,:,:)        ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
-        real(prec), intent(IN)    :: H_ice(:,:)       ! nx,ny        [m] Ice thickness
-        real(prec), intent(IN)    :: rho_ice          ! [kg m-3] Ice density 
-        real(prec), intent(IN)    :: g
-        real(prec), intent(IN)    :: zeta_aa(:)       ! [-] Height axis, centered aa-nodes 
-        real(prec), intent(IN)    :: zeta_ac(:)       ! [-] Height axis, boundaries ac-nodes
-        real(prec), intent(IN)    :: beta1            ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2            ! Timestepping weighting parameter
+        real(wp), intent(INOUT) :: Q_strn(:,:,:)    ! nx,ny,nz_aa  [Pa m a-1 ??] Heat production
+        real(wp), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity x-direction
+        real(wp), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity y-direction
+        real(wp), intent(IN)    :: dzsdx(:,:)       ! nx,ny        [m m-1] Surface slope x-direction
+        real(wp), intent(IN)    :: dzsdy(:,:)       ! nx,ny        [m m-1] Surface slope y-direction
+        real(wp), intent(IN)    :: cp(:,:,:)        ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
+        real(wp), intent(IN)    :: H_ice(:,:)       ! nx,ny        [m] Ice thickness
+        real(wp), intent(IN)    :: rho_ice          ! [kg m-3] Ice density 
+        real(wp), intent(IN)    :: g
+        real(wp), intent(IN)    :: zeta_aa(:)       ! [-] Height axis, centered aa-nodes 
+        real(wp), intent(IN)    :: zeta_ac(:)       ! [-] Height axis, boundaries ac-nodes
+        real(wp), intent(IN)    :: beta1            ! Timestepping weighting parameter
+        real(wp), intent(IN)    :: beta2            ! Timestepping weighting parameter
         
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa 
-        real(prec) :: ux_aa_up, ux_aa_dwn
-        real(prec) :: uy_aa_up, uy_aa_dwn
-        real(prec) :: duxdz, duydz
-        real(prec) :: dzsdx_aa, dzsdy_aa  
-        real(prec) :: dz, depth 
-        real(prec) :: Q_strn_now 
+        real(wp) :: ux_aa_up, ux_aa_dwn
+        real(wp) :: uy_aa_up, uy_aa_dwn
+        real(wp) :: duxdz, duydz
+        real(wp) :: dzsdx_aa, dzsdy_aa  
+        real(wp) :: dz, depth 
+        real(wp) :: Q_strn_now 
 
         nx    = size(Q_strn,1)
         ny    = size(Q_strn,2)
@@ -575,14 +575,14 @@ contains
                     Q_strn(i,j,k) = beta1*Q_strn_now + beta2*Q_strn(i,j,k) 
                     
                     ! Ensure Q_strn is strictly positive 
-                    if (Q_strn(i,j,k) .lt. 0.0_prec) Q_strn(i,j,k) = 0.0_prec 
+                    if (Q_strn(i,j,k) .lt. 0.0_wp) Q_strn(i,j,k) = 0.0_wp 
                 
                 end do 
 
             else 
                 ! No Q_strn outside of ice sheet 
                 
-                Q_strn(i,j,k) = 0.0_prec 
+                Q_strn(i,j,k) = 0.0_wp 
 
             end if 
 
@@ -600,15 +600,15 @@ contains
         ! i.e., the magnitude of basal stress multiplied with the magnitude of basal velocity.
         ! See Cuffey and Paterson, p. 418, Eq. 9.35. 
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: sec_year 
+        real(wp), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
+        real(wp), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(wp), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(wp), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(wp), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(wp), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
+        real(wp), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(wp), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        real(wp), intent(IN)    :: sec_year 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
@@ -648,14 +648,18 @@ contains
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Get neighbor indices limited to ice-covered points
+                ! im1m = im1
+                ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
+                ! ip1m = ip1
+                ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+                ! jm1m = jm1 
+                ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+                ! jp1m = jp1 
+                ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
                 im1m = im1
-                if (f_ice(im1,j) .lt. 1.0) im1m = i  
                 ip1m = ip1
-                if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
-                jm1m = jm1 
-                if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+                jm1m = jm1
                 jp1m = jp1 
-                if (f_ice(i,jp1) .lt. 1.0) jp1m = j
 
                 ! Get velocity components on nodes
                 call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
@@ -697,20 +701,20 @@ contains
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: sec_year
+        real(wp), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
+        real(wp), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(wp), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(wp), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(wp), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(wp), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(wp), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        real(wp), intent(IN)    :: sec_year
 
         ! Local variables
         integer    :: i, j, nx, ny, n 
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: uxy_aa, taub_aa 
-        real(prec) :: Q_b_now
+        real(wp) :: uxy_aa, taub_aa 
+        real(wp) :: Q_b_now
 
         nx = size(Q_b,1)
         ny = size(Q_b,2)
@@ -725,11 +729,11 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            uxy_aa  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(im1,j)))**2 &
-                          + (0.5_prec*(uy_b(i,j)+uy_b(i,jm1)))**2 )
+            uxy_aa  = sqrt( (0.5_wp*(ux_b(i,j)+ux_b(im1,j)))**2 &
+                          + (0.5_wp*(uy_b(i,j)+uy_b(i,jm1)))**2 )
 
-            taub_aa = sqrt( (0.5_prec*(taub_acx(i,j)+taub_acx(im1,j)))**2 &
-                          + (0.5_prec*(taub_acy(i,j)+taub_acy(i,jm1)))**2 )
+            taub_aa = sqrt( (0.5_wp*(taub_acx(i,j)+taub_acx(im1,j)))**2 &
+                          + (0.5_wp*(taub_acy(i,j)+taub_acy(i,jm1)))**2 )
             
             Q_b_now = abs(uxy_aa*taub_aa)      ! [Pa m a-1] == [J a-1 m-2]
 
@@ -741,7 +745,7 @@ contains
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
             ! Ensure Q_b is strictly positive 
-            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
+            if (Q_b(i,j) .lt. 0.0_wp) Q_b(i,j) = 0.0_wp 
             
         end do 
         end do 
@@ -757,31 +761,31 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: var_hi(:,:) 
-        real(prec), intent(IN)  :: var_1,var_2,var_3,var_4
+        real(wp), intent(OUT) :: var_hi(:,:) 
+        real(wp), intent(IN)  :: var_1,var_2,var_3,var_4
         
         ! Local variables 
         integer :: i, j, nx  
-        real(prec) :: dx 
-        real(prec) :: x(size(var_hi,1)), y(size(var_hi,2)) 
+        real(wp) :: dx 
+        real(wp) :: x(size(var_hi,1)), y(size(var_hi,2)) 
 
         nx = size(var_hi,1)
 
-        dx = 1/real(nx,prec)
+        dx = 1.0/real(nx,wp)
 
         ! Populate x,y axes for interpolation points (between 0 and 1)
         ! Note: x and y points are offset from values of 0 and 1 to be
         ! sure that each mini grid box has the same area contribution
         ! to the total grid cell.
         do i = 1, nx 
-            !x(i) = 0.0_prec + real(i-1)/real(nx-1)
-            x(i) = 0.5_prec*dx + real(i-1)*dx 
+            !x(i) = 0.0_wp + real(i-1)/real(nx-1)
+            x(i) = 0.5_wp*dx + real(i-1)*dx 
         end do 
         y = x 
 
 
         ! Calculate linear interpolation value 
-        var_hi = 0.0_prec 
+        var_hi = 0.0_wp 
 
         do i = 1, nx 
         do j = 1, nx 
@@ -804,18 +808,18 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: z1, z2, z3, z4 
-        real(prec), intent(IN) :: xout, yout 
-        real(prec) :: zout 
+        real(wp), intent(IN) :: z1, z2, z3, z4 
+        real(wp), intent(IN) :: xout, yout 
+        real(wp) :: zout 
 
         ! Local variables 
-        real(prec) :: x0, x1, y0, y1 
-        real(prec) :: alpha1, alpha2, p0, p1 
+        real(wp) :: x0, x1, y0, y1 
+        real(wp) :: alpha1, alpha2, p0, p1 
 
-        x0 = 0.0_prec 
-        x1 = 1.0_prec
-        y0 = 0.0_prec
-        y1 = 1.0_prec
+        x0 = 0.0_wp 
+        x1 = 1.0_wp
+        y0 = 0.0_wp
+        y1 = 1.0_wp
 
         alpha1  = (xout - x0) / (x1-x0)
         p0      = z3 + alpha1*(z4-z3)
@@ -832,8 +836,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: T_ice  
-        real(prec) :: cp 
+        real(wp), intent(IN) :: T_ice  
+        real(wp) :: cp 
 
         ! Specific heat capacity (Greve and Blatter, 2009, Eq. 4.39; Ritz, 1987)
         cp = (146.3 +7.253*T_ice)    ! [J kg-1 K-1]
@@ -846,9 +850,9 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: T_ice  
-        real(prec), intent(IN) :: sec_year 
-        real(prec) :: ct 
+        real(wp), intent(IN) :: T_ice  
+        real(wp), intent(IN) :: sec_year 
+        real(wp) :: ct 
 
         ! Heat conductivity (Greve and Blatter, 2009, Eq. 4.37; Ritz, 1987)
         ct = 9.828*exp(-0.0057*T_ice)*sec_year  ! [W m-1 K-1 * sec_year] => [J m-1 K-1 a-1]
@@ -864,20 +868,20 @@ contains
         
         implicit none 
 
-        real(prec), intent(IN) :: H_ice  ! [m] Total ice thickness of this point
-        real(prec), intent(IN) :: zeta   ! [-] Fractional height of this point within the ice
-        real(prec), intent(IN) :: T0     ! [K] Reference freezing point of water (e.g., 273.15 K or 0 C)
-        real(prec), intent(IN) :: beta   ! [K Pa^-1] Melting point gradient with pressure
-        real(prec), intent(IN) :: rho_ice 
-        real(prec), intent(IN) :: g 
-        real(prec) :: T_pmp              ! [K] Pressure corrected melting point
+        real(wp), intent(IN) :: H_ice  ! [m] Total ice thickness of this point
+        real(wp), intent(IN) :: zeta   ! [-] Fractional height of this point within the ice
+        real(wp), intent(IN) :: T0     ! [K] Reference freezing point of water (e.g., 273.15 K or 0 C)
+        real(wp), intent(IN) :: beta   ! [K Pa^-1] Melting point gradient with pressure
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: g 
+        real(wp) :: T_pmp              ! [K] Pressure corrected melting point
 
         ! Local variables
-        real(prec) :: depth
+        real(wp) :: depth
 
-!         real(prec), parameter :: beta = 9.8e-8 [K Pa^-1]      ! Greve and Blatter (2009) 
-!         real(prec), parameter :: beta = 9.7e-8 [K Pa^-1]      ! EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
-!         real(prec), parameter :: beta = 7.9e-8 [K Pa^-1]      ! Kleiner et al. (2015)
+!         real(wp), parameter :: beta = 9.8e-8 [K Pa^-1]      ! Greve and Blatter (2009) 
+!         real(wp), parameter :: beta = 9.7e-8 [K Pa^-1]      ! EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+!         real(wp), parameter :: beta = 7.9e-8 [K Pa^-1]      ! Kleiner et al. (2015)
 
         ! Get thickness of ice above current point
         depth = H_ice*(1.0-zeta)
@@ -912,20 +916,20 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            if (f_grnd(i,j) .eq. 0.0_prec) then
+            if (f_grnd(i,j) .eq. 0.0_wp) then
                 ! Floating points are temperate by default
-                f_pmp(i,j) = 1.0_prec 
+                f_pmp(i,j) = 1.0_wp 
 
             else 
                 ! Calculate the fraction at the pressure melting point 
 
-                if (gamma .eq. 0.0_prec) then
+                if (gamma .eq. 0.0_wp) then
                     ! No decay function, binary pmp fraction
 
                     if (T_ice(i,j) .ge. T_pmp(i,j)) then 
-                        f_pmp(i,j) = 1.0_prec
+                        f_pmp(i,j) = 1.0_wp
                     else 
-                        f_pmp(i,j) = 0.0_prec 
+                        f_pmp(i,j) = 0.0_wp 
                     end if  
 
                 else
@@ -936,8 +940,8 @@ contains
                     f_pmp(i,j) = exp(dT/gamma)
 
                     ! Ensure pure values of 0.0 and 1.0 beyond a threshold 
-                    if (f_pmp(i,j) .lt. 1e-2)        f_pmp(i,j) = 0.0_prec 
-                    if (f_pmp(i,j) .gt. (1.0-1e-2))  f_pmp(i,j) = 1.0_prec 
+                    if (f_pmp(i,j) .lt. 1e-2)        f_pmp(i,j) = 0.0_wp 
+                    if (f_pmp(i,j) .gt. (1.0-1e-2))  f_pmp(i,j) = 1.0_wp 
 
                 end if 
 
@@ -958,20 +962,20 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice 
-        real(prec), intent(IN) :: T_pmp 
-        real(prec), intent(IN) :: H_grnd 
-        real(prec), intent(IN) :: T0 
-        real(prec), intent(IN) :: rho_ice
-        real(prec), intent(IN) :: rho_sw 
-        real(prec) :: T_base_shlf
+        real(wp), intent(IN) :: H_ice 
+        real(wp), intent(IN) :: T_pmp 
+        real(wp), intent(IN) :: H_grnd 
+        real(wp), intent(IN) :: T0 
+        real(wp), intent(IN) :: rho_ice
+        real(wp), intent(IN) :: rho_sw 
+        real(wp) :: T_base_shlf
 
         ! Local variables 
-        real(prec), parameter :: a1 = - 0.0575      ! [degC / PSU]
-        real(prec), parameter :: b1 =   0.0901      ! [degC]
-        real(prec), parameter :: c1 =   7.61E-4     ! [degC / m]
-        real(prec), parameter :: S0 =   34.75       ! [g / kg == PSU]
-        real(prec) :: f_scalar, H_grnd_lim 
+        real(wp), parameter :: a1 = - 0.0575      ! [degC / PSU]
+        real(wp), parameter :: b1 =   0.0901      ! [degC]
+        real(wp), parameter :: c1 =   7.61E-4     ! [degC / m]
+        real(wp), parameter :: S0 =   34.75       ! [g / kg == PSU]
+        real(wp) :: f_scalar, H_grnd_lim 
 
         T_base_shlf = a1*S0 + b1 + c1*(rho_ice/rho_sw)*H_ice + T0 
 
@@ -995,22 +999,22 @@ contains
        
         implicit none
 
-        real(prec), intent(OUT) :: enth(:,:,:)          ! [J m-3] Enthalpy 
-        real(prec), intent(OUT) :: T_ice(:,:,:)         ! [K] Temperature
-        real(prec), intent(OUT) :: omega(:,:,:)         ! [--] Water content
-        real(prec), intent(IN)  :: cp(:,:,:)            ! Heat capacity
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: T_srf(:,:) 
-        real(prec), intent(IN)  :: zeta_aa(:)
-        real(prec), intent(IN)  :: T0 
-        real(prec), intent(IN)  :: rho_ice 
-        real(prec), intent(IN)  :: L_ice 
-        real(prec), intent(IN)  :: T_pmp_beta 
-        real(prec), intent(IN)  :: g
+        real(wp), intent(OUT) :: enth(:,:,:)          ! [J m-3] Enthalpy 
+        real(wp), intent(OUT) :: T_ice(:,:,:)         ! [K] Temperature
+        real(wp), intent(OUT) :: omega(:,:,:)         ! [--] Water content
+        real(wp), intent(IN)  :: cp(:,:,:)            ! Heat capacity
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: T_srf(:,:) 
+        real(wp), intent(IN)  :: zeta_aa(:)
+        real(wp), intent(IN)  :: T0 
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: L_ice 
+        real(wp), intent(IN)  :: T_pmp_beta 
+        real(wp), intent(IN)  :: g
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa   
-        real(prec) :: T_base, T_pmp  
+        real(wp) :: T_base, T_pmp  
 
         nx    = size(T_ice,1)
         ny    = size(T_ice,2)
@@ -1048,15 +1052,15 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: T_srf
-        real(prec), intent(IN) :: T_base
-        real(prec), intent(IN) :: T0 
-        real(prec), intent(IN) :: zeta_aa(:) 
-        real(prec) :: T_ice(size(zeta_aa,1))
+        real(wp), intent(IN) :: T_srf
+        real(wp), intent(IN) :: T_base
+        real(wp), intent(IN) :: T0 
+        real(wp), intent(IN) :: zeta_aa(:) 
+        real(wp) :: T_ice(size(zeta_aa,1))
 
         ! Local variables 
         integer :: k 
-        real(prec) :: T_srf_now 
+        real(wp) :: T_srf_now 
 
         ! Limit surface temperature to below melting 
         T_srf_now = min(T_srf,T0) 
@@ -1077,30 +1081,30 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: enth(:,:,:)      ! [J m-3] Enthalpy 
-        real(prec), intent(OUT) :: T_ice(:,:,:)     ! [K] Temperature
-        real(prec), intent(OUT) :: omega(:,:,:)     ! [--] Water content
-        real(prec), intent(IN)  :: T_pmp(:,:,:)     ! [K] Pressure melting point temp.
-        real(prec), intent(IN)  :: cp(:,:,:)        ! [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)  :: ct(:,:,:)        ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)  :: Q_rock(:,:)      ! [mW m-2] Bedrock surface heat flux 
-        real(prec), intent(IN)  :: T_srf(:,:)       ! [K] Surface temperature 
-        real(prec), intent(IN)  :: H_ice(:,:)       ! [m] Ice thickness 
-        real(prec), intent(IN)  :: H_w(:,:)         ! [m] Basal water layer thickness 
-        real(prec), intent(IN)  :: smb(:,:)         ! [m a-1] Surface mass balance (melting is negative)
-        real(prec), intent(IN)  :: bmb(:,:)         ! [m a-1] Basal mass balance (melting is negative)
-        real(prec), intent(IN)  :: f_grnd(:,:)      ! [--] Floating point or grounded?
-        real(prec), intent(IN)  :: zeta_aa(:)       ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)  :: rho_ice 
-        real(prec), intent(IN)  :: L_ice 
-        real(prec), intent(IN)  :: sec_year
+        real(wp), intent(OUT) :: enth(:,:,:)      ! [J m-3] Enthalpy 
+        real(wp), intent(OUT) :: T_ice(:,:,:)     ! [K] Temperature
+        real(wp), intent(OUT) :: omega(:,:,:)     ! [--] Water content
+        real(wp), intent(IN)  :: T_pmp(:,:,:)     ! [K] Pressure melting point temp.
+        real(wp), intent(IN)  :: cp(:,:,:)        ! [J kg-1 K-1] Specific heat capacity
+        real(wp), intent(IN)  :: ct(:,:,:)        ! [J a-1 m-1 K-1] Heat conductivity 
+        real(wp), intent(IN)  :: Q_rock(:,:)      ! [mW m-2] Bedrock surface heat flux 
+        real(wp), intent(IN)  :: T_srf(:,:)       ! [K] Surface temperature 
+        real(wp), intent(IN)  :: H_ice(:,:)       ! [m] Ice thickness 
+        real(wp), intent(IN)  :: H_w(:,:)         ! [m] Basal water layer thickness 
+        real(wp), intent(IN)  :: smb(:,:)         ! [m a-1] Surface mass balance (melting is negative)
+        real(wp), intent(IN)  :: bmb(:,:)         ! [m a-1] Basal mass balance (melting is negative)
+        real(wp), intent(IN)  :: f_grnd(:,:)      ! [--] Floating point or grounded?
+        real(wp), intent(IN)  :: zeta_aa(:)       ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: L_ice 
+        real(wp), intent(IN)  :: sec_year
         logical,    intent(IN)  :: cold             ! False: robin as normal, True: ensure cold base 
 
         ! Local variable
         integer :: i, j, k, nx, ny, nz_aa  
         logical :: is_float 
         
-        real(prec), allocatable :: T1(:) 
+        real(wp), allocatable :: T1(:) 
 
         nx    = size(T_ice,1)
         ny    = size(T_ice,2)
@@ -1126,7 +1130,7 @@ contains
                 end do 
                 
                 ! Average Robin solution with cold linear solution 
-                T_ice(i,j,:) = 0.5_prec*(T_ice(i,j,:) + T1)
+                T_ice(i,j,:) = 0.5_wp*(T_ice(i,j,:) + T1)
             end if 
 
         end do 
@@ -1153,29 +1157,29 @@ contains
         
         implicit none 
 
-        real(prec), intent(IN) :: zeta_aa(:) 
-        real(prec), intent(IN) :: T_pmp(:)
-        real(prec), intent(IN) :: kt(:) 
-        real(prec), intent(IN) :: cp(:) 
-        real(prec), intent(IN) :: rho_ice 
-        real(prec), intent(IN) :: H_ice 
-        real(prec), intent(IN) :: T_srf 
-        real(prec), intent(IN) :: mb_net
-        real(prec), intent(IN) :: Q_rock 
+        real(wp), intent(IN) :: zeta_aa(:) 
+        real(wp), intent(IN) :: T_pmp(:)
+        real(wp), intent(IN) :: kt(:) 
+        real(wp), intent(IN) :: cp(:) 
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: H_ice 
+        real(wp), intent(IN) :: T_srf 
+        real(wp), intent(IN) :: mb_net
+        real(wp), intent(IN) :: Q_rock 
         logical,    intent(IN) :: is_float 
-        real(prec), intent(IN) :: sec_year 
+        real(wp), intent(IN) :: sec_year 
 
-        real(prec) :: T_ice(size(zeta_aa,1))
+        real(wp) :: T_ice(size(zeta_aa,1))
 
         ! Local variables 
         integer    :: k, nz_aa 
-        real(prec) :: dTdz_b, z, kappa, ll   
+        real(wp) :: dTdz_b, z, kappa, ll   
 
-        real(prec), parameter :: sqrt_pi   = sqrt(pi) 
-        real(prec), parameter :: T_ocn     = 271.15   ! [K]
-        real(prec), parameter :: H_ice_min = 0.1      ! [m] Minimum ice thickness to calculate Robin solution 
-        real(prec), parameter :: mb_net_min = 1e-2    ! [m a-1] Minimum allowed net mass balance for stability
-        real(prec) :: Q_rock_now, mb_now  
+        real(wp), parameter :: sqrt_pi   = sqrt(pi) 
+        real(wp), parameter :: T_ocn     = 271.15   ! [K]
+        real(wp), parameter :: H_ice_min = 0.1      ! [m] Minimum ice thickness to calculate Robin solution 
+        real(wp), parameter :: mb_net_min = 1e-2    ! [m a-1] Minimum allowed net mass balance for stability
+        real(wp) :: Q_rock_now, mb_now  
 
         nz_aa = size(T_ice,1) 
         
@@ -1240,17 +1244,17 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: enth_rock(:,:,:)     ! [J m-3] 3D enthalpy field
-        real(prec), intent(OUT) :: T_rock(:,:,:)        ! [K] 3D temperature field
-        real(prec), intent(OUT) :: Q_rock(:,:)          ! [mW m-2] Bed surface heat flux 
-        real(prec), intent(IN)  :: cp_rock              ! [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)  :: kt_rock              ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)  :: Q_geo(:,:)           ! [mW m-2] Geothermal heat flux 
-        real(prec), intent(IN)  :: T_bed(:,:)           ! [K] Surface temperature 
-        real(prec), intent(IN)  :: H_rock               ! [m] Column thickness 
-        real(prec), intent(IN)  :: zeta_aa(:)           ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)  :: rho_rock 
-        real(prec), intent(IN)  :: sec_year 
+        real(wp), intent(OUT) :: enth_rock(:,:,:)     ! [J m-3] 3D enthalpy field
+        real(wp), intent(OUT) :: T_rock(:,:,:)        ! [K] 3D temperature field
+        real(wp), intent(OUT) :: Q_rock(:,:)          ! [mW m-2] Bed surface heat flux 
+        real(wp), intent(IN)  :: cp_rock              ! [J kg-1 K-1] Specific heat capacity
+        real(wp), intent(IN)  :: kt_rock              ! [J a-1 m-1 K-1] Heat conductivity 
+        real(wp), intent(IN)  :: Q_geo(:,:)           ! [mW m-2] Geothermal heat flux 
+        real(wp), intent(IN)  :: T_bed(:,:)           ! [K] Surface temperature 
+        real(wp), intent(IN)  :: H_rock               ! [m] Column thickness 
+        real(wp), intent(IN)  :: zeta_aa(:)           ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
+        real(wp), intent(IN)  :: rho_rock 
+        real(wp), intent(IN)  :: sec_year 
 
         ! Local variable
         integer :: i, j, k, nx, ny, nz_aa  
@@ -1286,19 +1290,19 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: T_rock(:) 
-        real(prec), intent(IN)  :: kt_rock 
-        real(prec), intent(IN)  :: rho_rock 
-        real(prec), intent(IN)  :: H_rock
-        real(prec), intent(IN)  :: T_bed 
-        real(prec), intent(IN)  :: Q_geo 
-        real(prec), intent(IN)  :: zeta_aa(:) 
-        real(prec), intent(IN)  :: sec_year 
+        real(wp), intent(OUT) :: T_rock(:) 
+        real(wp), intent(IN)  :: kt_rock 
+        real(wp), intent(IN)  :: rho_rock 
+        real(wp), intent(IN)  :: H_rock
+        real(wp), intent(IN)  :: T_bed 
+        real(wp), intent(IN)  :: Q_geo 
+        real(wp), intent(IN)  :: zeta_aa(:) 
+        real(wp), intent(IN)  :: sec_year 
 
         ! Local variables
         integer :: k, nz_aa
-        real(prec) :: Q_geo_now 
-        real(prec) :: dTdz
+        real(wp) :: Q_geo_now 
+        real(wp) :: dTdz
         
         nz_aa = size(zeta_aa,1)
 
@@ -1392,15 +1396,15 @@ contains
         
         implicit none 
 
-        real(prec), intent(IN)  :: X
-        real(prec) :: ERR
+        real(wp), intent(IN)  :: X
+        real(wp) :: ERR
         
         ! Local variables:
-        real(prec)              :: EPS
-        real(prec)              :: X2
-        real(prec)              :: ER
-        real(prec)              :: R
-        real(prec)              :: C0
+        real(wp)              :: EPS
+        real(wp)              :: X2
+        real(wp)              :: ER
+        real(wp)              :: R
+        real(wp)              :: C0
         integer                 :: k
         
         EPS = 1.0e-15
@@ -1409,7 +1413,7 @@ contains
             ER = 1.0
             R  = 1.0
             do k = 1, 50
-                R  = R * X2 / (real(k, prec) + 0.5)
+                R  = R * X2 / (real(k, wp) + 0.5)
                 ER = ER+R
                 if(abs(R) < abs(ER) * EPS) then
                     C0  = 2.0 / sqrt(pi) * X * exp(-X2)
@@ -1421,7 +1425,7 @@ contains
             ER = 1.0
             R  = 1.0
             do k = 1, 12
-                R  = -R * (real(k, prec) - 0.5) / X2
+                R  = -R * (real(k, wp) - 0.5) / X2
                 ER = ER + R
                 C0  = EXP(-X2) / (abs(X) * sqrt(pi))
                 ERR = 1.0 - C0 * ER
@@ -1440,14 +1444,14 @@ contains
         ! water balance: dHw/dt = bmb_w - till_rate
         implicit none 
          
-        real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
-        real(prec), intent(INOUT) :: dHwdt(:,:)       ! [m/a] Water layer thickness change
-        real(prec), intent(IN)    :: f_ice(:,:)       ! [m] Ice cell fraction
-        real(prec), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
-        real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
-        real(prec), intent(IN)    :: dt               ! [a] Timestep 
-        real(prec), intent(IN)    :: till_rate        ! [m/a] Till drainage rate 
-        real(prec), intent(IN)    :: H_w_max          ! [m] Maximum allowed water depth 
+        real(wp), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
+        real(wp), intent(INOUT) :: dHwdt(:,:)       ! [m/a] Water layer thickness change
+        real(wp), intent(IN)    :: f_ice(:,:)       ! [m] Ice cell fraction
+        real(wp), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
+        real(wp), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
+        real(wp), intent(IN)    :: dt               ! [a] Timestep 
+        real(wp), intent(IN)    :: till_rate        ! [m/a] Till drainage rate 
+        real(wp), intent(IN)    :: H_w_max          ! [m] Maximum allowed water depth 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -1522,14 +1526,14 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: enth             ! [J m-3] Enthalpy 
-        real(prec), intent(IN)  :: temp             ! [K] Temperature 
-        real(prec), intent(IN)  :: omega            ! [-] Water content (fraction)
-        real(prec), intent(IN)  :: T_pmp            ! [K] Pressure melting point
-        real(prec), intent(IN)  :: cp               ! [J kg-1 K-1] Heat capacity 
-        real(prec), intent(IN)  :: L                ! [J kg-1] Latent heat of fusion 
+        real(wp), intent(OUT) :: enth             ! [J m-3] Enthalpy 
+        real(wp), intent(IN)  :: temp             ! [K] Temperature 
+        real(wp), intent(IN)  :: omega            ! [-] Water content (fraction)
+        real(wp), intent(IN)  :: T_pmp            ! [K] Pressure melting point
+        real(wp), intent(IN)  :: cp               ! [J kg-1 K-1] Heat capacity 
+        real(wp), intent(IN)  :: L                ! [J kg-1] Latent heat of fusion 
         
-        enth = (1.0_prec-omega)*(cp*temp) + omega*(cp*T_pmp + L)
+        enth = (1.0_wp-omega)*(cp*temp) + omega*(cp*T_pmp + L)
 
         return 
 
@@ -1540,16 +1544,16 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: enth(:)            ! [J m-3] Enthalpy, nz_aa nodes
-        real(prec), intent(OUT)   :: temp(:)            ! [K] Temperature, nz_aa nodes  
-        real(prec), intent(OUT)   :: omega(:)           ! [-] Water content (fraction), nz_aa nodes 
-        real(prec), intent(IN)    :: T_pmp(:)           ! [K] Pressure melting point, nz_aa nodes 
-        real(prec), intent(IN)    :: cp(:)              ! [J kg-1 K-1] Heat capacity,nz_aa nodes 
-        real(prec), intent(IN)    :: L                  ! [J kg-1] Latent heat of fusion
+        real(wp), intent(INOUT) :: enth(:)            ! [J m-3] Enthalpy, nz_aa nodes
+        real(wp), intent(OUT)   :: temp(:)            ! [K] Temperature, nz_aa nodes  
+        real(wp), intent(OUT)   :: omega(:)           ! [-] Water content (fraction), nz_aa nodes 
+        real(wp), intent(IN)    :: T_pmp(:)           ! [K] Pressure melting point, nz_aa nodes 
+        real(wp), intent(IN)    :: cp(:)              ! [J kg-1 K-1] Heat capacity,nz_aa nodes 
+        real(wp), intent(IN)    :: L                  ! [J kg-1] Latent heat of fusion
         
         ! Local variables
         integer    :: k, nz_aa  
-        real(prec), allocatable :: enth_pmp(:)  
+        real(wp), allocatable :: enth_pmp(:)  
 
         nz_aa = size(enth,1)
 
@@ -1572,7 +1576,7 @@ contains
                 ! Cold ice 
 
                 temp(k)  = enth(k) / cp(k) 
-                omega(k) = 0.0_prec
+                omega(k) = 0.0_wp
 
              end if
 
@@ -1584,13 +1588,13 @@ contains
             
             enth(nz_aa)  = enth_pmp(nz_aa)
             temp(nz_aa)  = enth(nz_aa) / cp(nz_aa)
-            omega(nz_aa) = 0.0_prec 
+            omega(nz_aa) = 0.0_wp 
         
         else 
             ! Cold surface, calculate T, and reset omega to zero 
             
             temp(nz_aa)  = enth(nz_aa) / cp(nz_aa)
-            omega(nz_aa) = 0.0_prec 
+            omega(nz_aa) = 0.0_wp 
         
         end if 
         

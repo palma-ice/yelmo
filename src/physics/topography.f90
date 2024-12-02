@@ -2158,7 +2158,7 @@ end if
     ! whereas the L21 equation is in water equivalent thickness, and it includes
     ! bedrock above sea level. But test this as it is first. 
     f_flt = -H_grnd
-
+    
     ! Calculate grounded fractions of all four quadrants of each a-grid cell
     call determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt)
     
@@ -2393,7 +2393,7 @@ end if
       dd  = f_NEp + f_SWp - f_NWp - f_SEp
 
       ! Exception for when d=0
-      if (ABS(dd) < 1e-4_dp) then
+      if (ABS(dd) < ftol) then
         if (f_SWp > 0.0_dp) then
           f_SWp = f_SWp + 0.1_dp
         else
@@ -2540,7 +2540,9 @@ end if
       end if
       
       if (nit > 4) then
+        write(io_unit_err,*) 
         write(io_unit_err,*) 'determine_grounded_fractions_CISM_quads - rotate_quad_until_match - ERROR: couldnt find matching scenario!'
+        write(io_unit_err,*) 'f_SW, f_SE, f_NE, f_NW: ', f_SW, f_SE, f_NE, f_NW
         stop 
       end if
       

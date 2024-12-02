@@ -180,12 +180,8 @@ module yelmo_defs
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
-<<<<<<< HEAD
-        real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable  :: lsf(:,:)
-=======
 
->>>>>>> main
     end type
 
     type ytopo_rates_class
@@ -797,12 +793,8 @@ module yelmo_defs
     type ydata_pd_class   ! pd = present-day
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(wp), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
-<<<<<<< HEAD
         real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:), mask(:,:) 
-=======
         integer,  allocatable :: mask_bed(:,:)
-        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
->>>>>>> main
         real(wp), allocatable :: T_srf(:,:), smb(:,:)
         real(wp), allocatable :: depth_iso(:,:,:)  
         

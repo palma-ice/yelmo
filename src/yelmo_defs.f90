@@ -180,7 +180,7 @@ module yelmo_defs
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
-        real(wp), allocatable  :: lsf(:,:)
+        real(wp), allocatable :: lsf(:,:)
 
     end type
 

@@ -45,7 +45,7 @@
     solver              = "impl-lis"        ! "expl", "impl-lis"
     calv_flt_method     = "kill-pos"        ! "zero", "simple", "flux", "vm-l19", "kill", "kill-pos"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
-    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    bmb_gl_method       = "nmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -86,16 +86,16 @@
     dmb_sigma_ref       = 300.0             ! [m]   Reference bed roughness
     dmb_m_d             = 3.0               ! [-]   Discharge distance scaling exponent
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
-
+    grounded_melt       = False             ! only needed for opt
 /
 
 &ydyn
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
-    beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
-    beta_q              = 0.2             ! Dragging law exponent 
+    beta_q              = 0.333           ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
@@ -147,7 +147,7 @@
 &ymat
     flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
-    rf_const                = 1e-16         ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
+    rf_const                = 2.9377e-12    ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
     rf_use_eismint2         = False         ! Only applied for rf_method=1
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent

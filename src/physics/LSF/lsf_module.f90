@@ -83,10 +83,10 @@ subroutine LSFinit(LSF,mask_ice)
 
     implicit none
 
-    real(wp), intent(OUT) :: LSF(:,:)   ! [m/yr] Calculated calving rate 
-    real(wp),  intent(IN) :: mask_ice(:,:) ! [m] Ice tickness
+    real(wp), intent(OUT) :: LSF(:,:)      ! [m/yr] Calculated calving rate 
+    real(wp),  intent(IN) :: mask_ice(:,:) ! Ice mask
      
-    ! Initialize LSF value at 0.0
+    ! Initialize LSF value at ocean value
     LSF = -1.0_wp  
     ! Assign values
     where(mask_ice .gt. 0.0_wp) LSF = 1.0_wp
@@ -133,14 +133,12 @@ subroutine LSFupdate(LSFn,LSF,CR,f_ice,ux,uy,var_dot,mask_adv,dx,dy,dt,solver,bo
     ! Compute the advected LSF field
     call calc_G_advec_simple(dlsf,lsf,f_ice,wx,wy, &
                              mask_adv,solver,boundaries,dx,dt)
-    !call calc_advec2D(dlsf,lsf,f_ice,wx,wy,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
     
+    ! check if the sum here is done correctly
     LSFn = dlsf*dt + lsf
+    ! saturate values to -1 to 1 (helps with stability)
     where(LSFn .gt. 1.0)  LSFn = 1.0
     where(LSFn .lt. -1.0) LSFn = -1.0
-    !where(LSFn .gt. 0.0)  LSFn = 1.0
-    !where(LSFn .lt. 0.0) LSFn = -1.0
-        
 
     return
 

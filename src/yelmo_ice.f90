@@ -885,6 +885,7 @@ end if
 
         ! Determine how to manage initial topography (H_ice,z_bed)
         call yelmo_init_topo(dom,filename,time,load_topo)
+        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%f_ice)
         !call LSFinit(dom%tpo%now%lsf,dom%dta%pd%mask)
         
         write(*,*) "yelmo_init:: topo intialized (loaded data if desired)."
@@ -1175,7 +1176,7 @@ end if
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         ! jablasco: init LSF
-        call LSFinit(dom%tpo%now%lsf,dom%dta%pd%mask)
+        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%f_ice)
         call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for entire domain)

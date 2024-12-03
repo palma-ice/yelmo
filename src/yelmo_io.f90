@@ -119,7 +119,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 15 
+            qtot = 16 
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -136,6 +136,7 @@ contains
             names(13) = "bmb"
             names(14) = "cmb"
             names(15) = "z_sl"
+            names(16) = "lsf"
 
         end if 
 
@@ -233,7 +234,10 @@ contains
             case("z_sl")
                 call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            
+            case("lsf")
+                call nc_write(filename,"lsf",ylmo%tpo%now%lsf,units="-",long_name="Level-set function (0-1: ice, -1-0: ocean)", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)           
+ 
             case DEFAULT 
 
                 write(io_unit_err,*) 

@@ -248,10 +248,12 @@ end if
                     !call calc_ice_fraction(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                     !    bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
                     !where(tpo%now%H_ice .eq. 0.0_wp) tpo%now%lsf   = -1.0_wp
+                    ! initialize the LSF mask before advecting
+                    call LSFinit(tpo%now%lsf,tpo%now%f_ice)
                     call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt)
                     ! jablasco: kill ice where lsf  less than 0.0
-                    where(tpo%now%lsf .lt. 0.0_wp)  tpo%now%H_ice = 0.0_wp
-                    where(tpo%now%H_ice .eq. 0.0_wp) tpo%now%lsf   = -1.0_wp
+                    !where(tpo%now%lsf .lt. 0.0_wp)  tpo%now%H_ice = 0.0_wp
+                    !where(tpo%now%H_ice .eq. 0.0_wp) tpo%now%lsf   = -1.0_wp
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -666,15 +668,7 @@ end if
         call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
                        var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
 
-        !call LSFupdate(LSFn,tpo%now%lsf,CR,tpo%now%f_ice, &
-        !               dyn%now%ux_bar,dyn%now%uy_bar,var_dot,tpo%par%dx,tpo%par%dy,dt,tpo%par%boundaries)
-    
-
         tpo%now%lsf = LSFn
-
-        ! jablasco: check limits here?
-        !where(tpo%now%lsf .ge. 1.0_wp) tpo%now%lsf = 1.0
-        !where(tpo%now%lsf .le. -1.0_wp) tpo%now%lsf = -1.0
 
         return
   
@@ -1334,8 +1328,6 @@ end if
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
-        allocate(pc%mb_relax(nx,ny))
-        allocate(pc%mb_resid(nx,ny))
         allocate(pc%lsf(nx,ny))
         
         ! Initialize to zero

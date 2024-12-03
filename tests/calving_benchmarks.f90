@@ -135,4 +135,26 @@ contains
 
     end subroutine set_calving_mask
 
+    subroutine calving_boundaries(T_srf,smb,ghf,xx,yy,H_ice,experiment,time,period,rad_el,dT_test,dsmb_test)
+
+        implicit none
+
+        real(wp), intent(OUT) :: T_srf(:,:)
+        real(wp), intent(OUT) :: smb(:,:)
+        real(wp), intent(OUT) :: ghf(:,:)
+        real(wp), intent(IN)  :: xx(:,:)      ! [m]
+        real(wp), intent(IN)  :: yy(:,:)      ! [m]
+        real(wp), intent(IN)  :: H_ice(:,:)
+        character(len=*), intent(IN) :: experiment
+        real(wp), intent(IN) :: time
+        real(wp), intent(IN) :: period
+        real(wp), intent(IN), optional :: rad_el
+        real(wp), intent(IN), optional :: dT_test
+        real(wp), intent(IN), optional :: dsmb_test
+
+        real(wp), parameter :: x_summit = 0.0
+        real(wp), parameter :: y_summit = 0.0
+
+    end subroutine calving_boundaries
+
 end module calving_benchmarks

@@ -120,7 +120,7 @@ jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab-sd0.
 #runopt='-rs  -q 12h -w 05:00:00'
 #output/bench-2024-12-01
 
-./runme ${runopt} -e calving -n par/yelmo_calving.nml -o ${fldr}/calvmip-exp01 -p ctl.exp="exp1" ctl.dt2D_out=100 ctl.time_end=4100
+./runme ${runopt} -e calving -n par/yelmo_calving.nml -o ${fldr}/calvmip-exp01 -p ctl.exp="exp1" ctl.dt2D_out=200 ctl.time_end=10e3
 
 ### AGE TESTS ###
 

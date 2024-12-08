@@ -510,8 +510,11 @@ end if
 
         end do 
 
-        ! Finalize averaging of instantaneous rates
-        call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt_max_0,step="final",overwrite=.TRUE.,check_mb=check_mb)
+        if (dt_max_0 .gt. 0.0_wp) then
+            ! Finalize averaging of instantaneous rates 
+            ! (only if a timestep was calculated, otherwise maintain rates that were there)
+            call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt_max_0,step="final",overwrite=.TRUE.,check_mb=check_mb)
+        end if
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

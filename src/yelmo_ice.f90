@@ -1174,6 +1174,9 @@ end if
         ! Here several fields in ytopo will be overwritten and topo will be fully consistent with itself.
 
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
+        ! Note: thermodynamic state has not been loaded yet, so mask_bed produced here
+        ! will not contain regions of temperate ice. masks should be updated again
+        ! after loaded remaining fields.
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
@@ -1308,11 +1311,11 @@ end if
             dom%thrm%par%method      = dom_thrm_method 
             dom%thrm%par%rock_method = dom_thrm_rock_method
 
-            ! Re-run topo again to make sure all fields are synchronized (masks, etc)
-            !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
-
         end if 
+
+        ! Re-run topo again to make sure all fields are synchronized (masks, etc)
+        !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

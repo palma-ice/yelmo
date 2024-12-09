@@ -135,6 +135,9 @@ contains
         !$ time2 = omp_get_wtime()
         !$ if(l_write_timer) print *,'TIME smooth_gauss_2D',time2-time1
         
+        ! ajr restart check:
+        !call yelmo_restart_write(dom,"./yelmo_restart_init_loop.nc",time)
+
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
@@ -159,6 +162,12 @@ contains
             ! Calculate adaptive timestep using proportional-integral (PI) methods
             call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
                                     dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%tpo%par%pc_k,dom%par%pc_controller)
+
+            ! ajr restart check:
+            ! write(*,*) "Set timestep: ", n, time_now, dt_pi, dt_max
+            ! write(*,*) "    ", dom%time%pc_dt
+            ! write(*,*) "    ", dom%time%pc_eta
+            ! write(*,*) "    ", dom%par%pc_eps
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -1168,6 +1177,9 @@ end if
             dom%bnd  = bnd_restart 
             dom%time = tme_restart
 
+            ! And ensure pc is already active
+            dom%time%pc_active = .TRUE. 
+
         end if 
 
         ! Step 3: update remaining topogaphic info to be consistent with initial fields 
@@ -1251,6 +1263,9 @@ end if
             ! Load variables from a restart file 
 
             call yelmo_restart_read(dom,trim(dom%par%restart),time)
+            
+            ! And ensure pc is already active
+            dom%time%pc_active = .TRUE. 
             
         else 
 

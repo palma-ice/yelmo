@@ -1661,7 +1661,7 @@ end if
     end subroutine calc_grounding_line_zone
 
     subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_ice,H_grnd,f_grnd,gz_Hg0,gz_Hg1, &
-                                                            gz_nx,bmb_gl_method,boundaries,grounded_melt,mask_pd)
+                                                            gz_nx,bmb_gl_method,boundaries)
 
         implicit none 
 
@@ -1675,10 +1675,7 @@ end if
         real(wp),         intent(IN)  :: gz_Hg1
         integer,          intent(IN)  :: gz_nx
         character(len=*), intent(IN)  :: bmb_gl_method 
-        character(len=*), intent(IN)  :: boundaries
-        ! jablasco: for optimization (optional, check!)
-        logical,  intent(IN), optional  :: grounded_melt
-        real(wp), intent(IN), optional  :: mask_pd(:,:)
+        character(len=*), intent(IN)  :: boundaries 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -1758,12 +1755,6 @@ end if
                 end where 
 
         end select
-
-        ! jablasco: apply melt to grounded points if they should be floating
-        if (present(mask_pd) .and. grounded_melt) then
-            where(mask_pd .eq. 3.0_wp) bmb = bmb_shlf
-            where(mask_pd .eq. 0.0_wp) bmb = bmb_shlf
-        end if
 
         ! For aesthetics, also make sure that bmb is zero on ice-free land
         where (H_grnd .gt. 0.0_wp .and. H_ice .eq. 0.0_wp) bmb = 0.0_wp 

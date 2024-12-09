@@ -206,7 +206,7 @@ contains
                 end if 
 
                 ! Embayed to the bottom?
-                if (   (f_grnd(i,jp1)   .eq. 0.0 .and. f_ice(i,jp1)   .eq. 0.0) &
+                if (   (f_grnd(i,jm1)   .eq. 0.0 .and. f_ice(i,jm1)   .eq. 0.0) &
                  .and. (f_grnd(im1,jm1) .eq. 0.0 .and. f_ice(im1,jm1) .eq. 1.0) &
                  .and. (f_grnd(ip1,jm1) .eq. 0.0 .and. f_ice(ip1,jm1) .eq. 1.0) ) then 
 

@@ -28,19 +28,19 @@ contains
         type(ydyn_class),   intent(IN)    :: dyn
         type(ymat_class),   intent(IN)    :: mat
         type(ybound_class), intent(IN)    :: bnd  
-        real(prec),         intent(IN)    :: time  
+        real(wp),         intent(IN)    :: time  
 
         ! Local variables 
         integer :: i, j, k, nx, ny  
-        real(prec) :: dt 
-        real(prec), allocatable :: H_w_now(:,:)
-        real(prec), allocatable :: dTdz_b_now(:,:)
+        real(wp) :: dt 
+        real(wp), allocatable :: H_w_now(:,:)
+        real(wp), allocatable :: dTdz_b_now(:,:)
         
         nx = thrm%par%nx
         ny = thrm%par%ny
 
         allocate(H_w_now(nx,ny)) 
-        H_w_now = 0.0_prec 
+        H_w_now = 0.0_wp
 
         ! Initialize time if necessary 
         if (thrm%par%time .gt. dble(time)) then 
@@ -143,7 +143,7 @@ end select
 
             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%f_ice,tpo%now%f_grnd, &
-                                    -thrm%now%bmb_grnd*(bnd%c%rho_ice/bnd%c%rho_w),dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+                                    -thrm%now%bmb_grnd*(bnd%c%rho_ice/bnd%c%rho_w),dt*0.5_wp,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 
@@ -256,8 +256,9 @@ end select
 
         end if 
 
-        ! Calculate homologous temperature at the base 
-        thrm%now%T_prime_b = thrm%now%T_ice(:,:,1) - thrm%now%T_pmp(:,:,1) 
+        ! Calculate homologous temperature eveerywhere and at the base 
+        thrm%now%T_prime   = thrm%now%T_ice - thrm%now%T_pmp 
+        thrm%now%T_prime_b = thrm%now%T_prime(:,:,1)
         
         ! Calculate gridpoint fraction at the pressure melting point
         call calc_f_pmp(thrm%now%f_pmp,thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1), &
@@ -288,55 +289,58 @@ end select
 
         implicit none 
 
-        real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
-        real(prec), intent(INOUT) :: T_ice(:,:,:)   ! [K] Ice column temperature
-        real(prec), intent(INOUT) :: omega(:,:,:)   ! [--] Ice water content
-        real(prec), intent(INOUT) :: bmb_grnd(:,:)  ! [m a-1] Basal mass balance (melting is negative)
-        real(prec), intent(OUT)   :: Q_ice_b(:,:)   ! [J a-1 m-2] Basal ice heat flux 
-        real(prec), intent(OUT)   :: H_cts(:,:)     ! [m] Height of the cold-temperate transition surface (CTS)
-        real(prec), intent(INOUT) :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
-        real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
-        real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
-        real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
-        real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
-        real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
-        real(prec), intent(IN)    :: Q_rock(:,:)    ! [mW m-2] Heat flux at bed surface from bedrock (like Q_geo)
-        real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
-        real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
-        real(prec), intent(IN)    :: f_ice(:,:)     ! [--] Area fraction ice cover
-        real(prec), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
-        real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
-        real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
-        real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
-        real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
-        real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
-        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
-        real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-        real(prec), intent(IN)    :: omega_max      ! [--] Maximum allowed water content fraction 
-        real(wp),   intent(IN)    :: rho_ice 
-        real(wp),   intent(IN)    :: rho_sw
-        real(wp),   intent(IN)    :: rho_w
-        real(wp),   intent(IN)    :: L_ice
-        real(wp),   intent(IN)    :: T0
-        real(wp),   intent(IN)    :: sec_year 
-        real(prec), intent(IN)    :: dt             ! [a] Time step 
-        real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
+        real(wp), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
+        real(wp), intent(INOUT) :: T_ice(:,:,:)   ! [K] Ice column temperature
+        real(wp), intent(INOUT) :: omega(:,:,:)   ! [--] Ice water content
+        real(wp), intent(INOUT) :: bmb_grnd(:,:)  ! [m a-1] Basal mass balance (melting is negative)
+        real(wp), intent(OUT)   :: Q_ice_b(:,:)   ! [J a-1 m-2] Basal ice heat flux 
+        real(wp), intent(OUT)   :: H_cts(:,:)     ! [m] Height of the cold-temperate transition surface (CTS)
+        real(wp), intent(INOUT) :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
+        real(wp), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
+        real(wp), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
+        real(wp), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
+        real(wp), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
+        real(wp), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
+        real(wp), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
+        real(wp), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
+        real(wp), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
+        real(wp), intent(IN)    :: Q_rock(:,:)    ! [mW m-2] Heat flux at bed surface from bedrock (like Q_geo)
+        real(wp), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
+        real(wp), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
+        real(wp), intent(IN)    :: f_ice(:,:)     ! [--] Area fraction ice cover
+        real(wp), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
+        real(wp), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
+        real(wp), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
+        real(wp), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
+        real(wp), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
+        real(wp), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
+        real(wp), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
+        real(wp), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
+        real(wp), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
+        real(wp), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
+        real(wp), intent(IN)    :: omega_max      ! [--] Maximum allowed water content fraction 
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
+        real(wp), intent(IN)    :: rho_w
+        real(wp), intent(IN)    :: L_ice
+        real(wp), intent(IN)    :: T0
+        real(wp), intent(IN)    :: sec_year 
+        real(wp), intent(IN)    :: dt             ! [a] Time step 
+        real(wp), intent(IN)    :: dx             ! [a] Horizontal grid step 
         character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
         character(len=*), intent(IN) :: solver_advec    ! "expl" or "impl-upwind"
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
-        real(prec) :: H_ice_now 
-        real(prec) :: wt_neighb(3,3) 
-        real(prec) :: wt_tot 
+        real(wp) :: T_shlf, H_grnd_lim, f_scalar, T_base  
+        real(wp) :: H_ice_now 
+        real(wp) :: wt_neighb(3,3) 
+        real(wp) :: wt_tot 
 
-        real(prec), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
+        real(wp), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
+
+        ! ajr symtest
+        logical :: is_symmetric 
 
         nx    = size(T_ice,1)
         ny    = size(T_ice,2)
@@ -404,11 +408,11 @@ end select
                 end if 
 
                 T_ice(i,j,:)  = define_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
-                omega(i,j,:)  = 0.0_prec 
+                omega(i,j,:)  = 0.0_wp 
                 call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
-                bmb_grnd(i,j) = 0.0_prec
-                Q_ice_b(i,j)  = 0.0_prec 
-                H_cts(i,j)    = 0.0_prec
+                bmb_grnd(i,j) = 0.0_wp
+                Q_ice_b(i,j)  = 0.0_wp 
+                H_cts(i,j)    = 0.0_wp
 
             end if 
 
@@ -416,6 +420,41 @@ end select
         end do 
         !!$omp end parallel do
 
+! ajr symtest: check BCs for symmetry
+if (.FALSE.) then
+
+        ! diva (moving)
+        ! i = 25
+        ! j = 18 
+
+        ! sia (moving)
+        i = 20
+        j = 25 
+
+        write(*,*)
+        call check_symmetry_2D(T_ice(:,:,1),"T_ice_b",i,j,"x",is_symmetric)
+        
+        if (.not. is_symmetric) then
+            call check_symmetry_2D(H_ice,"H_ice",i,j,"x")
+            call check_symmetry_2D(f_ice,"f_ice",i,j,"x")
+            call check_symmetry_2D(bmb_grnd,"bmb_grnd",i,j,"x")
+            call check_symmetry_2D(Q_strn(:,:,1),"Q_strn_b",i,j,"x")
+            call check_symmetry_2D(Q_b,"Q_b",i,j,"x")
+            call check_symmetry_2D(T_srf,"T_srf",i,j,"x")
+            call check_symmetry_2D(uz(:,:,1),"uz_b",i,j,"x")
+            call check_symmetry_2D(H_w,"H_w",i,j,"x")
+            call check_symmetry_2D(Q_rock,"Q_rock",i,j,"x")
+            call check_symmetry_2D(Q_ice_b,"Q_ice_b",i,j,"x")
+            call check_symmetry_2D(advecxy(:,:,1),"advecxy_b",i,j,"x")
+
+            stop "Symmetry!"
+        end if
+
+        write(*,*) 
+
+end if
+
+if (.TRUE.) then
         ! Extrapolate thermodynamics to ice-free and partially ice-covered 
         ! neighbors to the ice margin.
         ! (Helps with stability to give good values of ATT to newly advected points)
@@ -449,6 +488,7 @@ end select
         end do 
         end do 
         !!$omp end parallel do
+end if 
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)
@@ -459,6 +499,49 @@ end select
         return 
 
     end subroutine calc_ytherm_enthalpy_3D
+
+    subroutine check_symmetry_2D(var,varnm,i,j,dir,is_symmetric)
+
+        implicit none
+
+        real(wp), intent(IN) :: var(:,:)
+        character(len=*), intent(IN) :: varnm
+        integer,  intent(IN) :: i, j  
+        character(len=*), intent(IN) :: dir     ! Direction to check "x" or "y"
+        logical, optional, intent(OUT) :: is_symmetric 
+
+        ! Local variables
+        integer :: imid, jmid
+        integer :: is, js 
+        
+        imid = (size(var,1)-1)/2 + 1 
+        jmid = (size(var,2)-1)/2 + 1 
+        
+        ! Get symmetric counterparts
+        if (dir .eq. "x") then 
+            js = j 
+            is = imid - (i-imid)
+        else if (dir .eq. "y") then 
+            is = i 
+            js = jmid - (j-jmid)
+        else
+            write(error_unit,*) "check_symmetry_2D:: Error: argument 'dir' must be 'x' or 'y'."
+            stop
+        end if
+
+        write(*,"(a4,a12,2f15.3,g18.6)") "sym: ", trim(varnm), var(i,j), var(is,js), abs(var(is,js)-var(i,j))
+
+        if (present(is_symmetric)) then
+            if (abs(var(is,js)-var(i,j)) .lt. 1e-3) then
+                is_symmetric = .TRUE.
+            else 
+                is_symmetric = .FALSE.
+            end if
+        end if
+
+        return
+
+    end subroutine check_symmetry_2D
 
     subroutine calc_ytherm_enthalpy_bedrock_3D(enth_rock,T_rock,Q_rock,T_ice_b,T_pmp_b,cp_rock,kt_rock,H_rock, &
                                                 H_ice,H_grnd,Q_ice_b,Q_geo,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
@@ -472,32 +555,32 @@ end select
 
         implicit none 
 
-        real(prec), intent(INOUT) :: enth_rock(:,:,:)   ! [J m-3] Bedrock enthalpy
-        real(prec), intent(INOUT) :: T_rock(:,:,:)      ! [K] Bedrock temperature
-        real(prec), intent(OUT)   :: Q_rock(:,:)        ! [mW m-2] Bed surface heat flux 
-        real(prec), intent(IN)    :: T_ice_b(:,:)       ! [K] Ice temperature at ice base
-        real(prec), intent(IN)    :: T_pmp_b(:,:)       ! [K] Pressure melting point temp at ice base.
-        real(prec), intent(IN)    :: cp_rock            ! [J kg-1 K-1] Specific heat capacity 
-        real(prec), intent(IN)    :: kt_rock            ! [J a-1 m-1 K-1] Heat conductivity
-        real(prec), intent(IN)    :: H_rock             ! [m] Bedrock thickness 
-        real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness 
-        real(prec), intent(IN)    :: H_grnd(:,:)        ! [--] Ice thickness above flotation 
-        real(prec), intent(IN)    :: Q_ice_b(:,:)       ! [mW m-2] Ice base heat flux
-        real(prec), intent(IN)    :: Q_geo(:,:)         ! [mW m-2] Geothermal heat flux deep in bedrock
-        real(prec), intent(IN)    :: zeta_aa(:)         ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)    :: zeta_ac(:)         ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        real(prec), intent(IN)    :: dzeta_a(:)         ! nz_aa [--] Solver discretization helper variable ak
-        real(prec), intent(IN)    :: dzeta_b(:)         ! nz_aa [--] Solver discretization helper variable bk
-        real(prec), intent(IN)    :: rho_ice 
-        real(prec), intent(IN)    :: rho_sw
-        real(prec), intent(IN)    :: rho_rock 
-        real(prec), intent(IN)    :: T0 
-        real(prec), intent(IN)    :: sec_year 
-        real(prec), intent(IN)    :: dt                 ! [a] Time step 
+        real(wp), intent(INOUT) :: enth_rock(:,:,:)   ! [J m-3] Bedrock enthalpy
+        real(wp), intent(INOUT) :: T_rock(:,:,:)      ! [K] Bedrock temperature
+        real(wp), intent(OUT)   :: Q_rock(:,:)        ! [mW m-2] Bed surface heat flux 
+        real(wp), intent(IN)    :: T_ice_b(:,:)       ! [K] Ice temperature at ice base
+        real(wp), intent(IN)    :: T_pmp_b(:,:)       ! [K] Pressure melting point temp at ice base.
+        real(wp), intent(IN)    :: cp_rock            ! [J kg-1 K-1] Specific heat capacity 
+        real(wp), intent(IN)    :: kt_rock            ! [J a-1 m-1 K-1] Heat conductivity
+        real(wp), intent(IN)    :: H_rock             ! [m] Bedrock thickness 
+        real(wp), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness 
+        real(wp), intent(IN)    :: H_grnd(:,:)        ! [--] Ice thickness above flotation 
+        real(wp), intent(IN)    :: Q_ice_b(:,:)       ! [mW m-2] Ice base heat flux
+        real(wp), intent(IN)    :: Q_geo(:,:)         ! [mW m-2] Geothermal heat flux deep in bedrock
+        real(wp), intent(IN)    :: zeta_aa(:)         ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
+        real(wp), intent(IN)    :: zeta_ac(:)         ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
+        real(wp), intent(IN)    :: dzeta_a(:)         ! nz_aa [--] Solver discretization helper variable ak
+        real(wp), intent(IN)    :: dzeta_b(:)         ! nz_aa [--] Solver discretization helper variable bk
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
+        real(wp), intent(IN)    :: rho_rock 
+        real(wp), intent(IN)    :: T0 
+        real(wp), intent(IN)    :: sec_year 
+        real(wp), intent(IN)    :: dt                 ! [a] Time step 
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: T_base
+        real(wp) :: T_base
 
         nx    = size(T_rock,1)
         ny    = size(T_rock,2)
@@ -555,10 +638,10 @@ end select
 
         type(ytherm_param_class), intent(OUT) :: par
         character(len=*),         intent(IN)  :: filename
-        real(prec),               intent(IN)  :: zeta_aa(:)  
-        real(prec),               intent(IN)  :: zeta_ac(:)  
+        real(wp),               intent(IN)  :: zeta_aa(:)  
+        real(wp),               intent(IN)  :: zeta_ac(:)  
         integer,                  intent(IN)  :: nx, ny 
-        real(prec),               intent(IN)  :: dx 
+        real(wp),               intent(IN)  :: dx 
         logical, optional,        intent(IN)  :: init
 
         ! Local variables 
@@ -596,8 +679,8 @@ end select
 
         ! In case of method=="temp", prescribe some parameters
         if (trim(par%method) .eq. "temp") then  
-            par%enth_cr   = 1.0_prec 
-            par%omega_max = 0.0_prec 
+            par%enth_cr   = 1.0_wp 
+            par%omega_max = 0.0_wp 
         end if 
 
         ! Set internal parameters
@@ -659,6 +742,7 @@ end select
         allocate(now%T_ice(nx,ny,nz_aa))
         allocate(now%omega(nx,ny,nz_aa))
         allocate(now%T_pmp(nx,ny,nz_aa))
+        allocate(now%T_prime(nx,ny,nz_aa))
         allocate(now%bmb_grnd(nx,ny))
         allocate(now%f_pmp(nx,ny))
         allocate(now%Q_strn(nx,ny,nz_aa))
@@ -682,6 +766,7 @@ end select
         now%T_ice       = 0.0
         now%omega       = 0.0  
         now%T_pmp       = 0.0
+        now%T_prime     = 0.0
         now%bmb_grnd    = 0.0 
         now%f_pmp       = 0.0 
         now%Q_strn      = 0.0 
@@ -715,6 +800,7 @@ end select
         if (allocated(now%T_ice))       deallocate(now%T_ice)
         if (allocated(now%omega))       deallocate(now%omega)
         if (allocated(now%T_pmp))       deallocate(now%T_pmp)
+        if (allocated(now%T_prime))     deallocate(now%T_prime)
         if (allocated(now%bmb_grnd))    deallocate(now%bmb_grnd)
         if (allocated(now%f_pmp))       deallocate(now%f_pmp)
         if (allocated(now%Q_strn))      deallocate(now%Q_strn)

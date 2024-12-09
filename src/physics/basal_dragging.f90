@@ -876,14 +876,18 @@ contains
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! Get neighbor indices limited to ice-covered points
+            ! im1m = im1
+            ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
+            ! ip1m = ip1
+            ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+            ! jm1m = jm1 
+            ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+            ! jp1m = jp1 
+            ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
             im1m = im1
-            if (f_ice(im1,j) .lt. 1.0) im1m = i  
             ip1m = ip1
-            if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
             jm1m = jm1 
-            if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
             jp1m = jp1 
-            if (f_ice(i,jp1) .lt. 1.0) jp1m = j
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point
@@ -993,14 +997,18 @@ contains
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! Get neighbor indices limited to ice-covered points
+            ! im1m = im1
+            ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
+            ! ip1m = ip1
+            ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+            ! jm1m = jm1 
+            ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+            ! jp1m = jp1 
+            ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
             im1m = im1
-            if (f_ice(im1,j) .lt. 1.0) im1m = i  
             ip1m = ip1
-            if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
             jm1m = jm1 
-            if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
             jp1m = jp1 
-            if (f_ice(i,jp1) .lt. 1.0) jp1m = j
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point

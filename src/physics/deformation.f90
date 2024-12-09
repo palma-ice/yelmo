@@ -14,8 +14,6 @@ module deformation
     use yelmo_tools, only : get_neighbor_indices, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
                     acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, acz_to_nodes_3D
-                    
-    use grid_calcs 
 
     implicit none 
     
@@ -728,10 +726,8 @@ end if
                 jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(im1,j,k))/(2.0*dx)
                 jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,jm1,k))/(2.0*dy)
 
-
                 ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
                 ! Second-order, one-sided derivatives
-
                 ! jvel%dxx
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
                     if (f_ice(im1,j) .eq. 1.0 .and. im1-1 .gt. 0) then
@@ -1069,7 +1065,6 @@ end if
 
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
                     ! Second-order, one-sided derivatives
-
                     ! jvel%dzx
                     if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
                         jvel%dzx(i,j,k) = 0.0

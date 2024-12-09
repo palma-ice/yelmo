@@ -5,7 +5,7 @@ module yelmo_defs
     use omp_lib
 
     use nml, only : nml_replace
-
+    
     implicit none 
 
     ! =========================================================================
@@ -654,6 +654,7 @@ module yelmo_defs
         real(wp), allocatable :: T_ice(:,:,:)     ! [K]     Ice temp. 
         real(wp), allocatable :: omega(:,:,:)     ! [--]    Ice water content
         real(wp), allocatable :: T_pmp(:,:,:)     ! Pressure-corrected melting point
+        real(wp), allocatable :: T_prime(:,:,:)   ! Pressure-corrected temperature
         
         real(wp), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
         real(wp), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 

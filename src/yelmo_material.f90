@@ -29,17 +29,17 @@ contains
         type(ydyn_class),   intent(IN)    :: dyn 
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd     
-        real(prec),         intent(IN)    :: time    ! Current time (for age tracing)
+        real(wp),           intent(IN)    :: time    ! Current time (for age tracing)
 
         ! Local variables
-        integer    :: k, nz_aa
-        real(prec) :: dt
+        integer  :: k, nz_aa
+        real(wp) :: dt
 
-        real(prec), allocatable :: X_srf(:,:) 
-        logical,    allocatable :: mask_tracers(:,:) 
+        real(wp), allocatable :: X_srf(:,:) 
+        logical,  allocatable :: mask_tracers(:,:) 
 
-        real(prec), parameter   :: enh_min = 0.1_prec       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
-        real(prec), parameter   :: enh_max = 10.0_prec      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(wp), parameter   :: enh_min = 0.1_wp       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(wp), parameter   :: enh_max = 10.0_wp      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
 
         nz_aa = mat%par%nz_aa
 
@@ -67,7 +67,7 @@ contains
             ! (avoid very fast-flowing ice, as they are not interesting here)
             ! Surface value will be imposed in these places 
             mask_tracers = .TRUE. 
-            where (dyn%now%uxy_bar .gt. 500.0_prec) mask_tracers = .FALSE. 
+            where (dyn%now%uxy_bar .gt. 500.0_wp) mask_tracers = .FALSE. 
 
             call calc_tracer_3D(mat%now%dep_time,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                 tpo%now%H_ice,tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method, &
@@ -183,8 +183,8 @@ contains
                 where (mat%now%enh_bnd .gt. enh_max) mat%now%enh_bnd = enh_max
                 
                 ! Additionally update field to impose a value of one in streaming/floating regimes 
-                call modify_enhancement_factor_bnd(mat%now%enh_bnd,tpo%now%f_grnd,dyn%now%uxy_bar,enh_stream=1.0_prec, &
-                                enh_shlf=1.0_prec,umin=mat%par%enh_umin,umax=mat%par%enh_umax)
+                call modify_enhancement_factor_bnd(mat%now%enh_bnd,tpo%now%f_grnd,dyn%now%uxy_bar,enh_stream=1.0_wp, &
+                                enh_shlf=1.0_wp,umin=mat%par%enh_umin,umax=mat%par%enh_umax)
 
         
                 ! Finally scale enh by enh_bnd 
@@ -277,15 +277,15 @@ contains
 
         type(ymat_param_class), intent(OUT) :: par
         character(len=*),       intent(IN)  :: filename
-        real(prec),             intent(IN)  :: zeta_aa(:)
-        real(prec),             intent(IN)  :: zeta_ac(:)
+        real(wp),               intent(IN)  :: zeta_aa(:)
+        real(wp),               intent(IN)  :: zeta_ac(:)
         integer,                intent(IN)  :: nx, ny 
-        real(prec),             intent(IN)  :: dx  
+        real(wp),               intent(IN)  :: dx  
         logical, optional,      intent(IN)  :: init 
 
         ! Local variables 
-        logical :: init_pars 
-        real(prec) :: age_iso(10) 
+        logical  :: init_pars 
+        real(wp) :: age_iso(10) 
 
         age_iso = 0.0 
         

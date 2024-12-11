@@ -604,15 +604,25 @@ end if
         integer,           intent(IN), optional :: jrange(2)
         
         ! Local variables
-        integer  :: ncid, n   
+        integer  :: ncid, n, q   
         integer :: i1, i2, j1, j2 
         logical  :: initialize_file  
         
+        type(yelmo_io_tables) :: io
+
         initialize_file = .TRUE. 
         if (present(init)) initialize_file = init
 
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,dom%grd%nx,dom%grd%ny,irange,jrange)
+
+        ! Load variable io tables
+        call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
+        call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
+        call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
+        call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
+        call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
+        call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
 
         ! == Initialize netcdf file ==============================================
 
@@ -660,7 +670,8 @@ end if
 
         call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
         call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
-        
+
+if (.FALSE.) then
         ! == ytopo variables ===
         call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
         call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
@@ -705,7 +716,14 @@ end if
         
         call nc_write(filename,"H_ice_dyn",   dom%tpo%now%H_ice_dyn,   units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
         call nc_write(filename,"f_ice_dyn",   dom%tpo%now%f_ice_dyn,   units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])  
-        
+
+else
+        do q = 1, size(io%tpo)
+            call yelmo_write_var_io_ytopo(filename,io%tpo(q),dom,n,ncid)
+        end do
+
+end if
+
         ! = ytopo_pc variables (just for diagnostic output) ===
         
         call nc_write(filename,"pc_pred_H_ice",     dom%tpo%now%pred%H_ice,     units="m",    dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])

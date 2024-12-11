@@ -11,7 +11,7 @@
 | bmb_shlf          | xc, yc      | m/yr        | Basal mass balance for ice shelf                   |
 | fmb_shlf          | xc, yc      | m/yr        | Frontal mass balance for ice shelf                 |
 | T_shlf            | xc, yc      | K           | Ice shelf temperature                              |
-| Q_geo             | xc, yc      | W m^-2      | Geothermal heat flow at depth                      |
+| Q_geo             | xc, yc      | mW m^-2     | Geothermal heat flow at depth                      |
 | enh_srf           | xc, yc      | -           | Enhancement factor at the surface                  |
 | basins            | xc, yc      | -           | Basin identification numbers                       |
 | basin_mask        | xc, yc      | -           | Mask for basins                                    |

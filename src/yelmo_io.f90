@@ -56,6 +56,7 @@ contains
         ! Local variables
         integer :: i1, i2, j1, j2 
 
+        ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
         ! Initialize file by writing grid info
@@ -109,22 +110,8 @@ contains
 
         type(yelmo_io_tables) :: io
 
-        ! Get indices for region to write. If not provided, use whole domain
-        if (present(irange)) then
-            i1 = irange(1)
-            i2 = irange(2)
-        else
-            i1 = 1
-            i2 = ylmo%grd%nx
-        end if
-
-        if (present(jrange)) then
-            j1 = jrange(1)
-            j2 = jrange(2)
-        else
-            j1 = 1
-            j2 = ylmo%grd%ny
-        end if
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
         if (present(nms_tpo)) then 
             qtot = size(nms_tpo,1)
@@ -225,50 +212,159 @@ end if
         select case(trim(v%varname))
 
             case("H_ice")
-                call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,start=[1,1,n], &
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%H_ice,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("z_srf")
-                call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,start=[1,1,n], &
+            case("dHidt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dHidt,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("mask_bed")
-                call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,start=[1,1,n], &
+            case("dHidt_dyn")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dHidt_dyn,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("mb_net")
-                call nc_write(filename,"mb_net",ylmo%tpo%now%mb_net,start=[1,1,n], &
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mb_net,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mb_relax")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mb_relax,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mb_resid")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mb_resid,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mb_err")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mb_err,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("smb")
-                call nc_write(filename,"smb",ylmo%tpo%now%smb,start=[1,1,n], &
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%smb,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("bmb")
-                call nc_write(filename,"bmb",ylmo%tpo%now%bmb,start=[1,1,n], &
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%bmb,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("fmb")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%fmb,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dmb")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dmb,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("cmb")
-                call nc_write(filename,"cmb",ylmo%tpo%now%bmb,start=[1,1,n], &
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("bmb_ref")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%bmb_ref,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("fmb_ref")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%fmb_ref,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dmb_ref")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dmb_ref,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("cmb_flt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_flt,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("cmb_grnd")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_grnd,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("z_srf")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_srf,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dzsdt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dzsdt,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mask_adv")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mask_adv,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("eps_eff")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%eps_eff,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("tau_eff")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%tau_eff,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("z_base")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_base,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dzsdx")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dzsdx,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dzsdy")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dzsdy,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dHidx")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dHidx,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dHidy")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dHidy,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dzbdx")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dzbdx,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dzbdy")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dzbdy,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("H_eff")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%H_eff,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("H_grnd")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%H_grnd,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("H_calv")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%H_calv,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("kt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%kt,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("z_bed_filt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_bed_filt,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_grnd")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_grnd,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_grnd_acx")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_grnd_acx,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_grnd_acy")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_grnd_acy,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_grnd_ab")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_grnd_ab,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_ice")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_ice,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_grnd_bmb")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_grnd_bmb,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_grnd_pin")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_grnd_pin,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dist_margin")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dist_margin,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dist_grline")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dist_grline,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mask_bed")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mask_bed,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mask_grz")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mask_grz,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("mask_frnt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%mask_frnt,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("dHidt_dyn_n")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dHidt_dyn_n,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("H_ice_n")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%H_ice_n,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("z_srf_n")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_srf_n,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("H_ice_dyn")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%H_ice_dyn,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("f_ice_dyn")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_ice_dyn,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             
-            
-            ! ymat
-            ! case("visc_bar")
-            !     call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,start=[1,1,n], &
-            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-
-            ! ytherm
-            ! case("T_prime_b")
-            !     call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,start=[1,1,n], &
-            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            ! case("H_w")
-            !     call nc_write(filename,"H_w",ylmo%thrm%now%H_w,start=[1,1,n], &
-            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            ! ybound
-            ! case("z_bed")
-            !     call nc_write(filename,"z_bed",ylmo%bnd%z_bed,start=[1,1,n], &
-            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            ! case("z_sl")
-            !     call nc_write(filename,"z_sl",ylmo%bnd%z_sl,start=[1,1,n], &
-            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            
-            
-
             case DEFAULT 
 
                 write(io_unit_err,*) 

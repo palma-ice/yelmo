@@ -1,7 +1,9 @@
 module yelmo_grid
     ! This module holds routines to manage the gridded coordinates of a given Yelmo domain 
 
-    use yelmo_defs, only : sp, dp, prec, wp, pi, ygrid_class
+    use yelmo_defs, only : sp, dp, wp, pi, ygrid_class
+    use yelmo_tools, only : get_region_indices
+    
     use nml 
     use ncio 
 
@@ -28,7 +30,6 @@ module yelmo_grid
     public :: yelmo_init_grid_fromopt 
     public :: yelmo_init_grid_fromgrd
     public :: yelmo_grid_write
-    public :: yelmo_grid_write_cropped
 
 contains 
     
@@ -41,16 +42,16 @@ contains
 
         implicit none 
 
-        real(prec), allocatable, intent(INOUT) :: zeta_aa(:) 
-        real(prec), allocatable, intent(INOUT) :: zeta_ac(:) 
+        real(wp), allocatable, intent(INOUT) :: zeta_aa(:) 
+        real(wp), allocatable, intent(INOUT) :: zeta_ac(:) 
         integer,                 intent(OUT)   :: nz_ac 
         integer,      intent(IN)   :: nz_aa 
         character(*), intent(IN)   :: zeta_scale 
-        real(prec),   intent(IN)   :: zeta_exp 
+        real(wp),   intent(IN)   :: zeta_exp 
 
         ! Local variables
         integer :: k 
-        real(prec), allocatable :: tmp(:) 
+        real(wp), allocatable :: tmp(:) 
 
         ! Define size of zeta ac-node vector
         nz_ac = nz_aa + 1 
@@ -360,7 +361,7 @@ contains
         ! Local variables 
         character(len=56) :: units 
         integer :: nx, ny 
-        real(prec) :: x0, y0, dx, dy 
+        real(wp) :: x0, y0, dx, dy 
 
         ! Use the grid_name to determine grid parameters 
 
@@ -409,7 +410,7 @@ contains
         ! Local variables 
         character(len=56) :: units 
         integer :: nx, ny 
-        real(prec) :: x0, y0, dx, dy 
+        real(wp) :: x0, y0, dx, dy 
 
         ! Set units of grid parameters defined below
         units = "km" 
@@ -691,11 +692,11 @@ contains
 
         type(ygrid_class), intent(INOUT) :: grd 
         character(len=*),  intent(IN)    :: grid_name 
-        real(prec),        intent(IN)    :: xc(:) 
-        real(prec),        intent(IN)    :: yc(:) 
-        real(prec),        intent(IN), optional :: lon(:,:) 
-        real(prec),        intent(IN), optional :: lat(:,:) 
-        real(prec),        intent(IN), optional :: area(:,:) 
+        real(wp),        intent(IN)    :: xc(:) 
+        real(wp),        intent(IN)    :: yc(:) 
+        real(wp),        intent(IN), optional :: lon(:,:) 
+        real(wp),        intent(IN), optional :: lat(:,:) 
+        real(wp),        intent(IN), optional :: area(:,:) 
         
         ! Local variables
         integer    :: i, j
@@ -904,15 +905,15 @@ contains
 
         implicit none 
 
-        real(prec) :: x(:)
-        real(prec), optional :: x0, dx
-        real(prec) :: dx_tmp 
+        real(wp) :: x(:)
+        real(wp), optional :: x0, dx
+        real(wp) :: dx_tmp 
         integer :: i, nx  
 
         nx = size(x) 
 
         do i = 1, nx 
-            x(i) = real(i-1,prec)
+            x(i) = real(i-1,wp)
         end do 
 
         dx_tmp = 1.d0 
@@ -950,7 +951,7 @@ contains
 
     end subroutine ygrid_dealloc
 
-    subroutine yelmo_grid_write(grid,fnm,domain,grid_name,create)
+    subroutine yelmo_grid_write(grid, fnm, domain, grid_name, create, irange, jrange)
         ! Write grid info to netcdf file respecting coordinate conventions
         ! for easier interpretation/plotting etc. 
 
@@ -960,87 +961,20 @@ contains
         character(len=*),  intent(IN) :: domain
         character(len=*),  intent(IN) :: grid_name
         logical,           intent(IN) :: create  
-
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
+        
         ! Local variables 
         character(len=16) :: xnm 
         character(len=16) :: ynm 
         character(len=16) :: grid_mapping_name
+        integer :: i1, i2, j1, j2
 
         xnm = "xc"
         ynm = "yc" 
         grid_mapping_name = "crs" 
 
-        ! Create the netcdf file if desired
-        if (create) then 
-            
-            ! Create the empty netcdf file
-            call nc_create(fnm)
-
-            ! Write some general attributes that can be useful (e.g., for interpolation etc)
-            call nc_write_attr(fnm, "domain",    trim(domain))
-            call nc_write_attr(fnm, "grid_name", trim(grid_name))
-
-
-            ! Add grid axis variables to netcdf file
-            call nc_write_dim(fnm,xnm,x=grid%xc*1e-3,units="km")
-
-            call nc_write_dim(fnm,ynm,x=grid%yc*1e-3,units="km")
-            
-            if (grid%is_projection) then 
-                call nc_write_attr(fnm,xnm,"standard_name","projection_x_coordinate")
-                call nc_write_attr(fnm,ynm,"standard_name","projection_y_coordinate")
-            end if 
-
-        end if 
-
-        ! Add projection information if needed
-        if (grid%is_projection) then
-            call nc_write_map(fnm,grid%mtype,dble(grid%lambda),phi=dble(grid%phi), &
-                              alpha=dble(grid%alpha),x_e=dble(grid%x_e),y_n=dble(grid%y_n), &
-                              is_sphere=grid%is_sphere,semi_major_axis=dble(grid%semi_major_axis),& 
-                              inverse_flattening=dble(grid%inverse_flattening))
-        end if 
-
-        call nc_write(fnm,"x2D",grid%x*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping=grid_mapping_name)
-        call nc_write(fnm,"y2D",grid%y*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping=grid_mapping_name)
-
-        if (grid%is_projection) then 
-            call nc_write(fnm,"lon2D",grid%lon,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
-            call nc_write_attr(fnm,"lon2D","units","degrees_east")
-            call nc_write(fnm,"lat2D",grid%lat,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
-            call nc_write_attr(fnm,"lat2D","units","degrees_north")
-        end if 
-
-        call nc_write(fnm,"area",  grid%area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name,units="km^2")
-        if (grid%is_projection) call nc_write_attr(fnm,"area","coordinates","lat2D lon2D")
-        !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
-        !if (grid%is_projection) call nc_write_attr(fnm,"border","coordinates","lat2D lon2D")
-
-        return
-
-    end subroutine yelmo_grid_write
-
-    subroutine yelmo_grid_write_cropped(grid, fnm, domain, grid_name, create, &
-        i1, i2, j1, j2)
-        ! Write grid info to netcdf file respecting coordinate conventions
-        ! for easier interpretation/plotting etc. 
-
-        implicit none 
-        type(ygrid_class), intent(IN) :: grid 
-        character(len=*),  intent(IN) :: fnm
-        character(len=*),  intent(IN) :: domain
-        character(len=*),  intent(IN) :: grid_name
-        logical,           intent(IN) :: create  
-        integer,           intent(IN) :: i1, i2, j1, j2
-
-        ! Local variables 
-        character(len=16) :: xnm 
-        character(len=16) :: ynm 
-        character(len=16) :: grid_mapping_name
-
-        xnm = "xc"
-        ynm = "yc" 
-        grid_mapping_name = "crs" 
+        call get_region_indices(i1,i2,j1,j2,grid%nx,grid%ny,irange,jrange)
 
         ! Create the netcdf file if desired
         if (create) then 
@@ -1094,7 +1028,7 @@ contains
 
         return
 
-    end subroutine yelmo_grid_write_cropped
+    end subroutine yelmo_grid_write
 
 end module yelmo_grid
 

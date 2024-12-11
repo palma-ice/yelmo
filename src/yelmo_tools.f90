@@ -10,6 +10,7 @@ module yelmo_tools
     implicit none 
 
     private 
+    public :: get_region_indices
     public :: get_neighbor_indices
     public :: calc_magnitude 
     public :: calc_magnitude_from_staggered
@@ -93,6 +94,42 @@ module yelmo_tools
     public :: calc_vertical_integrated_3D
     
 contains 
+
+    subroutine get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+        ! Get indices for a region based on bounds. 
+        ! If no bounds provided, use whole domain.
+
+        implicit none
+
+        integer, intent(OUT) :: i1
+        integer, intent(OUT) :: i2
+        integer, intent(OUT) :: j1
+        integer, intent(OUT) :: j2
+        integer, intent(IN)  :: nx
+        integer, intent(IN)  :: ny
+        integer, intent(IN), optional :: irange(2)
+        integer, intent(IN), optional :: jrange(2)
+
+        
+        if (present(irange)) then
+            i1 = irange(1)
+            i2 = irange(2)
+        else
+            i1 = 1
+            i2 = nx
+        end if
+
+        if (present(jrange)) then
+            j1 = jrange(1)
+            j2 = jrange(2)
+        else
+            j1 = 1
+            j2 = ny
+        end if
+
+        return
+
+    end subroutine get_region_indices
 
     subroutine get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 

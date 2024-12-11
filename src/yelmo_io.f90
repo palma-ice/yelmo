@@ -5,8 +5,9 @@ module yelmo_io
     use ncio 
     
     use yelmo_defs 
+    use yelmo_tools, only : get_region_indices
     use yelmo_grid 
-
+    
     use variable_io
     use interp2D
     use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
@@ -26,7 +27,6 @@ module yelmo_io
     
     private 
     public :: yelmo_write_init
-    public :: yelmo_write_init_cropped
     public :: yelmo_write_step
     public :: yelmo_write_var
     public :: yelmo_write_step_model_metrics
@@ -37,53 +37,29 @@ module yelmo_io
 
 contains
 
-    subroutine yelmo_write_init(ylmo,filename,time_init,units)
-
-        implicit none 
-
-        type(yelmo_class), intent(IN) :: ylmo 
-        character(len=*),  intent(IN) :: filename, units 
-        real(wp),          intent(IN) :: time_init
+    subroutine yelmo_write_init(ylmo,filename,time_init,units,irange,jrange)
+        ! Initialize a NetCDF file for Yelmo output.
+        ! Produces a file with all possible dimension information 
+        ! to be able to plot different variables of the user's choice. 
+        ! Also, irange=[i1,i2] and jrange=[j1,j2] can be used to limit 
+        ! the dimensions to a specific horizontal region of the domain.
         
-        ! Initialize file by writing grid info
-        call yelmo_grid_write(ylmo%grd,filename,ylmo%par%domain,ylmo%par%grid_name,create=.TRUE.)
-
-
-        ! Initialize netcdf file and dimensions
-        call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,             units="month")
-        call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,         units="1")
-        call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,         units="1")
-        call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa, units="1")
-        call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso,     units="kyr")
-        call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,      units="kyr")
-        call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,              units="1")
-        
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
-
-        ! Static information
-        call nc_write(filename,"basins",  ylmo%bnd%basins, dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
-        call nc_write(filename,"regions", ylmo%bnd%regions,dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions")
-        
-        ! Additional optional static information 
-        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd,dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
-        
-        return
-
-    end subroutine yelmo_write_init
-
-    subroutine yelmo_write_init_cropped(ylmo,filename,time_init,units,i1,i2,j1,j2)
-
         implicit none 
 
         type(yelmo_class), intent(IN) :: ylmo 
         character(len=*),  intent(IN) :: filename
         character(len=*),  intent(IN) :: units 
         real(wp),          intent(IN) :: time_init
-        integer,           intent(IN) :: i1, i2, j1, j2 
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
+        
+        ! Local variables
+        integer :: i1, i2, j1, j2 
+
+        call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
         ! Initialize file by writing grid info
-        call yelmo_grid_write_cropped(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, create=.TRUE., &
-                                                                    i1=i1, i2=i2, j1=j1, j2=j2)
+        call yelmo_grid_write(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, create=.TRUE.,irange=irange,jrange=jrange)
 
         ! Initialize netcdf file and dimensions
         call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
@@ -105,30 +81,56 @@ contains
         
         return
 
-    end subroutine yelmo_write_init_cropped
+    end subroutine yelmo_write_init
 
-    subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd)
+    subroutine yelmo_write_step(ylmo,filename,time,nms_tpo,nms_dyn,nms_mat,nms_therm, &
+                                                nms_bnd,nms_dta,compare_pd,irange,jrange)
 
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo        
         character(len=*),  intent(IN) :: filename
         real(prec),        intent(IN) :: time
-        character(len=*),  optional, intent(IN) :: nms(:)
-        logical, optional, intent(IN) :: compare_pd
-
+        character(len=*),  intent(IN), optional :: nms_tpo(:)
+        character(len=*),  intent(IN), optional :: nms_dyn(:)
+        character(len=*),  intent(IN), optional :: nms_mat(:)
+        character(len=*),  intent(IN), optional :: nms_therm(:)
+        character(len=*),  intent(IN), optional :: nms_bnd(:)
+        character(len=*),  intent(IN), optional :: nms_dta(:)
+        logical,           intent(IN), optional :: compare_pd
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
+        
         ! Local variables
         integer    :: ncid, n, q, qtot
         character(len=56), allocatable :: names(:) 
         logical ::  write_pd_metrics 
+        integer :: i1, i2, j1, j2 
 
         type(yelmo_io_tables) :: io
 
-        if (present(nms)) then 
-            qtot = size(nms,1)
+        ! Get indices for region to write. If not provided, use whole domain
+        if (present(irange)) then
+            i1 = irange(1)
+            i2 = irange(2)
+        else
+            i1 = 1
+            i2 = ylmo%grd%nx
+        end if
+
+        if (present(jrange)) then
+            j1 = jrange(1)
+            j2 = jrange(2)
+        else
+            j1 = 1
+            j2 = ylmo%grd%ny
+        end if
+
+        if (present(nms_tpo)) then 
+            qtot = size(nms_tpo,1)
             allocate(names(qtot))
             do q = 1, qtot 
-                names(q) = trim(nms(q))
+                names(q) = trim(nms_tpo(q))
             end do 
         else 
             qtot = 18 
@@ -164,7 +166,7 @@ contains
         call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
         call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
         call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
-        
+
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -188,10 +190,14 @@ contains
         ! Loop over variables and write each variable
 if (.FALSE.) then
         ! Use variable_io
-        do q = 1, qtot 
-                call find_var_io_in_table(io%v,names(q),io%tpo)
-                call yelmo_write_var_io(filename,io%v,ylmo,n,ncid)
-        end do
+
+        if (present(nms_tpo)) then
+            do q = 1, size(nms_tpo) 
+                call find_var_io_in_table(io%v,nms_tpo(q),io%tpo)
+                call yelmo_write_var_io_ytopo(filename,io%v,ylmo,n,ncid)
+            end do
+        end if
+
 else
         ! Use hard-coded variable writing
         do q = 1, qtot 
@@ -206,7 +212,7 @@ end if
 
     end subroutine yelmo_write_step
 
-    subroutine yelmo_write_var_io(filename,v,ylmo,n,ncid)
+    subroutine yelmo_write_var_io_ytopo(filename,v,ylmo,n,ncid)
 
         implicit none
 
@@ -224,32 +230,8 @@ end if
             case("z_srf")
                 call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("z_bed")
-                call nc_write(filename,"z_bed",ylmo%bnd%z_bed,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("mask_bed")
                 call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("uxy_b")
-                call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("uxy_s")
-                call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("uxy_bar")
-                call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("beta")
-                call nc_write(filename,"beta",ylmo%dyn%now%beta,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("visc_bar")
-                call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("T_prime_b")
-                call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("H_w")
-                call nc_write(filename,"H_w",ylmo%thrm%now%H_w,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("mb_net")
                 call nc_write(filename,"mb_net",ylmo%tpo%now%mb_net,start=[1,1,n], &
@@ -263,10 +245,68 @@ end if
             case("cmb")
                 call nc_write(filename,"cmb",ylmo%tpo%now%bmb,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
-            case("z_sl")
-                call nc_write(filename,"z_sl",ylmo%bnd%z_sl,start=[1,1,n], &
-                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             
+            
+            ! ymat
+            ! case("visc_bar")
+            !     call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,start=[1,1,n], &
+            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+
+            ! ytherm
+            ! case("T_prime_b")
+            !     call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,start=[1,1,n], &
+            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            ! case("H_w")
+            !     call nc_write(filename,"H_w",ylmo%thrm%now%H_w,start=[1,1,n], &
+            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            ! ybound
+            ! case("z_bed")
+            !     call nc_write(filename,"z_bed",ylmo%bnd%z_bed,start=[1,1,n], &
+            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            ! case("z_sl")
+            !     call nc_write(filename,"z_sl",ylmo%bnd%z_sl,start=[1,1,n], &
+            !                     units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            
+            
+
+            case DEFAULT 
+
+                write(io_unit_err,*) 
+                write(io_unit_err,*) "yelmo_write_var_io_ytopo:: Error: variable not yet supported."
+                write(io_unit_err,*) "variable = ", trim(v%varname)
+                write(io_unit_err,*) "filename = ", trim(filename)
+                stop 
+                
+        end select
+
+        return
+
+    end subroutine yelmo_write_var_io_ytopo
+
+    subroutine yelmo_write_var_io_ydyn(filename,v,ylmo,n,ncid)
+
+        implicit none
+
+        character(len=*),  intent(IN) :: filename 
+        type(var_io_type), intent(IN) :: v
+        type(yelmo_class), intent(IN) :: ylmo 
+        integer                       :: n 
+        integer, optional             :: ncid 
+        
+        select case(trim(v%varname))
+
+            case("uxy_b")
+                call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("uxy_s")
+                call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("uxy_bar")
+                call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("beta")
+                call nc_write(filename,"beta",ylmo%dyn%now%beta,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             
             case("ux")
                 call nc_write(filename,"ux",ylmo%dyn%now%ux,start=[1,1,1,n], &
@@ -281,7 +321,7 @@ end if
             case DEFAULT 
 
                 write(io_unit_err,*) 
-                write(io_unit_err,*) "yelmo_write_var_io:: Error: variable not yet supported."
+                write(io_unit_err,*) "yelmo_write_var_io_ydyn:: Error: variable not yet supported."
                 write(io_unit_err,*) "variable = ", trim(v%varname)
                 write(io_unit_err,*) "filename = ", trim(filename)
                 stop 
@@ -290,7 +330,7 @@ end if
 
         return
 
-    end subroutine yelmo_write_var_io
+    end subroutine yelmo_write_var_io_ydyn
 
     subroutine yelmo_write_var(filename,varname,ylmo,n,ncid)
 

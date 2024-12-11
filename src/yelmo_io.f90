@@ -162,8 +162,9 @@ contains
         call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
         call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
         call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
-
-
+        call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
+        call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
+        
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 

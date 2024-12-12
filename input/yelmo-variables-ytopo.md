@@ -34,7 +34,7 @@
 | H_eff             | xc, yc      | m           | Effective ice thickness (margin-corrected)         |
 | H_grnd            | xc, yc      | m           | Grounded ice thickness                             |
 | H_calv            | xc, yc      | m           | Calving parameter field, ice thickness limit       |
-| kt                | xc, yc      |             | Calving parameter field, vm-l19                    |
+| kt_calv           | xc, yc      |             | Calving parameter field, vm-l19                    |
 | z_bed_filt        | xc, yc      | m           | Filtered bedrock elevation                         |
 | f_grnd            | xc, yc      |             | Grounded fraction                                  |
 | f_grnd_acx        | xc, yc      |             | Grounded fraction (acx nodes)                      |

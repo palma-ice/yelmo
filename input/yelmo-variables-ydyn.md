@@ -59,3 +59,12 @@
 | ssa_mask_acy      | xc, yc           | -           | SSA mask (y-dir)                              |
 | ssa_err_acx       | xc, yc           | m/yr        | SSA error (x-dir)                             |
 | ssa_err_acy       | xc, yc           | m/yr        | SSA error (y-dir)                             |
+| jvel_dxx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian, duxdx component            |
+| jvel_dxy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian, duxdy component            |
+| jvel_dxz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian, duxdz component            |
+| jvel_dyx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian, duydx component            |
+| jvel_dyy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian, duydy component            |
+| jvel_dyz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian, duydz component            |
+| jvel_dyx          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian, duzdx component            |
+| jvel_dyy          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian, duzdy component            |
+| jvel_dyz          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian, duzdz component            |

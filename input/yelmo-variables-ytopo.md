@@ -53,3 +53,19 @@
 | z_srf_n           | xc, yc      | m           | Surface elevation from previous timestep           |
 | H_ice_dyn         | xc, yc      | m           | Dynamic ice thickness                              |
 | f_ice_dyn         | xc, yc      |             | Dynamic ice-covered fraction                       |
+| pc_pred_H_ice     | xc, yc      | m           | Predicted ice thickness                            |
+| pc_pred_dHidt_dyn | xc, yc      | m/yr        | Predicted dynamic ice thickness rate of change     |
+| pc_pred_mb_net    | xc, yc      | m/yr        | Predicted net mass balance                         |
+| pc_pred_smb       | xc, yc      | m/yr        | Predicted surface mass balance                     |
+| pc_pred_bmb       | xc, yc      | m/yr        | Predicted basal mass balance                       |
+| pc_pred_fmb       | xc, yc      | m/yr        | Predicted frontal mass balance                     |
+| pc_pred_dmb       | xc, yc      | m/yr        | Predicted discharge mass balance                   |
+| pc_pred_cmb       | xc, yc      | m/yr        | Predicted calving mass balance                     |
+| pc_corr_H_ice     | xc, yc      | m           | Corrected ice thickness                            |
+| pc_corr_dHidt_dyn | xc, yc      | m/yr        | Corrected dynamic ice thickness rate of change     |
+| pc_corr_mb_net    | xc, yc      | m/yr        | Corrected net mass balance                         |
+| pc_corr_smb       | xc, yc      | m/yr        | Corrected surface mass balance                     |
+| pc_corr_bmb       | xc, yc      | m/yr        | Corrected basal mass balance                       |
+| pc_corr_fmb       | xc, yc      | m/yr        | Corrected frontal mass balance                     |
+| pc_corr_dmb       | xc, yc      | m/yr        | Corrected discharge mass balance                   |
+| pc_corr_cmb       | xc, yc      | m/yr        | Corrected calving mass balance                     |

@@ -82,10 +82,8 @@ contains
         ! Get ice thickness entering routine
         H_prev = tpo%now%H_ice 
 
-        ! === lsf ===
-        ! jablasco: obtain lsf mask before advection
-        ! jablasco: NO: binary values! needed?
-        !call LSFinit(tpo%now%lsf,H_prev,tpo%now%z_base)
+        ! jablasco: compute here LSF before mass advection
+        !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
  
         ! Step 1: Go through predictor-corrector-advance steps
 
@@ -108,6 +106,10 @@ contains
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+
+                    ! jablasco: compute LSF before advection here
+                    !where(tpo%now%f_grnd .gt. 0.0) tpo%now%lsf=1
+                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
 if (use_rk4) then
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -135,6 +137,10 @@ end if
                     ! Get ice-fraction mask for predicted ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+
+                    ! jablasco: compute LSF before advection here
+                    !where(tpo%now%f_grnd .gt. 0.0) tpo%now%lsf=1
+                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
 if (use_rk4) then
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -242,13 +248,13 @@ end if
 
                     ! === calving ===
                     ! Calculate and apply calving
-                    ! jablasco: turn calving off as basal melt
+                    ! jablasco: turn calving off
                     !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
                     ! jablasco: advect lsf as velocity minus calving-rate
-                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                    ! kill all ice outside LSF (computed before advection!)
                     where(tpo%now%z_base .gt. 0.0_wp) tpo%now%lsf = 1.0_wp 
-                    ! needed?
-                    where(tpo%now%H_ice .eq. 0.0_wp) tpo%now%lsf = -1.0_wp
+                    !where(tpo%now%H_ice .eq. 0.0_wp)  tpo%now%lsf = -1.0_wp ! needed?
 
                     ! jablasco: all ice on lsf<0 is calved ice
                     ! TO DO: compute values for cmb
@@ -333,6 +339,8 @@ end if
                     tpo%now%pred%dmb        = tpo%now%dmb
                     tpo%now%pred%cmb        = tpo%now%cmb 
                     tpo%now%pred%cmb_flt    = tpo%now%cmb_flt 
+                    tpo%now%pred%cmb_flt_x  = tpo%now%cmb_flt_x
+                    tpo%now%pred%cmb_flt_y  = tpo%now%cmb_flt_y
                     tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd 
                     
                 case("corrector")
@@ -350,6 +358,8 @@ end if
                     tpo%now%corr%dmb        = tpo%now%dmb
                     tpo%now%corr%cmb        = tpo%now%cmb 
                     tpo%now%corr%cmb_flt    = tpo%now%cmb_flt 
+                    tpo%now%corr%cmb_flt_x  = tpo%now%cmb_flt_x
+                    tpo%now%corr%cmb_flt_y  = tpo%now%cmb_flt_y
                     tpo%now%corr%cmb_grnd   = tpo%now%cmb_grnd
                     
                     ! Restore main ice thickness field to original 
@@ -382,6 +392,8 @@ end if
                         tpo%now%dmb         = tpo%now%pred%dmb 
                         tpo%now%cmb         = tpo%now%pred%cmb 
                         tpo%now%cmb_flt     = tpo%now%pred%cmb_flt 
+                        tpo%now%cmb_flt_x   = tpo%now%pred%cmb_flt_x
+                        tpo%now%cmb_flt_y   = tpo%now%pred%cmb_flt_y
                         tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd 
                         
                     else
@@ -397,6 +409,8 @@ end if
                         tpo%now%dmb         = tpo%now%corr%dmb 
                         tpo%now%cmb         = tpo%now%corr%cmb 
                         tpo%now%cmb_flt     = tpo%now%corr%cmb_flt 
+                        tpo%now%cmb_flt_x   = tpo%now%corr%cmb_flt_x
+                        tpo%now%cmb_flt_y   = tpo%now%corr%cmb_flt_y
                         tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd 
                         
                     end if
@@ -673,12 +687,14 @@ end if
             case("exp1","exp3")
 
                 !call calvmip_exp1(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%par%dx)
-                call calvmip_exp1_aa(tpo%now%cmb_flt,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%boundaries)
+                !call calvmip_exp1_aa(tpo%now%cmb_flt,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%boundaries)
+                call calvmip_exp1_ac(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries) 
 
             case("exp2")
     
-                !call calvmip_exp2(tpo%now%cmb_flt,dyn%now%uxy_bar,time_now)
-                call calvmip_exp1_exp2_aa(tpo%now%cmb_flt,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,time_now,tpo%par%boundaries)
+                !call calvmip_exp2_ac(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
+                !call calvmip_exp2+ac(tpo%now%cmb_flt,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,time_now,tpo%par%boundaries)
+                call calvmip_exp2_ac_norestart(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_ice,time_now,tpo%par%dx,tpo%par%boundaries)
 
             case DEFAULT
 
@@ -697,8 +713,10 @@ end if
         ! === LSF advection ===
         ! advect LSF mask based on the calving law
 
-        call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
-                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+        !call LSFupdate_aa(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+        call LSFupdate_ac(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'impl-upwind',tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
 
         tpo%now%lsf = LSFn
 
@@ -881,6 +899,8 @@ end if
                 tpo%now%rates%dmb           = 0.0
                 tpo%now%rates%cmb           = 0.0
                 tpo%now%rates%cmb_flt       = 0.0
+                tpo%now%rates%cmb_flt_x     = 0.0
+                tpo%now%rates%cmb_flt_y     = 0.0
                 tpo%now%rates%cmb_grnd      = 0.0
 
                 tpo%now%rates%dt_tot = 0.0 
@@ -1094,6 +1114,8 @@ end if
         allocate(now%rates%dmb(nx,ny))
         allocate(now%rates%cmb(nx,ny))
         allocate(now%rates%cmb_flt(nx,ny))
+        allocate(now%rates%cmb_flt_x(nx,ny))
+        allocate(now%rates%cmb_flt_y(nx,ny))
         allocate(now%rates%cmb_grnd(nx,ny))
         
         ! Remaining ytopo fields...
@@ -1115,6 +1137,8 @@ end if
         allocate(now%dmb(nx,ny))
         allocate(now%cmb(nx,ny))
         allocate(now%cmb_flt(nx,ny))
+        allocate(now%cmb_flt_x(nx,ny))
+        allocate(now%cmb_flt_y(nx,ny))
         allocate(now%cmb_grnd(nx,ny))
         allocate(now%lsf(nx,ny))       
  
@@ -1177,6 +1201,8 @@ end if
         now%rates%dmb           = 0.0
         now%rates%cmb           = 0.0
         now%rates%cmb_flt       = 0.0
+        now%rates%cmb_flt_x     = 0.0
+        now%rates%cmb_flt_y     = 0.0
         now%rates%cmb_grnd      = 0.0       
  
         now%H_ice       = 0.0 
@@ -1195,6 +1221,8 @@ end if
         now%dmb         = 0.0
         now%cmb         = 0.0
         now%cmb_flt     = 0.0
+        now%cmb_flt_x   = 0.0
+        now%cmb_flt_y   = 0.0
         now%cmb_grnd    = 0.0
         now%lsf         = 0.0       
  
@@ -1285,6 +1313,8 @@ end if
         if (allocated(now%dmb))         deallocate(now%dmb)
         if (allocated(now%cmb))         deallocate(now%cmb)
         if (allocated(now%cmb_flt))     deallocate(now%cmb_flt)
+        if (allocated(now%cmb_flt_x))   deallocate(now%cmb_flt_x)
+        if (allocated(now%cmb_flt_y))   deallocate(now%cmb_flt_y)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
         if (allocated(now%lsf))         deallocate(now%lsf)       
  

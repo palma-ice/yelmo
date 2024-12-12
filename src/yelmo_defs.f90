@@ -179,6 +179,8 @@ module yelmo_defs
         real(wp), allocatable :: dmb(:,:)
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
+        real(wp), allocatable :: cmb_flt_x(:,:)
+        real(wp), allocatable :: cmb_flt_y(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
         real(wp), allocatable :: lsf(:,:)
 
@@ -198,6 +200,8 @@ module yelmo_defs
         real(wp), allocatable :: dmb(:,:)         ! Net subgrid discharge
         real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
         real(wp), allocatable :: cmb_flt(:,:)     ! Calving rate, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_flt_x(:,:)   ! Calving rate, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_flt_y(:,:)   ! Calving rate, floating (applied) [m/a]
         real(wp), allocatable :: cmb_grnd(:,:)    ! Calving rate, grounded (applied) [m/a]
 
         real(wp) :: dt_tot
@@ -231,6 +235,8 @@ module yelmo_defs
         real(wp), allocatable   :: dmb_ref(:,:)     ! Subgrid discharge mb rate
 
         real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: cmb_flt_x(:,:)   ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: cmb_flt_y(:,:)   ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
         real(wp), allocatable   :: lsf(:,:)         ! LSF mask
 
@@ -832,7 +838,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
-        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_flt_x, cmb_flt_y, cmb_grnd
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
         real(wp)   :: lsf

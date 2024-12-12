@@ -131,7 +131,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 19
+            qtot = 21
             ! qtot=18
             allocate(names(qtot))
             names(1)  = "H_ice"
@@ -151,8 +151,10 @@ contains
             names(15) = "smb"
             names(16) = "bmb"
             names(17) = "cmb_flt"
-            names(18) = "z_sl"
-            names(19) = "lsf"
+            names(18) = "cmb_flt_x"
+            names(19) = "cmb_flt_y"
+            names(20) = "z_sl"
+            names(21) = "lsf"
 
         end if 
 
@@ -264,6 +266,12 @@ end if
             case("cmb_flt")
                 call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("cmb_flt_x")
+                call nc_write(filename,"cmb_flt_x",ylmo%tpo%now%cmb_flt_x,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
+            case("cmb_flt_y")
+                call nc_write(filename,"cmb_flt_y",ylmo%tpo%now%cmb_flt_y,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
             case("z_sl")
                 call nc_write(filename,"z_sl",ylmo%bnd%z_sl,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
@@ -357,6 +365,12 @@ end if
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             case("cmb_flt")
                 call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,units="m/yr ice equiv.",long_name="Calving mass balance", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("cmb_flt_x")
+                call nc_write(filename,"cmb_flt_x",ylmo%tpo%now%cmb_flt_x,units="m/yr ice equiv.",long_name="Calving mass balance", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            case("cmb_flt_y")
+                call nc_write(filename,"cmb_flt_y",ylmo%tpo%now%cmb_flt_y,units="m/yr ice equiv.",long_name="Calving mass balance", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             case("z_sl")
                 call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
@@ -556,6 +570,8 @@ end if
         call nc_write(filename,"dmb",         dom%tpo%now%dmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"cmb",         dom%tpo%now%cmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"cmb_flt",     dom%tpo%now%cmb_flt,     units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"cmb_flt_x",   dom%tpo%now%cmb_flt_x,   units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"cmb_flt_y",   dom%tpo%now%cmb_flt_y,   units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"cmb_grnd",    dom%tpo%now%cmb_grnd,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"lsf",         dom%tpo%now%lsf,         units="-",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"eps_eff",     dom%tpo%now%eps_eff,     units="1/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -1053,6 +1069,8 @@ end if
         call nc_read_interp(filename,"dmb",         tpo%now%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb",         tpo%now%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_flt",     tpo%now%cmb_flt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

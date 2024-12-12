@@ -76,20 +76,14 @@ contains
 
     end subroutine yelmo_write_init
 
-    subroutine yelmo_write_step(ylmo,filename,time,nms_tpo,nms_dyn,nms_mat,nms_therm, &
-                                                nms_bnd,nms_dta,compare_pd,irange,jrange)
+    subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd,irange,jrange)
 
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo        
         character(len=*),  intent(IN) :: filename
         real(prec),        intent(IN) :: time
-        character(len=*),  intent(IN), optional :: nms_tpo(:)
-        character(len=*),  intent(IN), optional :: nms_dyn(:)
-        character(len=*),  intent(IN), optional :: nms_mat(:)
-        character(len=*),  intent(IN), optional :: nms_therm(:)
-        character(len=*),  intent(IN), optional :: nms_bnd(:)
-        character(len=*),  intent(IN), optional :: nms_dta(:)
+        character(len=*),  intent(IN), optional :: nms(:)
         logical,           intent(IN), optional :: compare_pd
         integer,           intent(IN), optional :: irange(2)
         integer,           intent(IN), optional :: jrange(2)
@@ -100,17 +94,15 @@ contains
         logical ::  write_pd_metrics 
         integer :: i1, i2, j1, j2
 
-        type(yelmo_io_tables) :: io
-
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
 
-        if (present(nms_tpo)) then 
-            qtot = size(nms_tpo,1)
+        if (present(nms)) then 
+            qtot = size(nms,1)
             allocate(names(qtot))
             do q = 1, qtot 
-                names(q) = trim(nms_tpo(q))
+                names(q) = trim(nms(q))
             end do 
         else 
             qtot = 18 
@@ -139,14 +131,6 @@ contains
         write_pd_metrics = .TRUE. 
         if (present(compare_pd)) write_pd_metrics = compare_pd
 
-        ! Load io tables
-        call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
-        call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
-        call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
-        call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
-        call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
-        call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
-
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -166,7 +150,7 @@ contains
         end if
 
         ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid,irange,jrange)
  
         if (write_pd_metrics) then 
             ! Write present-day data metrics (rmse[H],etc)
@@ -177,22 +161,9 @@ contains
         qtot = size(names) 
 
         ! Loop over variables and write each variable
-if (.FALSE.) then
-        ! Use variable_io
-
-        if (present(nms_tpo)) then
-            do q = 1, size(nms_tpo) 
-                call find_var_io_in_table(io%v,nms_tpo(q),io%tpo)
-                call yelmo_write_var_io_ytopo(filename,io%v,ylmo,n,ncid)
-            end do
-        end if
-
-else
-        ! Use hard-coded variable writing
         do q = 1, qtot 
-               call yelmo_write_var(filename,names(q),ylmo,n,ncid)
+               call yelmo_write_var(filename,names(q),ylmo,n,ncid,irange,jrange)
         end do 
-end if
 
         ! Close the netcdf file
         call nc_close(ncid)
@@ -201,7 +172,7 @@ end if
 
     end subroutine yelmo_write_step
 
-    subroutine yelmo_write_var(filename,varname,ylmo,n,ncid)
+    subroutine yelmo_write_var(filename,varname,ylmo,n,ncid,irange,jrange)
 
         implicit none
 
@@ -210,18 +181,110 @@ end if
         type(yelmo_class), intent(IN) :: ylmo 
         integer                       :: n 
         integer, optional             :: ncid 
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
         
-        select case(trim(varname))
+        ! Local variables
+        integer :: q
+        logical :: found 
+        type(yelmo_io_tables) :: io
         
-            case DEFAULT 
+        ! Loop over each list of variables until the variable of interest is found
 
-                write(io_unit_err,*) 
-                write(io_unit_err,*) "yelmo_write_var:: Error: variable not yet supported."
-                write(io_unit_err,*) "variable = ", trim(varname)
-                write(io_unit_err,*) "filename = ", trim(filename)
-                stop 
-                
-        end select
+        found = .FALSE. 
+
+        ! == ytopo variables ===
+        if (.not. found) then
+
+            ! Load io table
+            call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
+            call find_var_io_in_table(io%v,varname,io%tpo)
+
+            if (.not. trim(io%v%varname) .eq. "none") then
+                call yelmo_write_var_io_ytopo(filename,io%v,ylmo,n,ncid,irange,jrange)
+                found = .TRUE.
+            end if
+
+        end if
+
+        ! == ydyn variables ===
+        if (.not. found) then
+
+            ! Load io table
+            call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
+            call find_var_io_in_table(io%v,varname,io%dyn)
+
+            if (.not. trim(io%v%varname) .eq. "none") then
+                call yelmo_write_var_io_ydyn(filename,io%v,ylmo,n,ncid,irange,jrange)
+                found = .TRUE.
+            end if
+
+        end if
+
+        ! == ymat variables ===
+        if (.not. found) then
+
+            ! Load io table
+            call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
+            call find_var_io_in_table(io%v,varname,io%mat)
+
+            if (.not. trim(io%v%varname) .eq. "none") then
+                call yelmo_write_var_io_ymat(filename,io%v,ylmo,n,ncid,irange,jrange)
+                found = .TRUE.
+            end if
+
+        end if
+
+        ! == ytherm variables ===
+        if (.not. found) then
+
+            ! Load io table
+            call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
+            call find_var_io_in_table(io%v,varname,io%thrm)
+
+            if (.not. trim(io%v%varname) .eq. "none") then
+                call yelmo_write_var_io_ytherm(filename,io%v,ylmo,n,ncid,irange,jrange)
+                found = .TRUE.
+            end if
+
+        end if
+
+        ! == ybound variables ===
+        if (.not. found) then
+
+            ! Load io table
+            call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
+            call find_var_io_in_table(io%v,varname,io%bnd)
+
+            if (.not. trim(io%v%varname) .eq. "none") then
+                call yelmo_write_var_io_ybound(filename,io%v,ylmo,n,ncid,irange,jrange)
+                found = .TRUE.
+            end if
+
+        end if
+
+        ! == ydata variables ===
+        if (.not. found) then
+
+            ! Load io table
+            call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
+            call find_var_io_in_table(io%v,varname,io%dta)
+
+            if (.not. trim(io%v%varname) .eq. "none") then
+                call yelmo_write_var_io_ydata(filename,io%v,ylmo,n,ncid,irange,jrange)
+                found = .TRUE.
+            end if
+
+        end if
+        
+        ! Error if still not found
+        if (.not. found) then
+            write(io_unit_err,*) 
+            write(io_unit_err,*) "yelmo_write_var:: Error: variable not yet supported."
+            write(io_unit_err,*) "variable = ", trim(varname)
+            write(io_unit_err,*) "filename = ", trim(filename)
+            stop   
+        end if
 
         return
 
@@ -252,7 +315,7 @@ end if
 
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,dom%grd%nx,dom%grd%ny,irange,jrange)
-
+        
         ! Load variable io tables
         call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
         call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
@@ -288,9 +351,9 @@ end if
         ! == Predictor-corrector (pc) variables ===
         ! (these will not be read in by yelmo_restart_read, but can be useful to output for diagnostics)
 
-        call nc_write(filename,"pc_tau",       dom%time%pc_tau,        units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
-        call nc_write(filename,"pc_tau_masked",dom%time%pc_tau_masked, units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
-        call nc_write(filename,"pc_tau_max",   dom%time%pc_tau_max,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
+        call nc_write(filename,"pc_tau",       dom%time%pc_tau(i1:i2,j1:j2),        units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
+        call nc_write(filename,"pc_tau_masked",dom%time%pc_tau_masked(i1:i2,j1:j2), units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
+        call nc_write(filename,"pc_tau_max",   dom%time%pc_tau_max(i1:i2,j1:j2),    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n])
         
         ! == time variables ===
 
@@ -917,7 +980,7 @@ end if
 
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
-
+        
         ! Allocate local representation of dims to be able to add "time" as last dimension
         allocate(dims(v%ndims+1))
         dims(1:v%ndims) = v%dims
@@ -1836,7 +1899,7 @@ end if
 
     end subroutine yelmo_write_var_io_ydata
 
-    subroutine yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+    subroutine yelmo_write_step_model_metrics(filename,ylmo,n,ncid,irange,jrange)
         ! Write model performance metrics (speed, dt, eta) 
 
         implicit none 
@@ -1845,7 +1908,15 @@ end if
         type(yelmo_class), intent(IN) :: ylmo 
         integer                       :: n 
         integer, optional             :: ncid 
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
         
+        ! Local variables
+        integer :: i1, i2, j1, j2
+
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
+
         ! Write model speed 
         call nc_write(filename,"speed",ylmo%time%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],missing_value=mv,ncid=ncid)
@@ -1856,10 +1927,9 @@ end if
         call nc_write(filename,"ssa_iter_avg",ylmo%time%ssa_iter_avg,units="",long_name="Average Picard iterations for SSA convergence", &
                       dim1="time",start=[n],count=[1],missing_value=mv,ncid=ncid)
 
-        call nc_write(filename,"pc_tau_max",abs(ylmo%time%pc_tau_max),units="m a**-1", &
+        call nc_write(filename,"pc_tau_max",abs(ylmo%time%pc_tau_max(i1:i2,j1:j2)),units="m a**-1", &
                         long_name="Maximum truncation error over last N timestep (magnitude)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[ylmo%grd%nx,ylmo%grd%ny,1], &
-                      missing_value=mv,ncid=ncid)
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],missing_value=mv,ncid=ncid)
         
         return 
 

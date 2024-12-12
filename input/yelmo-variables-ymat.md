@@ -7,8 +7,8 @@
 | enh_bar           | xc, yc           | -           | Depth-averaged enhancement                    |
 | ATT               | xc, yc, zeta     | -           | Rate factor                                   |
 | ATT_bar           | xc, yc           | -           | Depth-averaged rate factor                    |
-| visc              | xc, yc, zeta     | Pa·yr       | Ice viscosity                                 |
-| visc_bar          | xc, yc           | Pa·yr       | Depth-averaged ice viscosity                  |
+| visc              | xc, yc, zeta     | Pa yr       | Ice viscosity                                 |
+| visc_bar          | xc, yc           | Pa yr       | Depth-averaged ice viscosity                  |
 | visc_int          | xc, yc           | Pa yr m     | Ice viscosity interpolated at interfaces      |
 | f_shear_bar       | xc, yc           | -           | Depth-averaged shear fraction                 |
 | dep_time          | xc, yc, zeta     | yr          | Ice deposition time (for online age tracing)  |

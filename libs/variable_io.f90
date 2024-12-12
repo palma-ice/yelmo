@@ -45,19 +45,22 @@ contains
 
     end subroutine find_var_io_in_file
 
-    subroutine find_var_io_in_table(var,varname,var_table)
+    subroutine find_var_io_in_table(var,varname,var_table,with_error)
 
         implicit none
         
         type(var_io_type), intent(OUT) :: var
         character(len=*),  intent(IN)  :: varname 
         type(var_io_type), intent(IN)  :: var_table(:)
-        
+        logical,           intent(IN), optional :: with_error
+
         ! Local variables
         integer :: n 
         logical :: found
 
         found = .FALSE.
+        var%varname = "none"
+
         do n = 1, size(var_table)
             if (trim(var_table(n)%varname) .eq. trim(varname)) then
                 var = var_table(n)
@@ -66,12 +69,14 @@ contains
             end if
         end do
 
-        if (.not. found) then
-            write(error_unit,*) "find_var_io_in_table:: Error: variable not found in variable table."
-            write(error_unit,*) "varname = ", trim(varname)
-            stop 
+        if (.not. found .and. present(with_error)) then
+            if (with_error) then
+                write(error_unit,*) "find_var_io_in_table:: Error: variable not found in variable table."
+                write(error_unit,*) "varname = ", trim(varname)
+                stop
+            end if
         end if
-
+        
         return
 
     end subroutine find_var_io_in_table

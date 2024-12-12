@@ -383,14 +383,6 @@ program yelmo_benchmarks
             yelmo1%bnd%enh_srf = 1.0 
         end if 
 
-        if (time .le. 50e3) then 
-            yelmo1%thrm%par%method      = "temp"
-            yelmo1%thrm%par%rock_method = "equil"
-        else 
-            yelmo1%thrm%par%method      = trim(thrm_method_default)
-            yelmo1%thrm%par%rock_method = trim(rock_method_default)
-        end if 
-
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
         
@@ -520,8 +512,7 @@ contains
         type(bueler_test_type), intent(IN), optional :: buel 
 
         ! Local variables
-        integer    :: ncid, n, i, j, nx, ny  
-        real(prec) :: time_prev 
+        integer    :: ncid, n, i, j, nx, ny   
         real(prec), allocatable :: sym(:,:) 
 
         nx = ylmo%tpo%par%nx 
@@ -533,9 +524,7 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -604,7 +593,7 @@ contains
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"omega",ylmo%thrm%now%omega,units="--",long_name="Ice water content", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+        call nc_write(filename,"T_prime",ylmo%thrm%now%T_prime,units="deg C",long_name="Homologous ice temperature", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 !         call nc_write(filename,"T_pmp",ylmo%thrm%now%T_pmp,units="K",long_name="Ice pressure melting point (pmp)", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -679,6 +668,10 @@ contains
             call nc_write(filename,"div2D",ylmo%mat%now%strn2D%div,units="yr^-1",long_name="Divergence strain rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"te2D",ylmo%mat%now%strs2D%te,units="Pa",long_name="Effective stress", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            
+            sym = ylmo%mat%now%strn2D%de(nx:1:-1,:) - ylmo%mat%now%strn2D%de
+            call nc_write(filename,"de2D_sym",sym,units="yr^-1",long_name="Effective strain rate symmetry resid.", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             
             call nc_write(filename,"eps_eig_1",ylmo%mat%now%strn2D%eps_eig_1,units="1/yr",long_name="Eigen strain 1", &
@@ -853,7 +846,6 @@ contains
         
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny  
-        real(prec) :: time_prev 
 
         nx = ylmo%tpo%par%nx 
         ny = ylmo%tpo%par%ny 
@@ -862,9 +854,7 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)

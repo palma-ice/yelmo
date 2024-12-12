@@ -132,7 +132,6 @@ contains
             end do 
         else 
             qtot = 21
-            ! qtot=18
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -378,7 +377,6 @@ end if
             case("lsf")
                 call nc_write(filename,"lsf",ylmo%tpo%now%lsf,units="-",long_name="Level-set function (-1-0: ocean, 0-1: ice)", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
-            
             case("ux")
                 call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/yr",long_name="Velocity, x-direction", &
                                 dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -1051,6 +1049,10 @@ end if
         call nc_read(filename,"pc_dt",       tme%pc_dt, start=[1,n],count=[3,1],ncid=ncid)
         call nc_read(filename,"pc_eta",      tme%pc_eta,start=[1,n],count=[3,1],ncid=ncid)
         
+        call nc_read_interp(filename,"pc_tau",       tme%pc_tau,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_tau_masked",tme%pc_tau_masked,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"pc_tau_max",   tme%pc_tau_max,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        
         ! == ytopo variables ===
 
         call nc_read_interp(filename,"H_ice",       tpo%now%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -1188,6 +1190,11 @@ end if
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.FALSE.)
+        
+        ! == ytopo variables ===
+
+        ! Reload mask_bed since it contains thermodynamic information too
+        call nc_read_interp(filename,"mask_bed",      dom%tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
         ! == ydyn variables ===
 

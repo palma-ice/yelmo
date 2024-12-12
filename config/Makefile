@@ -112,6 +112,13 @@ roots : $(objdir)/root_finder.o tests/test_roots.f90
 		@echo "    test_roots.x is ready."
 		@echo " "
 
+variables : $(objdir)/variable_io.o tests/test_variables.f90
+		$(FC) $(DFLAGS) $(FFLAGS) -o $(bindir)/test_variables.x tests/test_variables.f90 \
+			$(LFLAGS) $(objdir)/nml.o $(objdir)/ncio.o $(objdir)/variable_io.o
+		@echo " "
+		@echo "    test_variables.x is ready."
+		@echo " "
+
 levelset : yelmo-static tests/test_levelset.f90
 		$(FC) $(DFLAGS) $(FFLAGS) -o $(bindir)/test_levelset.x tests/test_levelset.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o

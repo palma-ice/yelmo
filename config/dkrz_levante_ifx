@@ -40,5 +40,5 @@ LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
 
 #DFLAGS_NODEBUG = -O2 -fp-model precise
 DFLAGS_NODEBUG = -Ofast -march=core-avx2 -mtune=core-avx2 -traceback #-recursive
-DFLAGS_DEBUG   = -C -O0 -traceback -ftrapuv -fpe0 -check all -fp-model precise -debug extended -gen-interfaces -warn interfaces -check arg_temp_created
+DFLAGS_DEBUG   = -C -O0 -g -traceback -ftrapuv -fpe0 -check all,nouninit -fp-model precise -debug extended -gen-interfaces -warn interfaces -check arg_temp_created
 DFLAGS_PROFILE = -O2 -fp-model precise -pg

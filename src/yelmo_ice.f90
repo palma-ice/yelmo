@@ -136,6 +136,9 @@ contains
         !$ time2 = omp_get_wtime()
         !$ if(l_write_timer) print *,'TIME smooth_gauss_2D',time2-time1
         
+        ! ajr restart check:
+        !call yelmo_restart_write(dom,"./yelmo_restart_init_loop.nc",time)
+
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
@@ -160,6 +163,12 @@ contains
             ! Calculate adaptive timestep using proportional-integral (PI) methods
             call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
                                     dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%tpo%par%pc_k,dom%par%pc_controller)
+
+            ! ajr restart check:
+            ! write(*,*) "Set timestep: ", n, time_now, dt_pi, dt_max
+            ! write(*,*) "    ", dom%time%pc_dt
+            ! write(*,*) "    ", dom%time%pc_eta
+            ! write(*,*) "    ", dom%par%pc_eps
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -511,8 +520,11 @@ end if
 
         end do 
 
-        ! Finalize averaging of instantaneous rates
-        call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt_max_0,step="final",overwrite=.TRUE.,check_mb=check_mb)
+        if (dt_max_0 .gt. 0.0_wp) then
+            ! Finalize averaging of instantaneous rates 
+            ! (only if a timestep was calculated, otherwise maintain rates that were there)
+            call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt_max_0,step="final",overwrite=.TRUE.,check_mb=check_mb)
+        end if
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
@@ -1169,12 +1181,18 @@ end if
             dom%bnd  = bnd_restart 
             dom%time = tme_restart
 
+            ! And ensure pc is already active
+            dom%time%pc_active = .TRUE. 
+
         end if 
 
         ! Step 3: update remaining topogaphic info to be consistent with initial fields 
         ! Here several fields in ytopo will be overwritten and topo will be fully consistent with itself.
 
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
+        ! Note: thermodynamic state has not been loaded yet, so mask_bed produced here
+        ! will not contain regions of temperate ice. masks should be updated again
+        ! after loaded remaining fields.
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
@@ -1249,6 +1267,9 @@ end if
 
             call yelmo_restart_read(dom,trim(dom%par%restart),time)
             
+            ! And ensure pc is already active
+            dom%time%pc_active = .TRUE. 
+            
         else 
 
             ! Consistency check 
@@ -1308,11 +1329,11 @@ end if
             dom%thrm%par%method      = dom_thrm_method 
             dom%thrm%par%rock_method = dom_thrm_rock_method
 
-            ! Re-run topo again to make sure all fields are synchronized (masks, etc)
-            !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
-
         end if 
+
+        ! Re-run topo again to make sure all fields are synchronized (masks, etc)
+        !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

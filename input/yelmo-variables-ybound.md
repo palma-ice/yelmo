@@ -6,7 +6,7 @@
 | z_bed_sd          | xc, yc      | m           | Standard deviation of bedrock elevation            |
 | z_sl              | xc, yc      | m           | Sea level elevation                                |
 | H_sed             | xc, yc      | m           | Sediment thickness                                 |
-| smb               | xc, yc      | m/yr        | Surface mass balance                               |
+| smb_ref           | xc, yc      | m/yr        | Surface mass balance                               |
 | T_srf             | xc, yc      | K           | Surface temperature                                |
 | bmb_shlf          | xc, yc      | m/yr        | Basal mass balance for ice shelf                   |
 | fmb_shlf          | xc, yc      | m/yr        | Frontal mass balance for ice shelf                 |

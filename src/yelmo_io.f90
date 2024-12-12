@@ -82,7 +82,7 @@ contains
         
         type(yelmo_class), intent(IN) :: ylmo        
         character(len=*),  intent(IN) :: filename
-        real(prec),        intent(IN) :: time
+        real(wp),          intent(IN) :: time
         character(len=*),  intent(IN), optional :: nms(:)
         logical,           intent(IN), optional :: compare_pd
         integer,           intent(IN), optional :: irange(2)
@@ -128,7 +128,7 @@ contains
 
         end if 
 
-        write_pd_metrics = .TRUE. 
+        write_pd_metrics = .FALSE. 
         if (present(compare_pd)) write_pd_metrics = compare_pd
 
         ! Open the file for writing
@@ -980,7 +980,7 @@ contains
 
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
-        
+
         ! Allocate local representation of dims to be able to add "time" as last dimension
         allocate(dims(v%ndims+1))
         dims(1:v%ndims) = v%dims

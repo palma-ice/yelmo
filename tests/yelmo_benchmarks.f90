@@ -350,9 +350,9 @@ program yelmo_benchmarks
     ! == Write initial state ==
      
     ! 2D file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time_init,units="years",irange=[1,15],jrange=[1,15])
+    call yelmo_write_init(yelmo1,file2D,time_init=time_init,units="years")
     !call write_step_2D(yelmo1,file2D,time=time_init)  
-    call yelmo_write_step(yelmo1,file2D,time_init,irange=[1,15],jrange=[1,15]) 
+    call yelmo_write_step(yelmo1,file2D,time_init) 
             
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -457,7 +457,7 @@ program yelmo_benchmarks
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then 
             !call write_step_2D(yelmo1,file2D,time=time) 
-            call yelmo_write_step(yelmo1,file2D,time,irange=[1,15],jrange=[1,15]) 
+            call yelmo_write_step(yelmo1,file2D,time) 
             call write_step_2D_bueler(yelmo1,buel,file_compare,time)
 
             

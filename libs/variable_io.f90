@@ -9,7 +9,7 @@ module variable_io
         character(len=32)  :: varname
         character(len=32)  :: dimnames
         character(len=32)  :: units
-        character(len=128) :: long_name
+        character(len=256) :: long_name
 
         integer :: ndims
         character(len=32), allocatable :: dims(:)
@@ -76,7 +76,7 @@ contains
                 stop
             end if
         end if
-        
+
         return
 
     end subroutine find_var_io_in_table
@@ -113,11 +113,8 @@ contains
 
             if (line(1:2) .eq. "| ") then
                 ! Parse the line
-                call parse_line_to_variable(vt(n)%varname,vt(n)%dimnames,vt(n)%units,vt(n)%long_name,line)
+                call parse_line_to_variable(vt(n)%id,vt(n)%varname,vt(n)%dimnames,vt(n)%units,vt(n)%long_name,line)
                 
-                ! Store the id (variable number in table)
-                vt(n)%id = n 
-
                 ! Parse the dimensions
                 call parse_dims(vt(n)%dims,vt(n)%dimnames)
                 vt(n)%ndims = size(vt(n)%dims)
@@ -148,10 +145,11 @@ contains
 
     end subroutine load_var_io_table
 
-    subroutine parse_line_to_variable(varname,dimnames,units,long_name,line)
+    subroutine parse_line_to_variable(id,varname,dimnames,units,long_name,line)
 
         implicit none
 
+        integer,          intent(OUT) :: id
         character(len=*), intent(OUT) :: varname
         character(len=*), intent(OUT) :: dimnames
         character(len=*), intent(OUT) :: units
@@ -159,9 +157,12 @@ contains
         character(len=*), intent(IN)  :: line
         ! Local variables
         character(len=200) :: temp_line
+        character(len=20)  :: id_str
         integer :: pos1, pos2, length
+        integer :: ios 
 
         ! Initialize
+        id_str      = ""
         varname     = ""
         dimnames    = ""
         units       = ""
@@ -170,9 +171,26 @@ contains
         ! Remove leading/trailing spaces
         temp_line = adjustl(trim(line))
 
-        ! Extract var_name
+        ! Extract id
         pos1 = index(temp_line, '|') + 1
         temp_line = temp_line(pos1:)
+        pos2 = index(temp_line, '|') - 1
+        id_str = adjustl(trim(temp_line(:pos2)))
+
+        if (.not. trim(id_str) .eq. "") then
+            ! Convert to integer
+            read(id_str,"(i20)",iostat=ios) id
+            if (ios .ne. 0) then
+                write(error_unit,*) "variable_io:: parse_line_to_variable:: Error: id must be an integer."
+                write(error_unit,*) "id = ", trim(id_str)
+                stop
+            end if
+        else
+            id = 0
+        end if
+
+        ! Extract var_name
+        temp_line = temp_line(pos2+2:)
         pos2 = index(temp_line, '|') - 1
         varname = adjustl(trim(temp_line(:pos2)))
 
@@ -249,7 +267,7 @@ contains
 
         type(var_io_type), intent(IN) :: var
 
-        write(*,"(i4,3a20,2x,a35)") var%id, trim(var%varname), trim(var%dimnames), trim(var%units), trim(var%long_name)
+        write(*,"(i4,3a20,2x,a50)") var%id, trim(var%varname), trim(var%dimnames), trim(var%units), trim(var%long_name)
 
         return
 

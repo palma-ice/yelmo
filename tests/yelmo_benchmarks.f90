@@ -518,7 +518,9 @@ contains
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny   
         real(wp), allocatable :: sym(:,:) 
-        character(len=32), allocatable :: names(:)
+
+        integer :: q, qtot
+        character(len=32), allocatable :: vnms(:)
 
         nx = ylmo%tpo%par%nx 
         ny = ylmo%tpo%par%ny 
@@ -546,14 +548,19 @@ contains
         call nc_write(filename,"dt_adv3D",ylmo%time%dt_adv3D,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
+        qtot = 2
+        allocate(vnms(qtot))
+        vnms = ["H_ice","z_srf"]
 
-        !call yelmo_write_var(filename,names(q),ylmo,n,ncid)
+        do q = 1, qtot
+            call yelmo_write_var(filename,vnms(q),ylmo,n,ncid)
+        end do
 
         ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &

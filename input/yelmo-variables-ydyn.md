@@ -38,11 +38,11 @@
 | taub              | xc, yc           | Pa          | Basal stress magnitude                        |
 | taul_int_acx      | xc, yc           | Pa          | Depth-integrated lateral stress (x-dir)                       |
 | taul_int_acy      | xc, yc           | Pa          | Depth-integrated lateral stress (y-dir)                       |
-| qq_gl_acx         | xc, yc           | m^2/yr      | Flux across grounding line                    |
-| qq_gl_acy         | xc, yc           | m^2/yr      | Flux across grounding line                    |
-| qq_acx            | xc, yc           | m^2/yr      | Flux (x-dir)                                  |
-| qq_acy            | xc, yc           | m^2/yr      | Flux (y-dir)                                  |
-| qq                | xc, yc           | m^2/yr      | Flux magnitude                                |
+| qq_gl_acx         | xc, yc           | m^3/yr      | Flux across grounding line                    |
+| qq_gl_acy         | xc, yc           | m^3/yr      | Flux across grounding line                    |
+| qq_acx            | xc, yc           | m^3/yr      | Flux (x-dir)                                  |
+| qq_acy            | xc, yc           | m^3/yr      | Flux (y-dir)                                  |
+| qq                | xc, yc           | m^3/yr      | Flux magnitude                                |
 | de_eff            | xc, yc, zeta     | 1/yr        | Effective strain rate                         |
 | visc_eff          | xc, yc, zeta     | Pa yr       | Effective viscosity                           |
 | visc_eff_int      | xc, yc           | Pa yr m     | Depth-integrated viscosity                    |

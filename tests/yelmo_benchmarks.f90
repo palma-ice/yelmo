@@ -24,16 +24,16 @@ program yelmo_benchmarks
     character(len=56)  :: experiment
     logical    :: topo_fixed, dyn_fixed, with_bumps, low_z_sl 
     character(len=256) :: topo_fixed_file 
-    real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
-    real(prec) :: period, dt_test, alpha, omega, L, amp 
-    real(prec) :: bumps_L, bumps_A 
+    real(wp) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
+    real(wp) :: period, dt_test, alpha, omega, L, amp 
+    real(wp) :: bumps_L, bumps_A 
     integer    :: n  
 
     character(len=56) :: thrm_method_default 
     character(len=56) :: rock_method_default 
 
     character(len=56) :: grid_name
-    real(prec) :: dx, x0  
+    real(wp) :: dx, x0  
     integer    :: nx  
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
@@ -155,16 +155,16 @@ program yelmo_benchmarks
             ! Define a radially symmetric ice sheet to start, based on an ellipsoidal (square root) profile
             ! following Lipscomb et al. (2019) and CISMv2.1. 
 
-            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
+            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_wp,H0=2000.0_wp)
 
-            yelmo1%bnd%z_bed     = 0.0_prec 
+            yelmo1%bnd%z_bed     = 0.0_wp 
             yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
         case DEFAULT 
             ! EISMINT1, EISMINT2, HALFAR, BUELER 
 
-            yelmo1%bnd%z_bed     = 0.0_prec 
-            yelmo1%tpo%now%H_ice = 0.0_prec 
+            yelmo1%bnd%z_bed     = 0.0_wp 
+            yelmo1%tpo%now%H_ice = 0.0_wp 
             yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
 
     end select 
@@ -173,8 +173,8 @@ program yelmo_benchmarks
 
         L     = bumps_L                 ! [km] Length scale 
         amp   = bumps_A                 ! [m] Amplitude 
-        alpha = 0.5*pi/180.0_prec       ! [rad] 
-        omega = 2.0_prec*pi / (L*1e3)   ! [rad/m]
+        alpha = 0.5*pi/180.0_wp       ! [rad] 
+        omega = 2.0_wp*pi / (L*1e3)   ! [rad/m]
 
         !yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
         yelmo1%bnd%z_bed     = 0.0 + amp * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
@@ -208,8 +208,8 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-A 
             call bueler_test_AE(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                                L=750.0_prec,mbal0=0.3_prec,A=1e-16_prec,n=3.0_prec, &
-                                rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g,mu_max=0.0_prec)
+                                L=750.0_wp,mbal0=0.3_wp,A=1e-16_wp,n=3.0_wp, &
+                                rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g,mu_max=0.0_wp)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -226,7 +226,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B 
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                        time=0.0_wp,R0=750.0_wp,H0=3600.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                         rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             yelmo1%bnd%T_srf = 223.15 
@@ -244,7 +244,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with HALFAR conditions)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                        time=0.0_wp,R0=21.2132_wp,H0=707.1_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                         rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             yelmo1%bnd%T_srf = 223.15 
@@ -262,7 +262,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                        time=0.0_wp,R0=100.0_wp,H0=800.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                         rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             yelmo1%bnd%T_srf = 223.15 
@@ -283,7 +283,7 @@ program yelmo_benchmarks
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="dome",time=time,smb_max=0.5_prec,rad_el=1200.0_prec,period=period,dT_test=dT_test)
+                            experiment="dome",time=time,smb_max=0.5_wp,rad_el=1200.0_wp,period=period,dT_test=dT_test)
                 
         case("mismip-stnd") 
 
@@ -299,7 +299,7 @@ program yelmo_benchmarks
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
+                            experiment="dome",time=time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
                 
         case DEFAULT 
             ! EISMINT 
@@ -307,7 +307,7 @@ program yelmo_benchmarks
             ! Initialize eismint boundary values 
             call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                     yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                    experiment=experiment,time=0.0_prec,period=period,dT_test=dT_test)
+                                    experiment=experiment,time=0.0_wp,period=period,dT_test=dT_test)
 
 
     end select 
@@ -341,10 +341,10 @@ program yelmo_benchmarks
         ! Set conditions similar to EISMINT2-EXPA with smaller radius 
         call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                         yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                        experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
+                        experiment="dome",time=time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
 
-        call yelmo_update_equil(yelmo1,time_init,time_tot=real(5e3,prec), &
-                                                dt=5.0_prec,topo_fixed=.FALSE.)  
+        call yelmo_update_equil(yelmo1,time_init,time_tot=real(5e3,wp), &
+                                                dt=5.0_wp,topo_fixed=.FALSE.)  
     end if 
 
     ! == Write initial state ==
@@ -399,21 +399,21 @@ program yelmo_benchmarks
 
                 ! Update BUELER-B profile
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                      time=time,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                      time=time,R0=750.0_wp,H0=3600.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                       rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             case("HALFAR")
 
                 ! Update BUELER-B (but with HALFAR conditions)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                      time=time,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                      time=time,R0=21.2132_wp,H0=707.1_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                       rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             case("HALFAR-MED")
 
                 ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                            time=time,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                            time=time,R0=100.0_wp,H0=800.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                             rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
             
             case("mismip")
@@ -421,7 +421,7 @@ program yelmo_benchmarks
                 ! Set conditions similar to EISMINT2-EXPA with smaller radius 
                 call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="dome",time=time,smb_max=0.5_prec,rad_el=1200.0_prec,period=period,dT_test=dT_test)
+                                experiment="dome",time=time,smb_max=0.5_wp,rad_el=1200.0_wp,period=period,dT_test=dT_test)
                 
             case("mismip-stnd") 
 
@@ -434,7 +434,7 @@ program yelmo_benchmarks
                 ! Set conditions similar to EISMINT2-EXPA with smaller radius 
                 call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
+                                experiment="dome",time=time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
 
             case DEFAULT 
 
@@ -512,12 +512,13 @@ contains
         
         type(yelmo_class), intent(IN) :: ylmo
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        real(wp),          intent(IN) :: time
         type(bueler_test_type), intent(IN), optional :: buel 
 
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny   
-        real(prec), allocatable :: sym(:,:) 
+        real(wp), allocatable :: sym(:,:) 
+        character(len=32), allocatable :: names(:)
 
         nx = ylmo%tpo%par%nx 
         ny = ylmo%tpo%par%ny 
@@ -544,6 +545,9 @@ contains
         
         call nc_write(filename,"dt_adv3D",ylmo%time%dt_adv3D,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+
+        !call yelmo_write_var(filename,names(q),ylmo,n,ncid)
 
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
@@ -767,11 +771,11 @@ contains
         call nc_write(filename,"uxy_bar_sym",sym,units="m/a",long_name="Vertically integrated velocity magnitude symmetry check", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"qq_acx",ylmo%dyn%now%qq_acx,units="m^3/a",long_name="Ice flux (acx-nodes)", &
+        call nc_write(filename,"qq_acx",ylmo%dyn%now%qq_acx,units="m^3/yr",long_name="Ice flux (acx-nodes)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"qq_acy",ylmo%dyn%now%qq_acy,units="m^3/a",long_name="Ice flux (acy-nodes)", &
+        call nc_write(filename,"qq_acy",ylmo%dyn%now%qq_acy,units="m^3/yr",long_name="Ice flux (acy-nodes)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"qq",ylmo%dyn%now%qq,units="m^3/a",long_name="Ice flux", &
+        call nc_write(filename,"qq",ylmo%dyn%now%qq,units="m^3/yr",long_name="Ice flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
@@ -788,13 +792,13 @@ contains
         call nc_write(filename,"taub",ylmo%dyn%now%taub,units="Pa",long_name="Basal stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/a",long_name="Horizontal velocity (x)", &
+        call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/yr",long_name="Horizontal velocity (x)", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"uy",ylmo%dyn%now%uy,units="m/a",long_name="Horizontal velocity (y)", &
+        call nc_write(filename,"uy",ylmo%dyn%now%uy,units="m/yr",long_name="Horizontal velocity (y)", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy",ylmo%dyn%now%uxy,units="m/a",long_name="Horizontal velocity magnitude", &
+        call nc_write(filename,"uxy",ylmo%dyn%now%uxy,units="m/yr",long_name="Horizontal velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Vertical velocity", &
+        call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/yr",long_name="Vertical velocity", &
                       dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_vbvs",ylmo%dyn%now%f_vbvs,units="1",long_name="Basal to surface velocity fraction", &
@@ -802,7 +806,7 @@ contains
         call nc_write(filename,"f_shear_bar",ylmo%mat%now%f_shear_bar,units="1",long_name="Vertically averaged shearing fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Strain rate", &
+        call nc_write(filename,"de",ylmo%mat%now%strn%de,units="yr^-1",long_name="Strain rate", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         ! == yelmo_bound ==
@@ -815,17 +819,17 @@ contains
 !         call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/a ice equiv.",long_name="Net surface mass balance", &
+        call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/yr ice equiv.",long_name="Net surface mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance (potential)", &
+        call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/yr ice equiv.",long_name="Surface mass balance (potential)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
      
-        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
+        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/yr ice equiv.",long_name="Basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
+!         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/yr ice equiv.",long_name="Basal mass balance (shelf)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
@@ -846,7 +850,7 @@ contains
         type(yelmo_class),      intent(IN) :: ylmo
         type(bueler_test_type), intent(IN) :: buel 
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
         
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny  
@@ -903,11 +907,11 @@ end program yelmo_benchmarks
 
 !     ! Simulations to test rate factor feedback
 !     logical :: testing_ratefactor = .FALSE. 
-!     real(prec) :: mod_time_1, mod_time_2, mod_time_3 
-!     real(prec) :: rad_max, rad_min, rad_now
-!     real(prec) :: dT_max, dT_min, dT_now
-!     real(prec) :: dsmb_max, dsmb_min, dsmb_now 
-!     real(prec) :: f_lin 
+!     real(wp) :: mod_time_1, mod_time_2, mod_time_3 
+!     real(wp) :: rad_max, rad_min, rad_now
+!     real(wp) :: dT_max, dT_min, dT_now
+!     real(wp) :: dsmb_max, dsmb_min, dsmb_now 
+!     real(wp) :: f_lin 
 
 !     ! Settings for transient rate factor test. 
 !     mod_time_1 = 100e3 

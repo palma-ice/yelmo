@@ -15,16 +15,6 @@ module yelmo_io
     
     implicit none
 
-    type yelmo_io_tables
-        type(var_io_type) :: v
-        type(var_io_type), allocatable :: tpo(:)
-        type(var_io_type), allocatable :: dyn(:)
-        type(var_io_type), allocatable :: mat(:)
-        type(var_io_type), allocatable :: thrm(:)
-        type(var_io_type), allocatable :: bnd(:)
-        type(var_io_type), allocatable :: dta(:)
-    end type
-    
     private 
     public :: yelmo_write_init
     public :: yelmo_write_step
@@ -189,6 +179,9 @@ contains
         logical :: found 
         type(yelmo_io_tables) :: io
         
+        ! Store yelmo io tables locally for easier access
+        io = ylmo%io 
+
         ! Loop over each list of variables until the variable of interest is found
 
         found = .FALSE. 
@@ -197,7 +190,8 @@ contains
         if (.not. found) then
 
             ! Load io table
-            call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
+            ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+            !call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
             call find_var_io_in_table(io%v,varname,io%tpo)
 
             if (.not. trim(io%v%varname) .eq. "none") then
@@ -211,7 +205,8 @@ contains
         if (.not. found) then
 
             ! Load io table
-            call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
+            ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+            !call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
             call find_var_io_in_table(io%v,varname,io%dyn)
 
             if (.not. trim(io%v%varname) .eq. "none") then
@@ -225,7 +220,8 @@ contains
         if (.not. found) then
 
             ! Load io table
-            call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
+            ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+            !call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
             call find_var_io_in_table(io%v,varname,io%mat)
 
             if (.not. trim(io%v%varname) .eq. "none") then
@@ -239,7 +235,8 @@ contains
         if (.not. found) then
 
             ! Load io table
-            call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
+            ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+            !call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
             call find_var_io_in_table(io%v,varname,io%thrm)
 
             if (.not. trim(io%v%varname) .eq. "none") then
@@ -253,7 +250,8 @@ contains
         if (.not. found) then
 
             ! Load io table
-            call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
+            ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+            !call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
             call find_var_io_in_table(io%v,varname,io%bnd)
 
             if (.not. trim(io%v%varname) .eq. "none") then
@@ -267,7 +265,8 @@ contains
         if (.not. found) then
 
             ! Load io table
-            call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
+            ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+            !call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
             call find_var_io_in_table(io%v,varname,io%dta)
 
             if (.not. trim(io%v%varname) .eq. "none") then
@@ -310,6 +309,9 @@ contains
         
         type(yelmo_io_tables) :: io
 
+        ! Store yelmo io in local object for easier access
+        io = dom%io 
+
         initialize_file = .TRUE. 
         if (present(init)) initialize_file = init
 
@@ -317,12 +319,13 @@ contains
         call get_region_indices(i1,i2,j1,j2,dom%grd%nx,dom%grd%ny,irange,jrange)
         
         ! Load variable io tables
-        call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
-        call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
-        call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
-        call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
-        call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
-        call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
+        ! ajr: now not needed because the tables are loaded in yelmo_init and stored in ylmo%io
+        ! call load_var_io_table(io%tpo,"input/yelmo-variables-ytopo.md")
+        ! call load_var_io_table(io%dyn,"input/yelmo-variables-ydyn.md")
+        ! call load_var_io_table(io%mat,"input/yelmo-variables-ymat.md")
+        ! call load_var_io_table(io%thrm,"input/yelmo-variables-ytherm.md")
+        ! call load_var_io_table(io%bnd,"input/yelmo-variables-ybound.md")
+        ! call load_var_io_table(io%dta,"input/yelmo-variables-ydata.md")
 
         ! == Initialize netcdf file ==============================================
 

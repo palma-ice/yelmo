@@ -23,7 +23,7 @@ module yelmo_ice
 
     use topography, only : remove_englacial_lakes
     use mass_conservation, only : calc_G_boundaries, check_mass_conservation, apply_tendency
-
+    use variable_io, only : load_var_io_table
     !$  use omp_lib
 
     implicit none 
@@ -789,6 +789,18 @@ end if
         call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr_aa)
         
         write(*,*) "yelmo_init:: thermodynamics initialized."
+        
+        ! === Yelmo IO tables ===
+        
+        ! Load variable io tables
+        call load_var_io_table(dom%io%tpo,"input/yelmo-variables-ytopo.md")
+        call load_var_io_table(dom%io%dyn,"input/yelmo-variables-ydyn.md")
+        call load_var_io_table(dom%io%mat,"input/yelmo-variables-ymat.md")
+        call load_var_io_table(dom%io%thrm,"input/yelmo-variables-ytherm.md")
+        call load_var_io_table(dom%io%bnd,"input/yelmo-variables-ybound.md")
+        call load_var_io_table(dom%io%dta,"input/yelmo-variables-ydata.md")
+
+        write(*,*) "yelmo_init:: variable io tables loaded."
         
         ! === Ensure consistency with specific parameters ===
 

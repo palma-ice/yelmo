@@ -43,7 +43,7 @@ $(objdir)/mapping_scrip.o: $(libdir)/coordinates-light/mapping_scrip.f90 $(objdi
 								$(objdir)/gaussian_filter.o $(objdir)/index.o $(objdir)/grid_to_cdo.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/variable_io.o: $(libdir)/variable_io.f90 $(objdir)/ncio.o $(objdir)/yelmo_defs.o
+$(objdir)/variable_io.o: $(libdir)/variable_io.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 
@@ -138,7 +138,7 @@ $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
 
 ## YELMO BASE ###############################################
 
-$(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o
+$(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o $(objdir)/variable_io.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_grid.o: $(srcdir)/yelmo_grid.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o

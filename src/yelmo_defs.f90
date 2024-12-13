@@ -5,6 +5,7 @@ module yelmo_defs
     use omp_lib
 
     use nml, only : nml_replace
+    use variable_io, only : var_io_type
     
     implicit none 
 
@@ -883,6 +884,16 @@ module yelmo_defs
         
     end type 
 
+    type yelmo_io_tables
+        type(var_io_type) :: v
+        type(var_io_type), allocatable :: tpo(:)
+        type(var_io_type), allocatable :: dyn(:)
+        type(var_io_type), allocatable :: mat(:)
+        type(var_io_type), allocatable :: thrm(:)
+        type(var_io_type), allocatable :: bnd(:)
+        type(var_io_type), allocatable :: dta(:)
+    end type
+    
     ! =========================================================================
     !
     ! YELMO objects: yelmo 
@@ -987,6 +998,7 @@ module yelmo_defs
         type(ybound_class)      :: bnd      ! Boundary variables to drive model
         type(ydata_class)       :: dta      ! Data variables for comparison
         type(yregions_class)    :: reg      ! Regionally aggregated variables for whole domain 
+        type(yelmo_io_tables)   :: io       ! IO variable tables
     end type
 
     public   ! All yelmo defs are public

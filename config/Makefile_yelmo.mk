@@ -43,6 +43,9 @@ $(objdir)/mapping_scrip.o: $(libdir)/coordinates-light/mapping_scrip.f90 $(objdi
 								$(objdir)/gaussian_filter.o $(objdir)/index.o $(objdir)/grid_to_cdo.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/variable_io.o: $(libdir)/variable_io.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -242,7 +245,8 @@ yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 			 		   $(objdir)/ncio.o \
 			 		   $(objdir)/root_finder.o \
 			 		   $(objdir)/mapping_scrip.o \
-					   $(objdir)/variable_io.o \
+					   $(objdir)/timeout.o \
+					   $(objdir)/variable_io.o
 
 yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/grounding_line_flux.o \

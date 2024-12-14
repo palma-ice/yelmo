@@ -12,7 +12,7 @@
 |  8 | visc_int          | xc, yc           | Pa yr m     | Ice viscosity interpolated at interfaces      |
 |  9 | f_shear_bar       | xc, yc           | -           | Depth-averaged shear fraction                 |
 | 10 | dep_time          | xc, yc, zeta     | yr          | Ice deposition time (for online age tracing)  |
-| 11 | depth_iso         | xc, yc, zeta     | m           | Depth of specific isochronal layers           |
+| 11 | depth_iso         | xc, yc, age_iso  | m           | Depth of specific isochronal layers           |
 | 12 | strn2D_dxx        | xc, yc           | 1/yr        | 2D strain rate tensor component dxx           |
 | 13 | strn2D_dyy        | xc, yc           | 1/yr        | 2D strain rate tensor component dyy           |
 | 14 | strn2D_dxy        | xc, yc           | 1/yr        | 2D strain rate tensor component dxy           |

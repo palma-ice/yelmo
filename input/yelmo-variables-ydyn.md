@@ -65,6 +65,6 @@
 | 61 | jvel_dyx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydx             |
 | 62 | jvel_dyy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydy             |
 | 63 | jvel_dyz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydz             |
-| 64 | jvel_dyx          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdx             |
-| 65 | jvel_dyy          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdy             |
-| 66 | jvel_dyz          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdz             |
+| 64 | jvel_dzx          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdx             |
+| 65 | jvel_dzy          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdy             |
+| 66 | jvel_dzz          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdz             |

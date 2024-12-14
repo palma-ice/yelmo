@@ -67,7 +67,7 @@ contains
 
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
-        
+
         ! Write static fields
         call nc_write(filename,"basins",   ylmo%bnd%basins(i1:i2,j1:j2),  dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
         call nc_write(filename,"regions",  ylmo%bnd%regions(i1:i2,j1:j2), dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions") 
@@ -873,6 +873,19 @@ contains
 
         ! == ymat variables ===
 
+        call nc_read_interp(filename,"enh",         dom%mat%now%enh,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"enh_bnd",     dom%mat%now%enh_bnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"enh_bar",     dom%mat%now%enh_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"ATT",         dom%mat%now%ATT,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"ATT_bar",     dom%mat%now%ATT_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"visc",        dom%mat%now%visc,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"visc_int",    dom%mat%now%visc_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
+        call nc_read_interp(filename,"f_shear_bar", dom%mat%now%f_shear_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
+        call nc_read_interp(filename,"dep_time",    dom%mat%now%dep_time,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
+        call nc_read_interp(filename,"depth_iso",   dom%mat%now%depth_iso,ncid=ncid,start=[1,1,1,n],count=[nx,ny,n_iso,1],mps=mps) 
+        
         call nc_read_interp(filename,"strn2D_dxx", dom%mat%now%strn2D%dxx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"strn2D_dyy", dom%mat%now%strn2D%dyy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"strn2D_dxy", dom%mat%now%strn2D%dxy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
@@ -907,19 +920,6 @@ contains
         call nc_read_interp(filename,"strs_tyz", dom%mat%now%strs%tyz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
         call nc_read_interp(filename,"strs_te",  dom%mat%now%strs%te,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
 
-        call nc_read_interp(filename,"enh",         dom%mat%now%enh,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
-        call nc_read_interp(filename,"enh_bnd",     dom%mat%now%enh_bnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"enh_bar",     dom%mat%now%enh_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"ATT",         dom%mat%now%ATT,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
-        call nc_read_interp(filename,"ATT_bar",     dom%mat%now%ATT_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"visc",        dom%mat%now%visc,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
-        call nc_read_interp(filename,"visc_int",    dom%mat%now%visc_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"f_shear_bar", dom%mat%now%f_shear_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"dep_time",    dom%mat%now%dep_time,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps) 
-        call nc_read_interp(filename,"depth_iso",   dom%mat%now%depth_iso,ncid=ncid,start=[1,1,1,n],count=[nx,ny,n_iso,1],mps=mps) 
-        
         ! == ytherm variables ===
 
         call nc_read_interp(filename,"enth",        dom%thrm%now%enth,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps)   

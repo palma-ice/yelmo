@@ -43,6 +43,9 @@ contains
         integer,           intent(IN), optional :: irange(2)
         integer,           intent(IN), optional :: jrange(2)
         
+        ! Local variables
+        integer :: i1, i2, j1, j2
+
         ! Initialize file by writing grid info
         call yelmo_grid_write(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, create=.TRUE.,irange=irange,jrange=jrange)
 
@@ -62,6 +65,14 @@ contains
             call nc_write_attr(filename,"yc","standard_name","projection_y_coordinate")
         end if 
 
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
+        
+        ! Write static fields
+        call nc_write(filename,"basins",   ylmo%bnd%basins(i1:i2,j1:j2),  dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
+        call nc_write(filename,"regions",  ylmo%bnd%regions(i1:i2,j1:j2), dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions") 
+        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd(i1:i2,j1:j2),dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
+        
         return
 
     end subroutine yelmo_write_init
@@ -87,7 +98,7 @@ contains
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
-
+        ! Determine which variables to write
         if (present(nms)) then 
             qtot = size(nms,1)
             allocate(names(qtot))
@@ -129,15 +140,6 @@ contains
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        if (n .eq. 1) then
-            ! First time index, write some static fields
-
-            call nc_write(filename,"basins",   ylmo%bnd%basins(i1:i2,j1:j2),  dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
-            call nc_write(filename,"regions",  ylmo%bnd%regions(i1:i2,j1:j2), dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions") 
-            call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd(i1:i2,j1:j2),dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
-        
-        end if
 
         ! Write model metrics (model speed, dt, eta)
         call yelmo_write_step_model_metrics(filename,ylmo,n,ncid,irange,jrange)

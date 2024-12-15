@@ -17,8 +17,8 @@ module yelmo_io
 
     private 
     public :: yelmo_write_init
-    public :: yelmo_write_step
     public :: yelmo_write_var
+    public :: yelmo_write_step
     public :: yelmo_write_step_model_metrics
     public :: yelmo_write_step_pd_metrics
     public :: yelmo_restart_write
@@ -78,91 +78,6 @@ contains
         return
 
     end subroutine yelmo_write_init
-
-    subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd,irange,jrange)
-
-        implicit none 
-        
-        type(yelmo_class), intent(IN) :: ylmo        
-        character(len=*),  intent(IN) :: filename
-        real(wp),          intent(IN) :: time
-        character(len=*),  intent(IN), optional :: nms(:)
-        logical,           intent(IN), optional :: compare_pd
-        integer,           intent(IN), optional :: irange(2)
-        integer,           intent(IN), optional :: jrange(2)
-        
-        ! Local variables
-        integer    :: ncid, n, q, qtot
-        character(len=56), allocatable :: names(:) 
-        logical ::  write_pd_metrics 
-        integer :: i1, i2, j1, j2
-
-        ! Get indices for current domain of interest
-        call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
-
-        ! Determine which variables to write
-        if (present(nms)) then 
-            qtot = size(nms,1)
-            allocate(names(qtot))
-            do q = 1, qtot 
-                names(q) = trim(nms(q))
-            end do 
-        else 
-            qtot = 16 
-            allocate(names(qtot))
-            names(1)  = "H_ice"
-            names(2)  = "z_srf"
-            names(3)  = "z_bed"
-            names(4)  = "mask_bed"
-            names(5)  = "uxy_b"
-            names(6)  = "uxy_s"
-            names(7)  = "uxy_bar"
-            names(8)  = "beta"
-            names(9)  = "visc_bar"
-            names(10) = "T_prime_b"
-            names(11) = "H_w"
-            names(12) = "mb_net"
-            names(13) = "smb"
-            names(14) = "bmb"
-            names(15) = "cmb"
-            names(16) = "z_sl"
-
-        end if 
-
-        write_pd_metrics = .FALSE. 
-        if (present(compare_pd)) write_pd_metrics = compare_pd
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_time_index(filename,"time",time,ncid)
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid,irange,jrange)
- 
-        if (write_pd_metrics) then 
-            ! Write present-day data metrics (rmse[H],etc)
-            call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        end if  
-        
-        ! Determine number of variables to write 
-        qtot = size(names) 
-
-        ! Loop over variables and write each variable
-        do q = 1, qtot 
-               call yelmo_write_var(filename,names(q),ylmo,n,ncid,irange,jrange)
-        end do 
-
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine yelmo_write_step
 
     subroutine yelmo_write_var(filename,varname,ylmo,n,ncid,irange,jrange)
 
@@ -290,6 +205,91 @@ contains
         return
 
     end subroutine yelmo_write_var
+
+    subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd,irange,jrange)
+
+        implicit none 
+        
+        type(yelmo_class), intent(IN) :: ylmo        
+        character(len=*),  intent(IN) :: filename
+        real(wp),          intent(IN) :: time
+        character(len=*),  intent(IN), optional :: nms(:)
+        logical,           intent(IN), optional :: compare_pd
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
+        
+        ! Local variables
+        integer    :: ncid, n, q, qtot
+        character(len=56), allocatable :: names(:) 
+        logical ::  write_pd_metrics 
+        integer :: i1, i2, j1, j2
+
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
+
+        ! Determine which variables to write
+        if (present(nms)) then 
+            qtot = size(nms,1)
+            allocate(names(qtot))
+            do q = 1, qtot 
+                names(q) = trim(nms(q))
+            end do 
+        else 
+            qtot = 16 
+            allocate(names(qtot))
+            names(1)  = "H_ice"
+            names(2)  = "z_srf"
+            names(3)  = "z_bed"
+            names(4)  = "mask_bed"
+            names(5)  = "uxy_b"
+            names(6)  = "uxy_s"
+            names(7)  = "uxy_bar"
+            names(8)  = "beta"
+            names(9)  = "visc_bar"
+            names(10) = "T_prime_b"
+            names(11) = "H_w"
+            names(12) = "mb_net"
+            names(13) = "smb"
+            names(14) = "bmb"
+            names(15) = "cmb"
+            names(16) = "z_sl"
+
+        end if 
+
+        write_pd_metrics = .FALSE. 
+        if (present(compare_pd)) write_pd_metrics = compare_pd
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid,irange,jrange)
+ 
+        if (write_pd_metrics) then 
+            ! Write present-day data metrics (rmse[H],etc)
+            call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        end if  
+        
+        ! Determine number of variables to write 
+        qtot = size(names) 
+
+        ! Loop over variables and write each variable
+        do q = 1, qtot 
+               call yelmo_write_var(filename,names(q),ylmo,n,ncid,irange,jrange)
+        end do 
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine yelmo_write_step
 
     subroutine yelmo_restart_write(dom,filename,time,init,irange,jrange)
         ! Write all yelmo data to file, so that it can be

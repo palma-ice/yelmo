@@ -69,9 +69,11 @@ contains
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
         ! Write static fields
-        call nc_write(filename,"basins",   ylmo%bnd%basins(i1:i2,j1:j2),  dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
-        call nc_write(filename,"regions",  ylmo%bnd%regions(i1:i2,j1:j2), dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions") 
-        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd(i1:i2,j1:j2),dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
+        call nc_write(filename,"ice_allowed", ylmo%bnd%ice_allowed(i1:i2,j1:j2), dim1="xc",dim2="yc",units="",long_name="Ice-allowed mask")
+        call nc_write(filename,"basins",      ylmo%bnd%basins(i1:i2,j1:j2),      dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
+        call nc_write(filename,"regions",     ylmo%bnd%regions(i1:i2,j1:j2),     dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions") 
+        call nc_write(filename,"z_bed_sd",    ylmo%bnd%z_bed_sd(i1:i2,j1:j2),    dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
+        call nc_write(filename,"H_sed",       ylmo%bnd%H_sed(i1:i2,j1:j2),       dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
         
         return
 
@@ -106,7 +108,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 18 
+            qtot = 16 
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -115,17 +117,15 @@ contains
             names(5)  = "uxy_b"
             names(6)  = "uxy_s"
             names(7)  = "uxy_bar"
-            names(8)  = "ux_bar"
-            names(9)  = "uy_bar"
-            names(10) = "beta"
-            names(11) = "visc_bar"
-            names(12) = "T_prime_b"
-            names(13) = "H_w"
-            names(14) = "mb_net"
-            names(15) = "smb"
-            names(16) = "bmb"
-            names(17) = "cmb"
-            names(18) = "z_sl"
+            names(8)  = "beta"
+            names(9)  = "visc_bar"
+            names(10) = "T_prime_b"
+            names(11) = "H_w"
+            names(12) = "mb_net"
+            names(13) = "smb"
+            names(14) = "bmb"
+            names(15) = "cmb"
+            names(16) = "z_sl"
 
         end if 
 
@@ -1874,19 +1874,19 @@ contains
             case("pd_depth_iso") ! 3D
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%depth_iso(i1:i2,j1:j2,:), &
                             start=[1,1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("err_H_ice")
+            case("pd_err_H_ice")
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_H_ice(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("err_z_srf")
+            case("pd_err_z_srf")
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_z_srf(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("err_z_bed")
+            case("pd_err_z_bed")
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_z_bed(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("err_uxy_s")
+            case("pd_err_uxy_s")
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_uxy_s(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("err_depth_iso") ! 3D
+            case("pd_err_depth_iso") ! 3D
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_depth_iso(i1:i2,j1:j2,:), &
                             start=[1,1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             

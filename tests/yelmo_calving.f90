@@ -70,8 +70,8 @@ program yelmo_calving
     select case(trim(ctl%exp))
         case("exp1","exp2")
             ctl%domain = "circular"
-            ctl%x0 = -800.0
-            ctl%x1 =  800.0
+            ctl%x0 = -900.0
+            ctl%x1 =  900.0
         case("exp3","exp4","exp5")
             ctl%domain = "thule"
             ctl%x0 = -1000.0
@@ -87,7 +87,7 @@ program yelmo_calving
 
     ! Get grid name
     write(ctl%grid_name,"(a,i2,a2)") trim(ctl%domain)//"-",int(ctl%dx),"KM"
-    
+   
     ! === Initialize ice sheet model =====
 
     ! First, define grid 
@@ -95,15 +95,16 @@ program yelmo_calving
 
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=ctl%path_par,grid_def="none",time=ctl%time_init, &
-                        load_topo=.FALSE.,domain=ctl%domain,grid_name=ctl%grid_name)
-    
+                    load_topo=.FALSE.,domain=ctl%domain,grid_name=ctl%grid_name)
 
-    ! === Define initial topography =====
-
+    ! === Define initial topography ===
     call calvmip_init(yelmo1%bnd%z_bed,yelmo1%grd%x,yelmo1%grd%y,yelmo1%par%domain)
 
-    yelmo1%tpo%now%H_ice = 0.0
-    yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed 
+    if (.not. yelmo1%par%use_restart) then
+        ! If no restart, set ice thickness to zero
+        yelmo1%tpo%now%H_ice = 0.0
+        yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed 
+    end if
 
     ! === Define additional boundary conditions =====
 
@@ -115,7 +116,7 @@ program yelmo_calving
     yelmo1%bnd%T_srf    = 223.15 
     yelmo1%bnd%Q_geo    = 42.0 
     yelmo1%bnd%smb      = 0.3
-            
+    
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -123,7 +124,7 @@ program yelmo_calving
     call yelmo_init_state(yelmo1,time=ctl%time_init,thrm_method="robin")
 
     ! == Write initial state ==
-     
+ 
     ! 2D file 
     call yelmo_write_init(yelmo1,ctl%file2D,time_init=ctl%time_init,units="years")
     call yelmo_write_step(yelmo1,ctl%file2D,time=ctl%time_init)  

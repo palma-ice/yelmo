@@ -81,9 +81,6 @@ contains
 
         ! Get ice thickness entering routine
         H_prev = tpo%now%H_ice 
-
-        ! jablasco: compute here LSF before mass advection
-        !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
  
         ! Step 1: Go through predictor-corrector-advance steps
 
@@ -108,8 +105,8 @@ contains
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
                     ! jablasco: compute LSF before advection here
-                    !where(tpo%now%f_grnd .gt. 0.0) tpo%now%lsf=1
-                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                    !where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = 1.0_wp
+                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
 if (use_rk4) then
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -139,8 +136,8 @@ end if
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
                     ! jablasco: compute LSF before advection here
-                    !where(tpo%now%f_grnd .gt. 0.0) tpo%now%lsf=1
-                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                    !where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = 1.0_wp
+                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
 if (use_rk4) then
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -252,18 +249,19 @@ end if
                     !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
                     ! jablasco: advect lsf as velocity minus calving-rate
                     !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                    ! kill all ice outside LSF (computed before advection!)
-                    where(tpo%now%z_base .gt. 0.0_wp) tpo%now%lsf = 1.0_wp 
-                    !where(tpo%now%H_ice .eq. 0.0_wp)  tpo%now%lsf = -1.0_wp ! needed?
 
                     ! jablasco: all ice on lsf<0 is calved ice
                     ! TO DO: compute values for cmb
-                    ! jablasco: should lsf affect also ice front of bedrock above sea-level?
+                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
                     where(tpo%now%lsf .lt. 0.0_wp) tpo%now%H_ice = 0.0_wp
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+                    ! Set ice border of LSF function to zero (helps with migration?)
+                    !call LSFborder(tpo%now%lsf,tpo%now%f_ice,tpo%par%boundaries)
+                    ! LSF only affects ocean points
+                    where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = 1.0_wp
 
                     ! If desired, finally relax solution to reference state
                     if (tpo%par%topo_rel .ne. 0) then 
@@ -671,6 +669,11 @@ end if
 
                 tpo%now%cmb_flt = 0.0
 
+            case("equil")
+                ! For an equilibrated ice sheet calving rate should be opposite to ice velocity
+                tpo%now%cmb_flt_x = -1*dyn%now%ux_bar
+                tpo%now%cmb_flt_y = -1*dyn%now%uy_bar
+
             case("vm16")
  
                 call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2, &
@@ -685,16 +688,12 @@ end if
             ! === CalvMIP ===
 
             case("exp1","exp3")
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries) 
+                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
 
-                !call calvmip_exp1(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%par%dx)
-                !call calvmip_exp1_aa(tpo%now%cmb_flt,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%boundaries)
-                call calvmip_exp1_ac(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries) 
-
-            case("exp2")
-    
-                !call calvmip_exp2_ac(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
-                !call calvmip_exp2+ac(tpo%now%cmb_flt,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,time_now,tpo%par%boundaries)
-                call calvmip_exp2_ac_norestart(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_ice,time_now,tpo%par%dx,tpo%par%boundaries)
+            case("exp2","exp4")
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
+                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
 
             case DEFAULT
 
@@ -712,11 +711,8 @@ end if
 
         ! === LSF advection ===
         ! advect LSF mask based on the calving law
-
-        !call LSFupdate_aa(LSFn,tpo%now%lsf,tpo%now%cmb_flt,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
-        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
-        call LSFupdate_ac(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
-                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'impl-upwind',tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
+        call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
 
         tpo%now%lsf = LSFn
 

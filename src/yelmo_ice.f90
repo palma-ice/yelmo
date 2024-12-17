@@ -1079,11 +1079,15 @@ end if
             ! Apply rate and update ice thickness
             call apply_tendency(dom%tpo%now%H_ice,dom%tpo%now%mb_resid,dt=1.0_wp,label="init")
 
-        end if 
+            ! Define the LSF mask
+            !call LSFinit(dom%tpo%now%lsf,dom%tpo%now%f_ice,dom%bnd%z_bed)
 
+        end if 
+     
+        ! arreglar esto para los restarts!
         ! Define the LSF mask
         call LSFinit(dom%tpo%now%lsf,dom%tpo%now%f_ice,dom%bnd%z_bed)
-      
+        
         ! Step 2: load topo and bnd variables from a restart file if desired 
         ! Store fields in temporary objects and determine which fields to pass
         ! to the main dom object.

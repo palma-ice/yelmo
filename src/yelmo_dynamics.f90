@@ -51,15 +51,15 @@ contains
         type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm 
         type(ybound_class), intent(IN)    :: bnd   
-        real(prec),         intent(IN)    :: time 
+        real(wp),         intent(IN)    :: time 
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        real(prec) :: dt 
+        real(wp) :: dt 
         real(8)    :: cpu_time0, cpu_time1
-        real(prec) :: model_time0, model_time1 
+        real(wp) :: model_time0, model_time1 
 
-        real(prec), allocatable :: uxy_prev(:,:) 
+        real(wp), allocatable :: uxy_prev(:,:) 
 
         logical, parameter :: write_ssa_diagnostics = .FALSE.
 
@@ -455,7 +455,7 @@ contains
         type(diva_param_class) :: diva_par 
 
         ! For vertical velocity calculation 
-        real(prec), allocatable :: bmb(:,:)
+        real(wp), allocatable :: bmb(:,:)
 
         ! Determine whether basal sliding is allowed 
         if (trim(dyn%par%solver) .eq. "diva-noslip") then 
@@ -549,7 +549,7 @@ contains
         type(l1l2_param_class) :: l1l2_par 
 
         ! For vertical velocity calculation 
-        real(prec), allocatable :: bmb(:,:)
+        real(wp), allocatable :: bmb(:,:)
 
         ! Determine whether basal sliding is allowed 
         if (trim(dyn%par%solver) .eq. "l1l2-noslip") then 
@@ -634,16 +634,16 @@ contains
 
 !         ! Local variables
 !         integer :: iter, i, j, nx, ny
-!         real(prec) :: H_mid   
-!         real(prec), allocatable :: ux_b_prev(:,:) 
-!         real(prec), allocatable :: uy_b_prev(:,:) 
+!         real(wp) :: H_mid   
+!         real(wp), allocatable :: ux_b_prev(:,:) 
+!         real(wp), allocatable :: uy_b_prev(:,:) 
 !         integer,    allocatable :: ssa_mask_acx(:,:) 
 !         integer,    allocatable :: ssa_mask_acy(:,:) 
 
-!         real(prec), allocatable :: beta_acx_prev(:,:) 
-!         real(prec), allocatable :: beta_acy_prev(:,:) 
+!         real(wp), allocatable :: beta_acx_prev(:,:) 
+!         real(wp), allocatable :: beta_acy_prev(:,:) 
 
-!         real(prec) :: L2_norm 
+!         real(wp) :: L2_norm 
 
 !         logical :: is_converged
 !         logical :: write_ssa_diagnostics
@@ -772,7 +772,7 @@ contains
 !             if (iter .gt. 1) then
 !                 ! Update ssa mask based on convergence with previous step to reduce calls 
 !                 call update_ssa_mask_convergence(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-!                                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=real(1e-3,prec)) 
+!                                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=real(1e-3,wp)) 
 !             end if 
 ! end if 
 
@@ -796,7 +796,7 @@ contains
 
             
 !             if (write_ssa_diagnostics) then  
-!                 !call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
+!                 !call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,wp))    
 !             end if 
 
 !             ! Exit iterations if ssa solution has converged
@@ -904,14 +904,17 @@ contains
 
     end subroutine calc_ydyn_neff
 
-    subroutine ydyn_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
+    subroutine ydyn_par_load(par,filename,group_ydyn,group_ytill,group_yneff,zeta_aa,zeta_ac,nx,ny,dx,init)
 
         type(ydyn_param_class), intent(OUT) :: par
         character(len=*),       intent(IN)  :: filename
-        real(prec),             intent(IN)  :: zeta_aa(:)
-        real(prec),             intent(IN)  :: zeta_ac(:)
+        character(len=*),       intent(IN)  :: group_ydyn        ! Usually "ydyn"
+        character(len=*),       intent(IN)  :: group_ytill       ! Usually "ytill"
+        character(len=*),       intent(IN)  :: group_yneff       ! Usually "yneff"
+        real(wp),               intent(IN)  :: zeta_aa(:)
+        real(wp),               intent(IN)  :: zeta_ac(:)
         integer,                intent(IN)  :: nx, ny 
-        real(prec),             intent(IN)  :: dx   
+        real(wp),               intent(IN)  :: dx   
         logical, optional,      intent(IN)  :: init 
 
         ! Local variables 
@@ -920,53 +923,53 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
         
-        call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
-        call nml_read(filename,"ydyn","visc_method",        par%visc_method,        init=init_pars)
-        call nml_read(filename,"ydyn","visc_const",         par%visc_const,         init=init_pars)
-        call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
-        call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
-        call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)
-        call nml_read(filename,"ydyn","beta_u0",            par%beta_u0,            init=init_pars)
-        call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
-        call nml_read(filename,"ydyn","beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
-        call nml_read(filename,"ydyn","beta_gl_f",          par%beta_gl_f,          init=init_pars)
-        call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)
-        call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
-        call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
-        call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
-        call nml_read(filename,"ydyn","eps_0",              par%eps_0,              init=init_pars)
-        call nml_read(filename,"ydyn","ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
-        call nml_read(filename,"ydyn","ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
-        call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
-        call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
-        call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
-        call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
-        call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
+        call nml_read(filename,group_ydyn,"solver",             par%solver,             init=init_pars)
+        call nml_read(filename,group_ydyn,"visc_method",        par%visc_method,        init=init_pars)
+        call nml_read(filename,group_ydyn,"visc_const",         par%visc_const,         init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_method",        par%beta_method,        init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_const",         par%beta_const,         init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_q",             par%beta_q,             init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_u0",            par%beta_u0,            init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_gl_f",          par%beta_gl_f,          init=init_pars)
+        call nml_read(filename,group_ydyn,"taud_gl_method",     par%taud_gl_method,     init=init_pars)
+        call nml_read(filename,group_ydyn,"H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
+        call nml_read(filename,group_ydyn,"n_sm_beta",          par%n_sm_beta,          init=init_pars)
+        call nml_read(filename,group_ydyn,"beta_min",           par%beta_min,           init=init_pars)
+        call nml_read(filename,group_ydyn,"eps_0",              par%eps_0,              init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
 
-        call nml_read(filename,"ydyn","taud_lim",           par%taud_lim,           init=init_pars)
-        call nml_read(filename,"ydyn","cb_sia",             par%cb_sia,             init=init_pars)
+        call nml_read(filename,group_ydyn,"taud_lim",           par%taud_lim,           init=init_pars)
+        call nml_read(filename,group_ydyn,"cb_sia",             par%cb_sia,             init=init_pars)
         
-        call nml_read(filename,"ytill","method",            par%till_method,        init=init_pars)
-        call nml_read(filename,"ytill","scale",             par%till_scale,         init=init_pars)
-        call nml_read(filename,"ytill","is_angle",          par%till_is_angle,      init=init_pars)
-        call nml_read(filename,"ytill","n_sd",              par%till_n_sd,          init=init_pars)
-        call nml_read(filename,"ytill","f_sed",             par%till_f_sed,         init=init_pars)
-        call nml_read(filename,"ytill","sed_min",           par%till_sed_min,       init=init_pars)
-        call nml_read(filename,"ytill","sed_max",           par%till_sed_max,       init=init_pars)
-        call nml_read(filename,"ytill","z0",                par%till_z0,            init=init_pars)
-        call nml_read(filename,"ytill","z1",                par%till_z1,            init=init_pars)
-        call nml_read(filename,"ytill","cf_min",            par%till_cf_min,        init=init_pars)
-        call nml_read(filename,"ytill","cf_ref",            par%till_cf_ref,        init=init_pars)
+        call nml_read(filename,group_ytill,"method",            par%till_method,        init=init_pars)
+        call nml_read(filename,group_ytill,"scale",             par%till_scale,         init=init_pars)
+        call nml_read(filename,group_ytill,"is_angle",          par%till_is_angle,      init=init_pars)
+        call nml_read(filename,group_ytill,"n_sd",              par%till_n_sd,          init=init_pars)
+        call nml_read(filename,group_ytill,"f_sed",             par%till_f_sed,         init=init_pars)
+        call nml_read(filename,group_ytill,"sed_min",           par%till_sed_min,       init=init_pars)
+        call nml_read(filename,group_ytill,"sed_max",           par%till_sed_max,       init=init_pars)
+        call nml_read(filename,group_ytill,"z0",                par%till_z0,            init=init_pars)
+        call nml_read(filename,group_ytill,"z1",                par%till_z1,            init=init_pars)
+        call nml_read(filename,group_ytill,"cf_min",            par%till_cf_min,        init=init_pars)
+        call nml_read(filename,group_ytill,"cf_ref",            par%till_cf_ref,        init=init_pars)
         
-        call nml_read(filename,"yneff","method",            par%neff_method,        init=init_pars)
-        call nml_read(filename,"yneff","const",             par%neff_const,         init=init_pars)
-        call nml_read(filename,"yneff","p",                 par%neff_p,             init=init_pars)
-        call nml_read(filename,"yneff","H_w_max",           par%neff_H_w_max,       init=init_pars)
-        call nml_read(filename,"yneff","N0",                par%neff_N0,            init=init_pars)
-        call nml_read(filename,"yneff","delta",             par%neff_delta,         init=init_pars)
-        call nml_read(filename,"yneff","e0",                par%neff_e0,            init=init_pars)
-        call nml_read(filename,"yneff","Cc",                par%neff_Cc,            init=init_pars)
-        call nml_read(filename,"yneff","s_const",           par%neff_S_const,       init=init_pars)
+        call nml_read(filename,group_yneff,"method",            par%neff_method,        init=init_pars)
+        call nml_read(filename,group_yneff,"const",             par%neff_const,         init=init_pars)
+        call nml_read(filename,group_yneff,"p",                 par%neff_p,             init=init_pars)
+        call nml_read(filename,group_yneff,"H_w_max",           par%neff_H_w_max,       init=init_pars)
+        call nml_read(filename,group_yneff,"N0",                par%neff_N0,            init=init_pars)
+        call nml_read(filename,group_yneff,"delta",             par%neff_delta,         init=init_pars)
+        call nml_read(filename,group_yneff,"e0",                par%neff_e0,            init=init_pars)
+        call nml_read(filename,group_yneff,"Cc",                par%neff_Cc,            init=init_pars)
+        call nml_read(filename,group_yneff,"s_const",           par%neff_S_const,       init=init_pars)
 
         ! === Set internal parameters ======
 
@@ -1352,8 +1355,8 @@ contains
 
         implicit none 
 
-        real(prec),       intent(INOUT) :: ux(:,:) 
-        real(prec),       intent(INOUT) :: uy(:,:) 
+        real(wp),       intent(INOUT) :: ux(:,:) 
+        real(wp),       intent(INOUT) :: uy(:,:) 
         character(len=*), intent(IN)    :: boundaries 
 
         ! Local variables 
@@ -1430,7 +1433,7 @@ contains
         character(len=*),  intent(IN) :: filename 
         integer,           intent(IN) :: nx 
         integer,           intent(IN) :: ny
-        real(prec),        intent(IN) :: time_init
+        real(wp),        intent(IN) :: time_init
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
@@ -1449,11 +1452,11 @@ contains
         type(ytopo_class), intent(IN) :: tpo 
         type(ydyn_class),  intent(IN) :: dyn 
         character(len=*),  intent(IN) :: filename 
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
 
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny  
-        real(prec) :: time_prev 
+        real(wp) :: time_prev 
 
         nx = tpo%par%nx 
         ny = tpo%par%ny 

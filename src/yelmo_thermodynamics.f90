@@ -634,14 +634,15 @@ end if
 
     end subroutine calc_ytherm_enthalpy_bedrock_3D
     
-    subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
+    subroutine ytherm_par_load(par,filename,group,zeta_aa,zeta_ac,nx,ny,dx,init)
 
         type(ytherm_param_class), intent(OUT) :: par
         character(len=*),         intent(IN)  :: filename
-        real(wp),               intent(IN)  :: zeta_aa(:)  
-        real(wp),               intent(IN)  :: zeta_ac(:)  
+        character(len=*),         intent(IN)  :: group          ! Usually "ytherm"
+        real(wp),                 intent(IN)  :: zeta_aa(:)  
+        real(wp),                 intent(IN)  :: zeta_ac(:)  
         integer,                  intent(IN)  :: nx, ny 
-        real(wp),               intent(IN)  :: dx 
+        real(wp),                 intent(IN)  :: dx 
         logical, optional,        intent(IN)  :: init
 
         ! Local variables 
@@ -652,29 +653,29 @@ end if
         if (present(init)) init_pars = .TRUE. 
  
         ! Store local parameter values in output object
-        call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
-        call nml_read(filename,"ytherm","dt_method",      par%dt_method,        init=init_pars)
-        call nml_read(filename,"ytherm","solver_advec",   par%solver_advec,     init=init_pars)
-        call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
-        call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia,   init=init_pars)
-        call nml_read(filename,"ytherm","n_sm_qstrn",     par%n_sm_qstrn,       init=init_pars)
-        call nml_read(filename,"ytherm","n_sm_qb",        par%n_sm_qb,          init=init_pars)
-        call nml_read(filename,"ytherm","use_const_cp",   par%use_const_cp,     init=init_pars)
-        call nml_read(filename,"ytherm","const_cp",       par%const_cp,         init=init_pars)
-        call nml_read(filename,"ytherm","use_const_kt",   par%use_const_kt,     init=init_pars)
-        call nml_read(filename,"ytherm","const_kt",       par%const_kt,         init=init_pars)
-        call nml_read(filename,"ytherm","enth_cr",        par%enth_cr,          init=init_pars)
-        call nml_read(filename,"ytherm","omega_max",      par%omega_max,        init=init_pars)
-        call nml_read(filename,"ytherm","till_rate",      par%till_rate,        init=init_pars)
-        call nml_read(filename,"ytherm","H_w_max",        par%H_w_max,          init=init_pars)
+        call nml_read(filename,group,"method",         par%method,           init=init_pars)
+        call nml_read(filename,group,"dt_method",      par%dt_method,        init=init_pars)
+        call nml_read(filename,group,"solver_advec",   par%solver_advec,     init=init_pars)
+        call nml_read(filename,group,"gamma",          par%gamma,            init=init_pars)
+        call nml_read(filename,group,"use_strain_sia", par%use_strain_sia,   init=init_pars)
+        call nml_read(filename,group,"n_sm_qstrn",     par%n_sm_qstrn,       init=init_pars)
+        call nml_read(filename,group,"n_sm_qb",        par%n_sm_qb,          init=init_pars)
+        call nml_read(filename,group,"use_const_cp",   par%use_const_cp,     init=init_pars)
+        call nml_read(filename,group,"const_cp",       par%const_cp,         init=init_pars)
+        call nml_read(filename,group,"use_const_kt",   par%use_const_kt,     init=init_pars)
+        call nml_read(filename,group,"const_kt",       par%const_kt,         init=init_pars)
+        call nml_read(filename,group,"enth_cr",        par%enth_cr,          init=init_pars)
+        call nml_read(filename,group,"omega_max",      par%omega_max,        init=init_pars)
+        call nml_read(filename,group,"till_rate",      par%till_rate,        init=init_pars)
+        call nml_read(filename,group,"H_w_max",        par%H_w_max,          init=init_pars)
         
-        call nml_read(filename,"ytherm","rock_method",    par%rock_method,      init=init_pars)
-        call nml_read(filename,"ytherm","nzr_aa",         par%nzr_aa,           init=init_pars)
-        call nml_read(filename,"ytherm","zeta_scale_rock",par%zeta_scale_rock,  init=init_pars)
-        call nml_read(filename,"ytherm","zeta_exp_rock",  par%zeta_exp_rock,    init=init_pars)
-        call nml_read(filename,"ytherm","H_rock",         par%H_rock,           init=init_pars)
-        call nml_read(filename,"ytherm","cp_rock",        par%cp_rock,          init=init_pars)
-        call nml_read(filename,"ytherm","kt_rock",        par%kt_rock,          init=init_pars)
+        call nml_read(filename,group,"rock_method",    par%rock_method,      init=init_pars)
+        call nml_read(filename,group,"nzr_aa",         par%nzr_aa,           init=init_pars)
+        call nml_read(filename,group,"zeta_scale_rock",par%zeta_scale_rock,  init=init_pars)
+        call nml_read(filename,group,"zeta_exp_rock",  par%zeta_exp_rock,    init=init_pars)
+        call nml_read(filename,group,"H_rock",         par%H_rock,           init=init_pars)
+        call nml_read(filename,group,"cp_rock",        par%cp_rock,          init=init_pars)
+        call nml_read(filename,group,"kt_rock",        par%kt_rock,          init=init_pars)
         
 
         ! In case of method=="temp", prescribe some parameters

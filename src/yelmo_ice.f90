@@ -660,7 +660,7 @@ end if
 
     end subroutine yelmo_update_equil
     
-    subroutine yelmo_init(dom,filename,grid_def,time,load_topo,domain,grid_name)
+    subroutine yelmo_init(dom,filename,grid_def,time,load_topo,domain,grid_name,group)
         ! Initialize a yelmo domain, including the grid itself, 
         ! and all sub-components (topo,dyn,mat,therm,bound,data)
 
@@ -675,11 +675,20 @@ end if
         logical, optional, intent(IN) :: load_topo 
         character(len=*),  intent(IN), optional :: domain
         character(len=*),  intent(IN), optional :: grid_name 
+        character(len=*),  intent(IN), optional :: group
 
         ! Local variables
         integer :: n_threads 
         character(len=10) :: n_threads_str 
+        character(len=32) :: nml_group
         
+        ! Make sure we know the namelist group for the yelmo block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "yelmo"         ! Default parameter blcok name
+        end if
+
         ! ==== GLOBAL INIT CHECKS ============================================
         
         ! Check openmp status - set global variable to use as a switch 
@@ -712,7 +721,7 @@ end if
         ! == yelmo == 
 
         ! Load the default yelmo parameters, then the domain specific parameters
-        call yelmo_par_load(dom%par,filename,domain,grid_name)
+        call yelmo_par_load(dom%par,filename,nml_group,domain,grid_name)
         
         ! Define physical constants
         call ybound_define_physical_constants(dom%bnd%c,dom%par%phys_const,domain,grid_name)
@@ -759,7 +768,7 @@ end if
         
         ! == topography ==
 
-        call ytopo_par_load(dom%tpo%par,filename,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ytopo_par_load(dom%tpo%par,filename,dom%par%nml_ytopo,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ytopo_alloc(dom%tpo%now,dom%tpo%par%nx,dom%tpo%par%ny)
         
@@ -767,7 +776,8 @@ end if
         
         ! == dynamics == 
 
-        call ydyn_par_load(dom%dyn%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ydyn_par_load(dom%dyn%par,filename,dom%par%nml_ydyn,dom%par%nml_ytill,dom%par%nml_yneff, &
+                            dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ydyn_alloc(dom%dyn%now,dom%dyn%par%nx,dom%dyn%par%ny,dom%dyn%par%nz_aa,dom%dyn%par%nz_ac)
         dom%dyn%par%init_state_set = .FALSE. 
@@ -776,7 +786,7 @@ end if
         
         ! == material == 
 
-        call ymat_par_load(dom%mat%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ymat_par_load(dom%mat%par,filename,dom%par%nml_ymat,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ymat_alloc(dom%mat%now,dom%mat%par%nx,dom%mat%par%ny,dom%mat%par%nz_aa,dom%mat%par%nz_ac,dom%mat%par%n_iso)
         
@@ -784,7 +794,7 @@ end if
         
         ! == thermodynamics == 
         
-        call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ytherm_par_load(dom%thrm%par,filename,dom%par%nml_ytherm,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr_aa)
         
@@ -880,7 +890,7 @@ end if
         call ybound_alloc(dom%bnd,dom%grd%nx,dom%grd%ny)
 
         ! Load region/basin masks
-        call ybound_load_masks(dom%bnd,filename,"yelmo_masks",dom%par%domain,dom%par%grid_name)
+        call ybound_load_masks(dom%bnd,filename,dom%par%nml_masks,dom%par%domain,dom%par%grid_name)
         
         ! Update the ice_allowed mask based on domain definition 
         call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
@@ -892,7 +902,7 @@ end if
         
         ! == data == 
         
-        call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
+        call ydata_par_load(dom%dta%par,filename,dom%par%nml_data,dom%par%domain,dom%par%grid_name,init=.TRUE.)
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
@@ -907,7 +917,7 @@ end if
         ! == topography ==
 
         ! Determine how to manage initial topography (H_ice,z_bed)
-        call yelmo_init_topo(dom,filename,time,load_topo)
+        call yelmo_init_topo(dom,filename,dom%par%nml_init_topo,time,load_topo)
 
         write(*,*) "yelmo_init:: topo intialized (loaded data if desired)."
         
@@ -926,7 +936,7 @@ end if
 
     end subroutine yelmo_init
 
-    subroutine yelmo_init_topo(dom,filename,time,load_topo)
+    subroutine yelmo_init_topo(dom,filename,group,time,load_topo)
         ! This subroutine is the first step to intializing 
         ! the state variables. It initializes only the topography
         ! to facilitate calculation of boundary variables (eg, T_srf),
@@ -938,6 +948,7 @@ end if
 
         type(yelmo_class), intent(INOUT) :: dom
         character(len=*),  intent(IN)    :: filename
+        character(len=*),  intent(IN)    :: group       ! Usually "yelmo_init_topo"
         real(wp),          intent(IN)    :: time 
         logical, optional, intent(IN)    :: load_topo 
 
@@ -981,13 +992,13 @@ end if
         ! Manipulate in local arrays, then store in the main dom object. 
 
         ! Load parameters related to topography initiaization 
-        call nml_read(filename,"yelmo_init_topo","init_topo_load",  init_topo_load)
-        call nml_read(filename,"yelmo_init_topo","init_topo_path",  init_topo_path)
-        call nml_read(filename,"yelmo_init_topo","init_topo_names", init_topo_names)
-        call nml_read(filename,"yelmo_init_topo","init_topo_state", init_topo_state)
-        call nml_read(filename,"yelmo_init_topo","z_bed_f_sd",      z_bed_f_sd)
-        call nml_read(filename,"yelmo_init_topo","smooth_H_ice",    smooth_H_ice)
-        call nml_read(filename,"yelmo_init_topo","smooth_z_bed",    smooth_z_bed)
+        call nml_read(filename,group,"init_topo_load",  init_topo_load)
+        call nml_read(filename,group,"init_topo_path",  init_topo_path)
+        call nml_read(filename,group,"init_topo_names", init_topo_names)
+        call nml_read(filename,group,"init_topo_state", init_topo_state)
+        call nml_read(filename,group,"z_bed_f_sd",      z_bed_f_sd)
+        call nml_read(filename,group,"smooth_H_ice",    smooth_H_ice)
+        call nml_read(filename,group,"smooth_z_bed",    smooth_z_bed)
 
         call yelmo_parse_path(init_topo_path,dom%par%domain,dom%par%grid_name)
             
@@ -1352,39 +1363,51 @@ end if
 
     end subroutine yelmo_init_state
 
-    subroutine yelmo_par_load(par,filename,domain,grid_name)
+    subroutine yelmo_par_load(par,filename,group,domain,grid_name)
 
         type(yelmo_param_class), intent(OUT) :: par
-        character(len=*), intent(IN) :: filename
-        character(len=*), intent(IN), optional :: domain
-        character(len=*), intent(IN), optional :: grid_name 
+        character(len=*),        intent(IN)  :: filename
+        character(len=*),        intent(IN)  :: group               ! Usually "yelmo"
+        character(len=*),        intent(IN), optional :: domain
+        character(len=*),        intent(IN), optional :: grid_name 
 
-        call nml_read(filename,"yelmo","domain",        par%domain)
-        call nml_read(filename,"yelmo","grid_name",     par%grid_name)
-        call nml_read(filename,"yelmo","grid_path",     par%grid_path)
-        call nml_read(filename,"yelmo","phys_const",    par%phys_const)
-        call nml_read(filename,"yelmo","experiment",    par%experiment)
-        call nml_read(filename,"yelmo","restart",       par%restart)
-        call nml_read(filename,"yelmo","restart_z_bed", par%restart_z_bed)
-        call nml_read(filename,"yelmo","restart_H_ice", par%restart_H_ice)
-        call nml_read(filename,"yelmo","restart_relax", par%restart_relax)
-        call nml_read(filename,"yelmo","log_timestep",  par%log_timestep)
-        call nml_read(filename,"yelmo","disable_kill",  par%disable_kill)
-        call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
-        call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
-        call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
-        call nml_read(filename,"yelmo","dt_method",     par%dt_method)
-        call nml_read(filename,"yelmo","dt_min",        par%dt_min)
-        call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
-        call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
-        call nml_read(filename,"yelmo","pc_method",     par%pc_method)
-        call nml_read(filename,"yelmo","pc_controller", par%pc_controller)
-        call nml_read(filename,"yelmo","pc_use_H_pred", par%pc_use_H_pred)
-        call nml_read(filename,"yelmo","pc_filter_vel", par%pc_filter_vel)
-        call nml_read(filename,"yelmo","pc_corr_vel",   par%pc_corr_vel)
-        call nml_read(filename,"yelmo","pc_n_redo",     par%pc_n_redo)
-        call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
-        call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
+        call nml_read(filename,group,"domain",        par%domain)
+        call nml_read(filename,group,"grid_name",     par%grid_name)
+        call nml_read(filename,group,"grid_path",     par%grid_path)
+        call nml_read(filename,group,"phys_const",    par%phys_const)
+        call nml_read(filename,group,"experiment",    par%experiment)
+
+        call nml_read(filename,group,"nml_ytopo",     par%nml_ytopo)
+        call nml_read(filename,group,"nml_ydyn",      par%nml_ydyn)
+        call nml_read(filename,group,"nml_ytill",     par%nml_ytill)
+        call nml_read(filename,group,"nml_yneff",     par%nml_yneff)
+        call nml_read(filename,group,"nml_ymat",      par%nml_ymat)
+        call nml_read(filename,group,"nml_ytherm",    par%nml_ytherm)
+        call nml_read(filename,group,"nml_masks",     par%nml_masks)
+        call nml_read(filename,group,"nml_init_topo", par%nml_init_topo)
+        call nml_read(filename,group,"nml_data",      par%nml_data)
+        
+        call nml_read(filename,group,"restart",       par%restart)
+        call nml_read(filename,group,"restart_z_bed", par%restart_z_bed)
+        call nml_read(filename,group,"restart_H_ice", par%restart_H_ice)
+        call nml_read(filename,group,"restart_relax", par%restart_relax)
+        call nml_read(filename,group,"log_timestep",  par%log_timestep)
+        call nml_read(filename,group,"disable_kill",  par%disable_kill)
+        call nml_read(filename,group,"zeta_scale",    par%zeta_scale)
+        call nml_read(filename,group,"zeta_exp",      par%zeta_exp)
+        call nml_read(filename,group,"nz_aa",         par%nz_aa)
+        call nml_read(filename,group,"dt_method",     par%dt_method)
+        call nml_read(filename,group,"dt_min",        par%dt_min)
+        call nml_read(filename,group,"cfl_max",       par%cfl_max)
+        call nml_read(filename,group,"cfl_diff_max",  par%cfl_diff_max)
+        call nml_read(filename,group,"pc_method",     par%pc_method)
+        call nml_read(filename,group,"pc_controller", par%pc_controller)
+        call nml_read(filename,group,"pc_use_H_pred", par%pc_use_H_pred)
+        call nml_read(filename,group,"pc_filter_vel", par%pc_filter_vel)
+        call nml_read(filename,group,"pc_corr_vel",   par%pc_corr_vel)
+        call nml_read(filename,group,"pc_n_redo",     par%pc_n_redo)
+        call nml_read(filename,group,"pc_tol",        par%pc_tol)
+        call nml_read(filename,group,"pc_eps",        par%pc_eps)
 
         ! Overwrite parameter values with argument definitions if available
         if (present(domain))     par%domain    = trim(domain)
@@ -1412,6 +1435,7 @@ end if
 
         if (par%pc_eps .gt. par%pc_tol) then 
             write(io_unit_err,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
+            write(io_unit_err,*) trim(filename), " : ", trim(group)
             write(io_unit_err,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
             stop 
         end if

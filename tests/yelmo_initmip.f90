@@ -342,7 +342,7 @@ program yelmo_test
 
                 ! Initialize state variables (dyn,therm,mat)
                 ! (initialize temps with robin method with a cold base)
-                call yelmo_init_topo(yelmo_r,path_par,time_r)
+                call yelmo_init_topo(yelmo_r,"ytopo",path_par,time_r)
                 call yelmo_init_state(yelmo_r,time=time_r,thrm_method="robin-cold")
 
                 ! Write restart file to compare with expected 

@@ -909,9 +909,20 @@ module yelmo_defs
         character (len=512) :: grid_path
         character (len=512) :: phys_const
         character (len=256) :: experiment
-        character (len=512) :: restart
-
+        
+        ! nml group names
+        character(len=32)   :: nml_ytopo
+        character(len=32)   :: nml_ydyn
+        character(len=32)   :: nml_ytill
+        character(len=32)   :: nml_yneff
+        character(len=32)   :: nml_ymat
+        character(len=32)   :: nml_ytherm
+        character(len=32)   :: nml_masks
+        character(len=32)   :: nml_init_topo
+        character(len=32)   :: nml_data
+        
         ! Restart options 
+        character (len=512) :: restart
         real(wp)            :: restart_relax
         logical             :: restart_z_bed 
         logical             :: restart_H_ice 

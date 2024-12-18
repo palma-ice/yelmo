@@ -38,6 +38,15 @@
     grid_path       = "none"
     phys_const      = "TROUGH"
     experiment      = "TROUGH-F17"
+    nml_ytopo       = "ytopo"
+    nml_ydyn        = "ydyn"
+    nml_ytill       = "ytill"
+    nml_yneff       = "yneff"
+    nml_ymat        = "ymat"
+    nml_ytherm      = "ytherm"
+    nml_masks       = "yelmo_masks"
+    nml_init_topo   = "yelmo_init_topo"
+    nml_data        = "yelmo_data"
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = False             ! Take H_ice from restart file

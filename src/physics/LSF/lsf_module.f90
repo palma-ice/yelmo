@@ -285,8 +285,8 @@ subroutine LSFinit(LSF,H_ice,z_bed,dx)
     where(H_ice .gt. 0.0_wp) LSF = 1.0_wp
     where(z_bed .gt. 0.0_wp) LSF = 1.0_wp 
 
-    !call eikonal_equation(LSF,H_grnd)
-    !LSF = LSF * dx
+    call eikonal_equation(LSF,z_bed)
+    LSF = LSF * dx
     !where(LSF .le. 0.0) LSF = -1.0
 
     return
@@ -447,15 +447,18 @@ subroutine eikonal_equation(lsf,H_grnd)
         if (lsf(i,j) .gt. 0.0 .and. ((lsf(i-1,j) .le. 0.0) .or.  (lsf(i+1,j) .le. 0.0) .or. &
                                      (lsf(i,j-1) .le. 0.0) .or.  (lsf(i,j+1) .le. 0.0))) then
             mask_lsf(i,j) = 1.0
+        else if (lsf(i,j) .le. 0.0 .and. ((lsf(i-1,j) .gt. 0.0) .or.  (lsf(i+1,j) .gt. 0.0) .or. &
+                                     (lsf(i,j-1) .gt. 0.0) .or.  (lsf(i,j+1) .gt. 0.0))) then
+            mask_lsf(i,j) = -1.0
         end if
     end do
     end do 
 
     ! Assign to dists mask
-    dist_ice_front = 0.0
-    where(lsf .le. 0.0) dist_ice_front = 1.0
+    dist_ice_front = mask_lsf !0.0
+    !where(lsf .le. 0.0) dist_ice_front = 1.0
     ! LSF should not affect points above sea level
-    where(H_grnd .ge. 0.0) dist_ice_front = 0.0
+    !where(H_grnd .ge. 0.0) dist_ice_front = 0.0
 
     ! compute distance to mask
     loop = 1.0
@@ -488,7 +491,7 @@ subroutine eikonal_equation(lsf,H_grnd)
     end do
 
     ! jablasco: correct distance! (distance for ice front grid is 0 not 1)
-    !where(dist_ice_front .gt. 0.0) dist_ice_front = dist_ice_front-1.0
+    where(dist_ice_front .gt. 0.0) dist_ice_front = dist_ice_front-1.0
     !where(lsf .lt. 0.0) dist_ice_front = -1.0
     where(0.0 .lt. lsf .and. lsf .lt. 1.0) dist_ice_front = lsf ! at the ice front the number is fractional
     !where(lsf .ge. 0.0) lsf = dist_ice_front

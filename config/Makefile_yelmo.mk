@@ -188,7 +188,7 @@ $(objdir)/yelmo_boundaries.o: $(srcdir)/yelmo_boundaries.f90 $(objdir)/yelmo_def
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_data.o: $(srcdir)/yelmo_data.f90 $(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o \
-						$(objdir)/nml.o $(objdir)/ncio.o $(objdir)/topography.o
+						$(objdir)/nml.o $(objdir)/ncio.o $(objdir)/topography.o $(objdir)/lsf_module.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_regions.o: $(srcdir)/yelmo_regions.f90 $(objdir)/ncio.o $(objdir)/yelmo_defs.o $(objdir)/topography.o
@@ -270,7 +270,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/velocity_sia.o \
 					   $(objdir)/velocity_ssa.o \
 					   $(objdir)/velocity_diva.o \
-					   $(objdir)/velocity_l1l2.o
+					   $(objdir)/velocity_l1l2.o 
 					   
 					   
 

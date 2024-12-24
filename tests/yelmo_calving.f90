@@ -3,6 +3,7 @@ program yelmo_calving
     use nml 
     use ncio  
     use yelmo 
+    use lsf_module
 
     use calving_benchmarks
     
@@ -104,6 +105,7 @@ program yelmo_calving
         ! If no restart, set ice thickness to zero
         yelmo1%tpo%now%H_ice = 0.0
         yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed 
+        call LSFinit(yelmo1%tpo%now%lsf,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf,yelmo1%tpo%par%dx)
     end if
 
     ! === Define additional boundary conditions =====

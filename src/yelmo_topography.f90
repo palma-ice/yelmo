@@ -86,6 +86,9 @@ contains
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
+            ! LSF evolution from dynamics
+            !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+
             ! Ice thickness evolution from dynamics alone
 
             select case(trim(pc_step))
@@ -103,10 +106,6 @@ contains
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
-
-                    ! jablasco: compute LSF before advection here
-                    !where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = 1.0_wp
-                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
 if (use_rk4) then
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -134,10 +133,6 @@ end if
                     ! Get ice-fraction mask for predicted ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
-
-                    ! jablasco: compute LSF before advection here
-                    !where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = 1.0_wp
-                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
 if (use_rk4) then
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -204,10 +199,6 @@ end if
                     ! Apply rate and update ice thickness
                     call apply_tendency(tpo%now%H_ice,tpo%now%bmb,dt,"bmb",adjust_mb=.TRUE.)
 
-                    ! jablasco: after updating SMB and BMB, now we can compute the LSF mask
-                    ! before the advection/discharge
-                    !call LSFinit(tpo%now%lsf,tpo%now%H_ice,tpo%now%z_base)
-
                     ! === fmb =====
                     ! TO DO: jablasco: fmb should be also a vertical velocity
 
@@ -247,21 +238,14 @@ end if
                     ! Calculate and apply calving
                     ! jablasco: turn calving off
                     !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
-                    ! jablasco: advect lsf as velocity minus calving-rate
-                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
                     ! jablasco: all ice on lsf<0 is calved ice
-                    ! TO DO: compute values for cmb
-                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                    where(tpo%now%lsf .lt. 0.0_wp) tpo%now%H_ice = 0.0_wp
+                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                    !where(tpo%now%lsf .le. 0.0_wp) tpo%now%H_ice = 0.0_wp
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
-                    ! Set ice border of LSF function to zero (helps with migration?)
-                    !call LSFborder(tpo%now%lsf,tpo%now%f_ice,tpo%par%boundaries)
-                    ! LSF only affects ocean points
-                    where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = 1.0_wp
 
                     ! If desired, finally relax solution to reference state
                     if (tpo%par%topo_rel .ne. 0) then 
@@ -667,7 +651,9 @@ end if
 
             case("zero","none")
 
-                tpo%now%cmb_flt = 0.0
+                tpo%now%cmb_flt_x = 0.0_wp
+                tpo%now%cmb_flt_y = 0.0_wp
+                tpo%now%cmb_flt   = 0.0_wp
 
             case("equil")
                 ! For an equilibrated ice sheet calving rate should be opposite to ice velocity
@@ -679,8 +665,9 @@ end if
                 call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2, &
                                   tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
                 ! convert tau_max in a parameter
-                call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice, &
-                                                    tpo%now%f_grnd,tpo%now%tau_eff,tpo%par%dx,tau_max=0.75e6)
+                ! jablasco: change!
+                !call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice, &
+                !                                    tpo%now%f_grnd,tpo%now%tau_eff,tpo%par%dx,tau_max=0.75e6)
 
             ! TO DO
             ! Add new laws
@@ -688,11 +675,12 @@ end if
             ! === CalvMIP ===
 
             case("exp1","exp3")
-                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries) 
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
                 call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
 
             case("exp2","exp4")
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
+                !call calc_cmb_border(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%lsf,tpo%par%boundaries)
                 call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
 
             case DEFAULT
@@ -703,16 +691,23 @@ end if
 
         end select
 
-        ! === Grounded calving laws ===
-        ! TO DO
+        ! === Marine terminating calving laws ===
+        ! MICI should be a marine terminating calving law (only for grounding-line points?)
 
-        ! The idea is to create then a calving-rate map of floating and grounded ice
+        ! === Land terminating calving laws ===
+        ! For the moment we will assume no calving laws for land-terminating ice points
+
+        ! === Merge all calving law ===
+        ! The idea is to merge then all calving-rates
 
 
         ! === LSF advection ===
         ! advect LSF mask based on the calving law
-        call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
-                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
+        !call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
+
+        call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'impl-upwind',tpo%par%boundaries)
 
         tpo%now%lsf = LSFn
 
@@ -1220,7 +1215,7 @@ end if
         now%cmb_flt_x   = 0.0
         now%cmb_flt_y   = 0.0
         now%cmb_grnd    = 0.0
-        now%lsf         = 0.0       
+        now%lsf         = 0.0 ! init to -1.0?       
  
         now%bmb_ref     = 0.0  
         now%fmb_ref     = 0.0

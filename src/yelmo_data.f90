@@ -6,6 +6,7 @@ module yelmo_data
     use yelmo_defs 
     use yelmo_tools, only : adjust_topography_gradients
     use topography 
+    use lsf_module
     
     implicit none
     
@@ -255,6 +256,9 @@ contains
             ! (extracted from `calc_H_grnd` in topography)
             dta%pd%H_grnd = dta%pd%H_ice - (bnd%c%rho_sw/bnd%c%rho_ice)*max(z_sl_pd-dta%pd%z_bed,0.0_wp)
 
+            ! Calculate LSF
+            call LSFinit(dta%pd%lsf,dta%pd%H_ice,dta%pd%H_grnd,dx)
+
             ! Define the mask to be consistent with internal mask_bed calculations
             dta%pd%mask_bed = mask_bed_ocean
             where(dta%pd%H_ice .eq. 0.0 .and. dta%pd%z_srf .gt. 0.0)  dta%pd%mask_bed = mask_bed_land
@@ -443,7 +447,8 @@ contains
         allocate(pd%z_bed(nx,ny))
         allocate(pd%H_grnd(nx,ny))
         allocate(pd%mask_bed(nx,ny))
-        
+        allocate(pd%lsf(nx,ny))       
+ 
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
         
@@ -467,6 +472,7 @@ contains
         pd%z_bed         = 0.0 
         pd%H_grnd        = 0.0 
         pd%mask_bed      = 0
+        pd%lsf           = 0.0
 
         pd%T_srf         = 0.0 
         pd%smb           = 0.0 
@@ -507,7 +513,8 @@ contains
         if (allocated(pd%z_bed))            deallocate(pd%z_bed)
         if (allocated(pd%H_grnd))           deallocate(pd%H_grnd)
         if (allocated(pd%mask_bed))         deallocate(pd%mask_bed)
-        
+        if (allocated(pd%lsf))              deallocate(pd%lsf)       
+ 
         if (allocated(pd%T_srf))            deallocate(pd%T_srf)
         if (allocated(pd%smb))              deallocate(pd%smb)
         

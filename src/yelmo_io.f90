@@ -131,7 +131,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 21
+            qtot = 22
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -154,6 +154,7 @@ contains
             names(19) = "cmb_flt_y"
             names(20) = "z_sl"
             names(21) = "lsf"
+            names(22) = "H_grnd"
 
         end if 
 
@@ -277,7 +278,9 @@ end if
             case("lsf")
                 call nc_write(filename,"lsf",ylmo%tpo%now%lsf,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid) 
-            
+            case("H_grnd") 
+                call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,start=[1,1,n], &
+                                units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid) 
             case("ux")
                 call nc_write(filename,"ux",ylmo%dyn%now%ux,start=[1,1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid)
@@ -377,6 +380,9 @@ end if
             case("lsf")
                 call nc_write(filename,"lsf",ylmo%tpo%now%lsf,units="-",long_name="Level-set function (-1-0: ocean, 0-1: ice)", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
+            case("H_grnd") 
+                call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="-",long_name="Grounded ice thickness (m)", &
+                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             case("ux")
                 call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/yr",long_name="Velocity, x-direction", &
                                 dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -554,6 +560,7 @@ end if
         call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"z_base",      dom%tpo%now%z_base,      units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_grnd",      dom%tpo%now%H_grnd,      units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
         call nc_write(filename,"dzsdt",       dom%tpo%now%dzsdt,       units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dHidt",       dom%tpo%now%dHidt,       units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -1058,6 +1065,7 @@ end if
         call nc_read_interp(filename,"H_ice",       tpo%now%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_srf",       tpo%now%z_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_base",      tpo%now%z_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"H_grnd",      tpo%now%H_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dzsdt",       tpo%now%dzsdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dHidt",       tpo%now%dHidt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dHidt_dyn",   tpo%now%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

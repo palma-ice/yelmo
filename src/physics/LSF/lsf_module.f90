@@ -1,7 +1,7 @@
 module lsf_module
     ! Definitions for various calving laws 
 
-    use yelmo_defs,        only : sp, dp, wp, prec, TOL_UNDERFLOW
+    use yelmo_defs,        only : sp, dp, wp, prec, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
     use yelmo_tools,       only : get_neighbor_indices
     use topography,        only : calc_H_eff
     use solver_advection,  only : calc_advec2D
@@ -285,22 +285,21 @@ subroutine LSFinit(LSF,H_ice,z_bed,dx)
     where(H_ice .gt. 0.0_wp) LSF = 1.0_wp
     where(z_bed .gt. 0.0_wp) LSF = 1.0_wp 
 
-    call eikonal_equation(LSF,z_bed)
-    LSF = LSF * dx
+    !call eikonal_equation(LSF,z_bed)
+    !LSF = LSF * dx
     !where(LSF .le. 0.0) LSF = -1.0
 
     return
     
 end subroutine LSFinit
 
-subroutine LSFupdate(LSFn,LSF,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
+subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
 
     implicit none
 
-    real(wp),       intent(OUT)   :: LSFn(:,:)               ! new LSF field (aa-nodes)
-    real(wp),       intent(IN)    :: LSF(:,:)                ! LSF to be advected (aa-nodes)
+    real(wp),       intent(INOUT) :: dlsf(:,:)               ! advected LSF field
+    real(wp),       intent(INOUT) :: lsf(:,:)                ! LSF to be advected (aa-nodes)
     real(wp),       intent(IN)    :: crx_ac(:,:),cry_ac(:,:) ! [m/yr] calving rate (vertical)
-    !real(wp),       intent(IN)    :: f_ice(:,:)              ! Ice fraction to be advected
     real(wp),       intent(IN)    :: ux_ac(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
     real(wp),       intent(IN)    :: vy_ac(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
     real(wp),       intent(IN)    :: H_grnd(:,:)             ! [m] floating contribution?
@@ -314,12 +313,12 @@ subroutine LSFupdate(LSFn,LSF,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
 
     ! Local variables
     integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
-    real(wp), allocatable :: dlsf(:,:), wx(:,:), wy(:,:), mask_lsf(:,:)
+    real(wp), allocatable :: wx(:,:), wy(:,:), mask_lsf(:,:)
     integer, allocatable  :: mask_new_adv(:,:)
 
-    nx = size(LSF,1)
-    ny = size(LSF,2)
-    allocate(dlsf(nx,ny))
+    nx = size(lsf,1)
+    ny = size(lsf,2)
+    !allocate(dlsf(nx,ny))
     allocate(wx(nx,ny))
     allocate(wy(nx,ny))
     allocate(mask_new_adv(nx,ny))
@@ -330,20 +329,21 @@ subroutine LSFupdate(LSFn,LSF,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
     mask_lsf = 0.0_wp
     mask_new_adv = 1
     mask_lsf = 1.0_wp ! Allow all LSF mask to be advected
-    !where(LSF .gt. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
+    !where(lsf .gt. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
 
     ! interpolate velocities to open ocean
     !call interpolatex_missing_iterative(crx_ac,ux_ac)
     !call interpolatey_missing_iterative(cry_ac,vy_ac)
 
     ! calving rate has opposite sign as velocity
-    wx = (ux_ac + crx_ac)/(ux_ac + 1e-6)
-    wy = (vy_ac + cry_ac)/(vy_ac + 1e-6)
+    wx = ux_ac + crx_ac
+    wy = vy_ac + cry_ac
  
     ! Compute the advected LSF field
     call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
                              mask_new_adv,solver,boundaries,dx,dt) ! changed mask_adv for 1
-    LSFn = dlsf*dt + lsf
+    call apply_tendency_lsf(lsf,dlsf,dt,label="dyn",adjust_lsf=.FALSE.)
+    where(H_grnd .gt. 0.0_wp) lsf = 1.0_wp
 
     ! Allow for in between values only in the zero border
     !do j = 1,ny
@@ -371,11 +371,11 @@ subroutine LSFupdate(LSFn,LSF,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
     !where(LSFn .le. 0.0) LSFn = -1.0
 
     ! saturate values to -1 to 1 (helps with stability)
-    where(LSFn .gt. 1.0)  LSFn = 1.0
-    where(LSFn .lt. -1.0) LSFn = -1.0
+    !where(LSFn .gt. 1.0)  LSFn = 1.0
+    !where(LSFn .lt. -1.0) LSFn = -1.0
 
     ! LSF should not affect points above sea level (maybe in a future it can)
-    where(H_grnd .gt. 0.0_wp) LSFn = 1.0_wp
+    !where(H_grnd .gt. 0.0_wp) LSFn = 1.0_wp
 
     return
 
@@ -444,11 +444,11 @@ subroutine eikonal_equation(lsf,H_grnd)
     mask_lsf = 0.0 ! Init mask to zero
     do i = 2, nx-1
     do j = 1, ny-1
-        if (lsf(i,j) .gt. 0.0 .and. ((lsf(i-1,j) .le. 0.0) .or.  (lsf(i+1,j) .le. 0.0) .or. &
-                                     (lsf(i,j-1) .le. 0.0) .or.  (lsf(i,j+1) .le. 0.0))) then
+        if (lsf(i,j) .ge. 0.0 .and. ((lsf(i-1,j) .lt. 0.0) .or.  (lsf(i+1,j) .lt. 0.0) .or. &
+                                     (lsf(i,j-1) .lt. 0.0) .or.  (lsf(i,j+1) .lt. 0.0))) then
             mask_lsf(i,j) = 1.0
-        else if (lsf(i,j) .le. 0.0 .and. ((lsf(i-1,j) .gt. 0.0) .or.  (lsf(i+1,j) .gt. 0.0) .or. &
-                                     (lsf(i,j-1) .gt. 0.0) .or.  (lsf(i,j+1) .gt. 0.0))) then
+        else if (lsf(i,j) .lt. 0.0 .and. ((lsf(i-1,j) .ge. 0.0) .or.  (lsf(i+1,j) .ge. 0.0) .or. &
+                                     (lsf(i,j-1) .ge. 0.0) .or.  (lsf(i,j+1) .ge. 0.0))) then
             mask_lsf(i,j) = -1.0
         end if
     end do
@@ -469,13 +469,13 @@ subroutine eikonal_equation(lsf,H_grnd)
         do j = 2, ny-1
 
             ! lsf positive points (ice)
-            if (lsf(i,j) .gt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
+            if (lsf(i,j) .ge. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
                 if(((dist_ice_front(i-1,j) .eq. current_label_ice)) .or. (dist_ice_front(i+1,j) .eq. current_label_ice) .or. &
                     (dist_ice_front(i,j-1) .eq. current_label_ice) .or. (dist_ice_front(i,j+1) .eq. current_label_ice)) then
                     dist_ice_front(i,j) = current_label_ice + 1.0
                     loop = 1.0
                 end if
-            else if (lsf(i,j) .le. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
+            else if (lsf(i,j) .lt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
                 if(((dist_ice_front(i-1,j) .eq. current_label_ocn)) .or. (dist_ice_front(i+1,j) .eq. current_label_ocn) .or. &
                     (dist_ice_front(i,j-1) .eq. current_label_ocn) .or. (dist_ice_front(i,j+1) .eq. current_label_ocn)) then
                     dist_ice_front(i,j) = current_label_ocn - 1.0
@@ -594,5 +594,66 @@ subroutine interpolatey_missing_iterative(array,mask)
         if (.not. has_changed) exit
     end do
 end subroutine interpolatey_missing_iterative
+
+subroutine apply_tendency_lsf(lsf,lsf_dot,dt,label,adjust_lsf)
+        
+    implicit none
+        
+    real(wp), intent(INOUT) :: lsf(:,:)
+    real(wp), intent(INOUT) :: lsf_dot(:,:)
+    real(wp), intent(IN)    :: dt
+    character(len=*),  intent(IN) :: label
+    logical, optional, intent(IN) :: adjust_lsf
+        
+    ! Local variables
+    integer :: i, j, nx, ny 
+    real(wp) :: lsf_prev 
+    real(wp) :: dlsfdt
+    logical  :: allow_adjust_lsf
+        
+    if (dt .gt. 0.0) then
+        ! Only apply this routine if dt > 0!
+        
+        allow_adjust_lsf = .FALSE.
+        if (present(adjust_lsf)) allow_adjust_lsf = adjust_lsf
+        
+        nx = size(lsf,1)
+        ny = size(lsf,2)
+        
+        !!$omp parallel do collapse(2) private(i,j,lsf_prev,dlsfdt)
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Store previous ice thickness
+            lsf_prev = lsf(i,j)
+        
+            ! Now update lsf with tendency for this timestep
+            lsf(i,j) = lsf_prev + dt*lsf_dot(i,j)
+
+            ! limit lsf to (-1,1)
+            if (lsf(i,j) .lt. -1.0) lsf(i,j) = -1.0
+            if (lsf(i,j) .gt. 1.0)  lsf(i,j) = 1.0
+
+            ! Ensure tiny numeric ice thicknesses are removed
+            ! check the effect of this
+            if (abs(lsf(i,j)) .lt. TOL) lsf(i,j) = 0.0
+
+            ! Calculate actual current rate of change
+            dlsfdt = (lsf(i,j) - lsf_prev) / dt
+
+            ! Update mb rate to match ice rate of change perfectly
+            if (allow_adjust_lsf) then
+                lsf_dot(i,j) = dlsfdt
+            end if
+
+        end do
+        end do
+        !!$omp end parallel do
+
+    end if
+
+    return
+
+end subroutine apply_tendency_lsf
 
 end module lsf_module

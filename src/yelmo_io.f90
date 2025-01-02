@@ -154,7 +154,7 @@ contains
             names(19) = "cmb_flt_y"
             names(20) = "z_sl"
             names(21) = "lsf"
-            names(22) = "H_grnd"
+            names(22) = "dlsf"
 
         end if 
 
@@ -278,8 +278,8 @@ end if
             case("lsf")
                 call nc_write(filename,"lsf",ylmo%tpo%now%lsf,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid) 
-            case("H_grnd") 
-                call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,start=[1,1,n], &
+            case("dlsf") 
+                call nc_write(filename,"dlsf",ylmo%tpo%now%dlsf,start=[1,1,n], &
                                 units=v%units,long_name=v%long_name,dims=v%dims,ncid=ncid) 
             case("ux")
                 call nc_write(filename,"ux",ylmo%dyn%now%ux,start=[1,1,1,n], &
@@ -380,8 +380,8 @@ end if
             case("lsf")
                 call nc_write(filename,"lsf",ylmo%tpo%now%lsf,units="-",long_name="Level-set function (-1-0: ocean, 0-1: ice)", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
-            case("H_grnd") 
-                call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="-",long_name="Grounded ice thickness (m)", &
+            case("dlsf") 
+                call nc_write(filename,"dlsf",ylmo%tpo%now%dlsf,units="-",long_name="LSF change (yr-1)", &
                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             case("ux")
                 call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/yr",long_name="Velocity, x-direction", &
@@ -579,6 +579,7 @@ end if
         call nc_write(filename,"cmb_flt_y",   dom%tpo%now%cmb_flt_y,   units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"cmb_grnd",    dom%tpo%now%cmb_grnd,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"lsf",         dom%tpo%now%lsf,         units="-",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"dlsf",        dom%tpo%now%dlsf,        units="yr-1",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"eps_eff",     dom%tpo%now%eps_eff,     units="1/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"tau_eff",     dom%tpo%now%tau_eff,     units="Pa",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,       units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
@@ -1082,6 +1083,7 @@ end if
         call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"lsf",         tpo%now%lsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dlsf",        tpo%now%dlsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

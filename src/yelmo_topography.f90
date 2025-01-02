@@ -86,6 +86,7 @@ contains
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
+            ! jablasco: chack when to do lsf update
             ! LSF evolution from dynamics
             !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
 
@@ -240,8 +241,9 @@ end if
                     !call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
 
                     ! jablasco: all ice on lsf<0 is calved ice
-                    !call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                    !where(tpo%now%lsf .le. 0.0_wp) tpo%now%H_ice = 0.0_wp
+                    call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                    ! do not calve but apply calving to mask
+                    !where(tpo%now%lsf .lt. 0.0_wp) tpo%now%H_ice = 0.0_wp
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -635,15 +637,12 @@ end if
         ! Local variables
         integer :: i, j, nx, ny
         real(wp), allocatable :: var_dot(:,:)
-        real(wp), allocatable :: LSFn(:,:)
 
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
    
         allocate(var_dot(nx,ny))
-        allocate(LSFn(nx,ny))
         var_dot = 0.0 ! check influence
-        LSFn    = 0.0 ! advected LSF map
 
         ! === Floating calving laws ===
   
@@ -706,10 +705,8 @@ end if
         !call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
         !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
 
-        call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
+        call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
                        var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'impl-upwind',tpo%par%boundaries)
-
-        tpo%now%lsf = LSFn
 
         return
 
@@ -1132,6 +1129,7 @@ end if
         allocate(now%cmb_flt_y(nx,ny))
         allocate(now%cmb_grnd(nx,ny))
         allocate(now%lsf(nx,ny))       
+        allocate(now%dlsf(nx,ny))
  
         allocate(now%bmb_ref(nx,ny))
         allocate(now%fmb_ref(nx,ny))
@@ -1215,7 +1213,8 @@ end if
         now%cmb_flt_x   = 0.0
         now%cmb_flt_y   = 0.0
         now%cmb_grnd    = 0.0
-        now%lsf         = 0.0 ! init to -1.0?       
+        now%lsf         = -1.0 ! init to 0.0?       
+        now%dlsf        = 0.0
  
         now%bmb_ref     = 0.0  
         now%fmb_ref     = 0.0
@@ -1308,6 +1307,7 @@ end if
         if (allocated(now%cmb_flt_y))   deallocate(now%cmb_flt_y)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
         if (allocated(now%lsf))         deallocate(now%lsf)       
+        if (allocated(now%dlsf))        deallocate(now%dlsf)
  
         if (allocated(now%bmb_ref))     deallocate(now%bmb_ref)
         if (allocated(now%fmb_ref))     deallocate(now%fmb_ref)

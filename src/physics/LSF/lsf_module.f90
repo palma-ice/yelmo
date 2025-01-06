@@ -178,8 +178,8 @@ subroutine calvmip_exp1(crx_ac,cry_ac,ux_ac,vy_ac,lsf_aa,dx,boundaries)
     ny = size(ux_ac,2)
 
     ! test for LSF improvement
-    crx_ac = 0.0_wp
-    cry_ac = 0.0_wp
+    crx_ac = -ux_ac !0.0_wp
+    cry_ac = -vy_ac !0.0_wp
 
     r = 0.0_wp
     do j = 1, ny
@@ -188,26 +188,50 @@ subroutine calvmip_exp1(crx_ac,cry_ac,ux_ac,vy_ac,lsf_aa,dx,boundaries)
         ! aa-nodes indices
         r = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
 
-        if (r .ge. 750e3) then
+        ! inland points
+        if (r .lt. 750e3) then
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! x-direction
-            if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(ip1,j) .le. 0.0) then
-                crx_ac(i,j)   = -ux_ac(i,j)
-            else if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(im1,j) .le. 0.0) then
-                crx_ac(im1,j) = -ux_ac(im1,j)
+            if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
+                crx_ac(i,j)   = 0.0
+            else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
+                crx_ac(im1,j) = 0.0
             end if
-
+            
             ! y-direction
-            if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(i,jp1) .le. 0.0) then
-                cry_ac(i,j)   = -vy_ac(i,j)
-            else if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(i,jm1) .le. 0.0) then
-                cry_ac(i,jm1) = -vy_ac(i,jm1)
+            if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
+                cry_ac(i,j)   = 0.0
+            else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
+                cry_ac(i,jm1) = 0.0
             end if
-
         end if
 
+        ! border points
+        !if (r .ge. 750e3) then
+        !    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+        !    ! x-direction
+        !    if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
+        !        crx_ac(i,j)   = -ux_ac(i,j)
+        !    else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
+        !        crx_ac(im1,j) = -ux_ac(im1,j)
+        !    end if
+        !
+        !    ! y-direction
+        !    if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
+        !        cry_ac(i,j)   = -vy_ac(i,j)
+        !    else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
+        !        cry_ac(i,jm1) = -vy_ac(i,jm1)
+        !    end if
+        !
+        !end if
+
     end do
     end do
+
+    !interpolate calving rates to inland ice
+    !call interpolatex_missing_iterative(crx_ac,ux_ac)
+    !call interpolatey_missing_iterative(cry_ac,vy_ac)
 
     return
 
@@ -279,11 +303,11 @@ subroutine LSFinit(LSF,H_ice,z_bed,dx)
     real(wp), intent(IN)  :: dx            ! Model resolution
 
     ! Initialize LSF value at ocean value
-    LSF = -1.0_wp  
+    LSF = 1.0_wp  
     
     ! Assign values
-    where(H_ice .gt. 0.0_wp) LSF = 1.0_wp
-    where(z_bed .gt. 0.0_wp) LSF = 1.0_wp 
+    where(H_ice .gt. 0.0_wp) LSF = -1.0_wp
+    where(z_bed .gt. 0.0_wp) LSF = -1.0_wp 
 
     !call eikonal_equation(LSF,z_bed)
     !LSF = LSF * dx
@@ -299,7 +323,7 @@ subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
 
     real(wp),       intent(INOUT) :: dlsf(:,:)               ! advected LSF field
     real(wp),       intent(INOUT) :: lsf(:,:)                ! LSF to be advected (aa-nodes)
-    real(wp),       intent(IN)    :: crx_ac(:,:),cry_ac(:,:) ! [m/yr] calving rate (vertical)
+    real(wp),       intent(INOUT) :: crx_ac(:,:),cry_ac(:,:) ! [m/yr] calving rate (vertical)
     real(wp),       intent(IN)    :: ux_ac(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
     real(wp),       intent(IN)    :: vy_ac(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
     real(wp),       intent(IN)    :: H_grnd(:,:)             ! [m] floating contribution?
@@ -318,7 +342,6 @@ subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
 
     nx = size(lsf,1)
     ny = size(lsf,2)
-    !allocate(dlsf(nx,ny))
     allocate(wx(nx,ny))
     allocate(wy(nx,ny))
     allocate(mask_new_adv(nx,ny))
@@ -328,10 +351,10 @@ subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
     dlsf     = 0.0_wp
     mask_lsf = 0.0_wp
     mask_new_adv = 1
-    mask_lsf = 1.0_wp ! Allow all LSF mask to be advected
-    !where(lsf .gt. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
+    !mask_lsf = 1.0_wp ! Allow all LSF mask to be advected
+    where(lsf .lt. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
 
-    ! interpolate velocities to open ocean
+    ! interpolate calving rates to open ocean?
     !call interpolatex_missing_iterative(crx_ac,ux_ac)
     !call interpolatey_missing_iterative(cry_ac,vy_ac)
 
@@ -343,7 +366,7 @@ subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
     call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
                              mask_new_adv,solver,boundaries,dx,dt) ! changed mask_adv for 1
     call apply_tendency_lsf(lsf,dlsf,dt,label="dyn",adjust_lsf=.FALSE.)
-    where(H_grnd .gt. 0.0_wp) lsf = 1.0_wp
+    where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
     ! Allow for in between values only in the zero border
     !do j = 1,ny
@@ -366,8 +389,8 @@ subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,
     !end do
 
     ! compute distance to ice front
-    !call eikonal_equation(LSFn,H_grnd)
-    !LSFn = LSFn*dx
+    !call eikonal_equation(lsf,H_grnd)
+    !lsf = lsf*dx
     !where(LSFn .le. 0.0) LSFn = -1.0
 
     ! saturate values to -1 to 1 (helps with stability)
@@ -428,7 +451,7 @@ subroutine eikonal_equation(lsf,H_grnd)
 
     ! Local variables
     integer :: i, j, nx, ny
-    real(prec) :: loop, current_label_ice, current_label_ocn
+    real(prec) :: loop, current_label_ice !, current_label_ocn
     real(prec), allocatable :: dist_ice_front(:,:)
     real(prec), allocatable :: mask_lsf(:,:)
 
@@ -438,27 +461,27 @@ subroutine eikonal_equation(lsf,H_grnd)
     allocate(mask_lsf(nx,ny))
     
     current_label_ice = 1.0
-    current_label_ocn = -1.0
+    !current_label_ocn = -1.0
     
-    ! Define border
-    mask_lsf = 0.0 ! Init mask to zero
-    do i = 2, nx-1
-    do j = 1, ny-1
-        if (lsf(i,j) .ge. 0.0 .and. ((lsf(i-1,j) .lt. 0.0) .or.  (lsf(i+1,j) .lt. 0.0) .or. &
-                                     (lsf(i,j-1) .lt. 0.0) .or.  (lsf(i,j+1) .lt. 0.0))) then
-            mask_lsf(i,j) = 1.0
-        else if (lsf(i,j) .lt. 0.0 .and. ((lsf(i-1,j) .ge. 0.0) .or.  (lsf(i+1,j) .ge. 0.0) .or. &
-                                     (lsf(i,j-1) .ge. 0.0) .or.  (lsf(i,j+1) .ge. 0.0))) then
-            mask_lsf(i,j) = -1.0
-        end if
-    end do
-    end do 
+    ! Define border (do not take the border which is set to zero)
+    !mask_lsf = 0.0 ! Init mask to zero
+    !do i = 3, nx-2
+    !do j = 3, ny-2
+    !    if (lsf(i,j) .gt. 0.0 .and. ((lsf(i-1,j) .le. 0.0) .or.  (lsf(i+1,j) .le. 0.0) .or. &
+    !                                 (lsf(i,j-1) .le. 0.0) .or.  (lsf(i,j+1) .le. 0.0))) then
+    !        mask_lsf(i,j) = 1.0
+    !    !else if (lsf(i,j) .lt. 0.0 .and. ((lsf(i-1,j) .ge. 0.0) .or.  (lsf(i+1,j) .ge. 0.0) .or. &
+    !    !                             (lsf(i,j-1) .ge. 0.0) .or.  (lsf(i,j+1) .ge. 0.0))) then
+    !    !    mask_lsf(i,j) = -1.0
+    !    end if
+    !end do
+    !end do 
 
     ! Assign to dists mask
-    dist_ice_front = mask_lsf !0.0
-    !where(lsf .le. 0.0) dist_ice_front = 1.0
+    dist_ice_front = 0.0
+    where(lsf .le. 0.0) dist_ice_front = 1.0
     ! LSF should not affect points above sea level
-    !where(H_grnd .ge. 0.0) dist_ice_front = 0.0
+    where(H_grnd .ge. 0.0) dist_ice_front = 0.0
 
     ! compute distance to mask
     loop = 1.0
@@ -469,24 +492,24 @@ subroutine eikonal_equation(lsf,H_grnd)
         do j = 2, ny-1
 
             ! lsf positive points (ice)
-            if (lsf(i,j) .ge. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
+            if (lsf(i,j) .gt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
                 if(((dist_ice_front(i-1,j) .eq. current_label_ice)) .or. (dist_ice_front(i+1,j) .eq. current_label_ice) .or. &
                     (dist_ice_front(i,j-1) .eq. current_label_ice) .or. (dist_ice_front(i,j+1) .eq. current_label_ice)) then
                     dist_ice_front(i,j) = current_label_ice + 1.0
                     loop = 1.0
                 end if
-            else if (lsf(i,j) .lt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
-                if(((dist_ice_front(i-1,j) .eq. current_label_ocn)) .or. (dist_ice_front(i+1,j) .eq. current_label_ocn) .or. &
-                    (dist_ice_front(i,j-1) .eq. current_label_ocn) .or. (dist_ice_front(i,j+1) .eq. current_label_ocn)) then
-                    dist_ice_front(i,j) = current_label_ocn - 1.0
-                    loop = 1.0
-                end if
+            !else if (lsf(i,j) .lt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
+            !    if(((dist_ice_front(i-1,j) .eq. current_label_ocn)) .or. (dist_ice_front(i+1,j) .eq. current_label_ocn) .or. &
+            !        (dist_ice_front(i,j-1) .eq. current_label_ocn) .or. (dist_ice_front(i,j+1) .eq. current_label_ocn)) then
+            !        dist_ice_front(i,j) = current_label_ocn - 1.0
+            !        loop = 1.0
+            !    end if
             end if
         end do
         end do
 
         current_label_ice = current_label_ice+1.0
-        current_label_ocn = current_label_ocn-1.0
+        !current_label_ocn = current_label_ocn-1.0
 
     end do
 
@@ -523,7 +546,7 @@ subroutine interpolatex_missing_iterative(array,mask)
 
         do i = 2, nx - 1
             do j = 2, ny - 1
-                if (array(i, j) .eq. 0.0 .and. mask(i,j) .eq. 0.0) then
+                if (array(i, j) .eq. 0.0 .and. mask(i,j) /= 0.0) then
                     sum = 0.0
                     count = 0.0
 
@@ -569,7 +592,7 @@ subroutine interpolatey_missing_iterative(array,mask)
 
         do i = 2, nx - 1
             do j = 2, ny - 1
-                if (array(i, j) .eq. 0.0 .and. mask(i,j) .eq. 0.0) then
+                if (array(i, j) .eq. 0.0 .and. mask(i,j) /= 0.0) then
                     sum = 0.0
                     count = 0.0
 
@@ -636,7 +659,7 @@ subroutine apply_tendency_lsf(lsf,lsf_dot,dt,label,adjust_lsf)
 
             ! Ensure tiny numeric ice thicknesses are removed
             ! check the effect of this
-            if (abs(lsf(i,j)) .lt. TOL) lsf(i,j) = 0.0
+            !if (abs(lsf(i,j)) .lt. TOL) lsf(i,j) = 0.0
 
             ! Calculate actual current rate of change
             dlsfdt = (lsf(i,j) - lsf_prev) / dt

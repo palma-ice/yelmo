@@ -242,8 +242,7 @@ end if
 
                     ! jablasco: all ice on lsf<0 is calved ice
                     call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                    ! do not calve but apply calving to mask
-                    !where(tpo%now%lsf .lt. 0.0_wp) tpo%now%H_ice = 0.0_wp
+                    where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -706,7 +705,7 @@ end if
         !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
 
         call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
-                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'impl-upwind',tpo%par%boundaries)
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'expl-upwind',tpo%par%boundaries)
 
         return
 
@@ -1213,7 +1212,7 @@ end if
         now%cmb_flt_x   = 0.0
         now%cmb_flt_y   = 0.0
         now%cmb_grnd    = 0.0
-        now%lsf         = -1.0 ! init to 0.0?       
+        now%lsf         = 1.0 ! init to 0.0?       
         now%dlsf        = 0.0
  
         now%bmb_ref     = 0.0  

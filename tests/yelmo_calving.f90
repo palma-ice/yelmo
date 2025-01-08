@@ -77,6 +77,10 @@ program yelmo_calving
             ctl%domain = "thule"
             ctl%x0 = -1000.0
             ctl%x1 =  1000.0
+        case("advection")
+            ctl%domain = "advection"
+            ctl%x0     = 0.0
+            ctl%x1     = 50.0
         case DEFAULT
             write(*,*) "ctl.exp = ",trim(ctl%domain), " not recognized."
             stop
@@ -105,8 +109,15 @@ program yelmo_calving
         ! If no restart, set ice thickness to zero
         yelmo1%tpo%now%H_ice = 0.0
         yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed 
-        call LSFinit(yelmo1%tpo%now%lsf,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf,yelmo1%tpo%par%dx)
+        select case(trim(ctl%exp))
+            case("advection")
+            call LSFadvection(yelmo1%tpo%now%lsf,yelmo1%bnd%z_bed,yelmo1%tpo%par%dx)
+        case DEFAULT 
+            call LSFinit(yelmo1%tpo%now%lsf,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf,yelmo1%tpo%par%dx)
+        end select
     end if
+
+    
 
     ! === Define additional boundary conditions =====
 
@@ -116,9 +127,15 @@ program yelmo_calving
     yelmo1%bnd%H_sed    = 0.0 
 
     yelmo1%bnd%T_srf    = 223.15 
-    yelmo1%bnd%Q_geo    = 42.0 
-    yelmo1%bnd%smb      = 0.3
-    
+    yelmo1%bnd%Q_geo    = 42.0
+
+    select case(trim(ctl%exp))
+        case("advection")
+            yelmo1%bnd%smb      = 0.0
+        case DEFAULT 
+            yelmo1%bnd%smb      = 0.3
+    end select    
+
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
 

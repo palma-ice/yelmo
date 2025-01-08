@@ -44,6 +44,10 @@ contains
 
                 call define_bedrock_thule(z_bed,xx,yy,R0,Bc,Bl,Ba,rc)
 
+            case("advection")
+
+                z_bed = xx*0.0;
+
             case DEFAULT
 
                 write(*,*) "calvmip_init:: Error: domain not recognized."

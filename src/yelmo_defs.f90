@@ -799,6 +799,7 @@ module yelmo_defs
         
         ! Comparison metrics 
         real(wp), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
+        real(wp), allocatable :: err_smb(:,:)
         real(wp), allocatable :: err_uxy_s(:,:)
         real(wp), allocatable :: err_depth_iso(:,:,:) 
 

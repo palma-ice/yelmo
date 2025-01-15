@@ -48,6 +48,7 @@ contains
 
         dta%pd%err_H_ice   = tpo%now%H_ice - dta%pd%H_ice 
         dta%pd%err_z_srf   = tpo%now%z_srf - dta%pd%z_srf 
+        dta%pd%err_smb     = bnd%smb - dta%pd%smb 
         dta%pd%err_uxy_s   = dyn%now%uxy_s - dta%pd%uxy_s 
         
         ! Isochronal layer error 
@@ -459,6 +460,7 @@ contains
         allocate(pd%err_H_ice(nx,ny))
         allocate(pd%err_z_srf(nx,ny))
         allocate(pd%err_z_bed(nx,ny))
+        allocate(pd%err_smb(nx,ny))
         allocate(pd%err_uxy_s(nx,ny))
         allocate(pd%err_depth_iso(nx,ny,n_iso))
 
@@ -483,6 +485,7 @@ contains
         pd%err_H_ice     = 0.0 
         pd%err_z_srf     = 0.0 
         pd%err_z_bed     = 0.0 
+        pd%err_smb       = 0.0 
         pd%err_uxy_s     = 0.0 
         pd%err_depth_iso = 0.0 
         
@@ -522,6 +525,7 @@ contains
         if (allocated(pd%err_H_ice))        deallocate(pd%err_H_ice)
         if (allocated(pd%err_z_srf))        deallocate(pd%err_z_srf)
         if (allocated(pd%err_z_bed))        deallocate(pd%err_z_bed)
+        if (allocated(pd%err_smb))          deallocate(pd%err_smb)
         if (allocated(pd%err_uxy_s))        deallocate(pd%err_uxy_s)
         if (allocated(pd%err_depth_iso))    deallocate(pd%err_depth_iso)
         

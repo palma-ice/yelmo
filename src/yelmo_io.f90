@@ -1883,6 +1883,9 @@ contains
             case("pd_err_z_bed")
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_z_bed(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("pd_err_smb_ref")
+                call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_smb(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("pd_err_uxy_s")
                 call nc_write(filename,trim(v%varname),ylmo%dta%pd%err_uxy_s(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)

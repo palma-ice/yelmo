@@ -5,7 +5,7 @@ NC_FROOT=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1
 INC_NC  = -I${NC_FROOT}/include
 LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf 
 
-LISROOT = libs/exlib/lis-serial
+LISROOT = libs/fesm-utils/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -18,7 +18,7 @@ FFLAGS = -I$(objdir) -J$(objdir) -ffree-line-length-none
 ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = libs/exlib/lis-omp
+    LISROOT = libs/fesm-utils/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

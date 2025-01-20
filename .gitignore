@@ -1,6 +1,6 @@
 Makefile
 libyelmo
-libs/exlib
+libs/fesm-utils
 libs/lis*
 ice_data
 tests/plots

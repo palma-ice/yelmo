@@ -9,7 +9,11 @@ module yelmo_regions
     implicit none
     
     private
-    public :: yelmo_calc_region
+    public :: yelmo_regions_init
+    public :: yelmo_regions_update
+    public :: yelmo_regions_write
+    
+    !public :: yelmo_calc_region
     public :: yelmo_write_reg_init
     public :: yelmo_write_reg_step 
 
@@ -32,6 +36,11 @@ contains
         ! Local variables
         integer :: k 
 
+        ! Set mask for global region where ice is allowed
+        if (allocated(ylmo%reg%mask)) deallocate(ylmo%reg%mask)
+        allocate(ylmo%reg%mask(ylmo%grd%nx,ylmo%grd%ny))
+        ylmo%reg%mask = ylmo%bnd%ice_allowed
+
         ! Allocate regions
         if (allocated(ylmo%regs)) deallocate(ylmo%regs)
         allocate(ylmo%regs(n))
@@ -42,8 +51,10 @@ contains
             ylmo%regs(k)%fnm   = ""
             ylmo%regs(k)%write = .FALSE. 
 
+            ! Set mask to global region for now
             if (allocated(ylmo%regs(k)%mask)) deallocate(ylmo%regs(k)%mask)
             allocate(ylmo%regs(k)%mask(ylmo%grd%nx,ylmo%grd%ny))
+            ylmo%regs(k)%mask = ylmo%bnd%ice_allowed
 
         end do
 
@@ -51,15 +62,100 @@ contains
 
     end subroutine yelmo_regions_init
 
-    subroutine yelmo_region_init(reg,name,mask,fnm,write)
-        ! To do, potentially. 
-        ! If we want to initialize several regions 
-        ! internally in Yelmo, to be updating them
-        ! automatically. For now, region calculations 
-        ! aside from the global domain will be specified 
-        ! by the user in the main program with 
-        ! the routines defined here. 
+    subroutine yelmo_regions_update(ylmo)
+        ! Update all regions defined in the yelmo object
         
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: ylmo
+
+        ! Local variables
+        integer :: k, n 
+
+        ! First calculate the global region
+
+        call yelmo_calc_region(ylmo%reg,ylmo%tpo,ylmo%dyn,ylmo%thrm,ylmo%mat,ylmo%bnd) 
+
+        ! Next calculate each sub region
+
+        n = size(ylmo%regs)
+
+        if (n .gt. 0) then
+            do k = 1, n 
+                call yelmo_calc_region(ylmo%regs(k),ylmo%tpo,ylmo%dyn,ylmo%thrm,ylmo%mat,ylmo%bnd) 
+            end do
+        end if
+
+        return 
+
+    end subroutine yelmo_regions_update
+
+    subroutine yelmo_regions_write(ylmo,time,init,units)
+        ! Write all regions defined in the yelmo object
+        ! that should be written
+        
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: ylmo
+        real(wp),          intent(IN)    :: time
+        logical,           intent(IN), optional :: init
+        character(len=*),  intent(IN), optional :: units 
+
+        ! Local variables
+        integer :: k, n 
+        logical :: initialize_files
+
+        
+        if (present(init)) then
+            initialize_files = init
+
+            if (initialize_files .and. (.not. present(units))) then
+                write(io_unit_err,*) "yelmo_regions_write:: Error: missing time units. If initializing &
+                                &the regional output files, the time units argument 'units' must &
+                                &also be specified."
+                stop
+            end if
+        else
+            initialize_files = .FALSE.
+        end if
+
+        ! First write the global region
+        if (ylmo%reg%write) then
+
+            if (initialize_files) then
+                call yelmo_write_reg_init(ylmo,ylmo%reg%fnm,time,units,ylmo%reg%mask)
+            end if
+
+            call yelmo_write_reg_step(ylmo,ylmo%reg%fnm,time,reg_now=ylmo%reg)
+        end if 
+
+        ! Next write each sub region
+
+        n = size(ylmo%regs)
+
+        if (n .gt. 0) then
+            do k = 1, n 
+                if (ylmo%regs(k)%write) then
+
+                    if (initialize_files) then
+                        call yelmo_write_reg_init(ylmo,ylmo%regs(k)%fnm,time,units,ylmo%regs(k)%mask)
+                    end if
+            
+                    call yelmo_write_reg_step(ylmo,ylmo%regs(k)%fnm,time,reg_now=ylmo%regs(k))
+                end if
+            end do
+        end if
+
+        return 
+
+    end subroutine yelmo_regions_write
+
+    subroutine yelmo_region_init(reg,name,mask,fnm,write)
+        ! Initialize a specific region with mask information,
+        ! possible filename for writing output and flag
+        ! to say whether to write to file or not. 
+        ! (actual file writing is handled by user program)
+
         implicit none 
 
         type(yregions_class), intent(INOUT) :: reg 
@@ -302,7 +398,8 @@ contains
         implicit none 
 
         type(yelmo_class), intent(IN) :: dom 
-        character(len=*),  intent(IN) :: filename, units 
+        character(len=*),  intent(IN) :: filename 
+        character(len=*),  intent(IN) :: units
         real(wp),          intent(IN) :: time_init
         logical,           intent(IN) :: mask(:,:) 
 
@@ -332,7 +429,6 @@ contains
 
         ! Local variables
         integer    :: ncid, n
-        real(wp) :: time_prev 
         type(yregions_class) :: reg
         
         ! 1. Determine regional values of variables 
@@ -370,9 +466,7 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)

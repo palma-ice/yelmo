@@ -525,9 +525,9 @@ end if
             call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt_max_0,step="final",overwrite=.TRUE.,check_mb=check_mb)
         end if
 
-        ! Update regional calculations (for now entire domain with ice)
-        call yelmo_calc_region(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
-
+        ! Update regional calculations (for entire domain and subdomains)
+        call yelmo_regions_update(dom)
+        
         ! Compare with data 
         call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%par%domain)
 
@@ -1215,9 +1215,8 @@ end if
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
-        ! Update regional calculations (for entire domain)
-        call yelmo_calc_region(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
-
+        ! Update regional calculations (for entire domain and subdomains)
+        call yelmo_regions_update(dom)
 
         ! Summary for log file: 
 
@@ -1355,9 +1354,8 @@ end if
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
-        ! Update regional calculations (for now entire domain with ice)
-        call yelmo_calc_region(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
-        
+        ! Update regional calculations (for entire domain and subdomains)
+        call yelmo_regions_update(dom)
 
         return 
 

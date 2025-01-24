@@ -91,7 +91,7 @@ contains
         type(ytherm_class),   intent(IN)    :: thrm 
         type(ymat_class),     intent(IN)    :: mat
         type(ybound_class),   intent(IN)    :: bnd  
-        logical,              intent(IN)    :: mask(:,:) 
+        logical,              intent(IN), optional :: mask(:,:) 
 
         ! Local variables
         integer  :: nx, ny
@@ -111,8 +111,8 @@ contains
         conv_km3a_Sv = 1e-6*(1e9*bnd%c%rho_w/bnd%c%rho_ice)/bnd%c%sec_year
 
         ! Grid size 
-        nx = size(mask,1)
-        ny = size(mask,2)
+        nx = size(reg%mask,1)
+        ny = size(reg%mask,2)
 
         ! Allocate masks 
         allocate(mask_tot(nx,ny))
@@ -122,10 +122,18 @@ contains
         allocate(H_af(nx,ny)) 
 
         ! Define masks 
-        mask_tot  = (mask .and. tpo%now%H_ice .gt. 0.0) 
-        mask_grnd = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .gt. 0.0)
-        mask_flt  = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
-         
+        if (present(mask)) then
+            ! Use provided mask
+            mask_tot  = (mask .and. tpo%now%H_ice .gt. 0.0) 
+            mask_grnd = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .gt. 0.0)
+            mask_flt  = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
+        else
+            ! Use predefined region mask
+            mask_tot  = (reg%mask .and. tpo%now%H_ice .gt. 0.0) 
+            mask_grnd = (reg%mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .gt. 0.0)
+            mask_flt  = (reg%mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
+        end if
+
         ! Calculate ice thickness above flotation 
         call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw,use_f_ice=.FALSE.)
 

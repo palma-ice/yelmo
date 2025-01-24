@@ -15,7 +15,7 @@ module yelmo_regions
 
 contains
 
-    subroutine yregions_init()
+    subroutine yelmo_regions_init(ylmo,n)
         ! To do, potentially. 
         ! If we want to initialize several regions 
         ! internally in Yelmo, to be updating them
@@ -26,12 +26,53 @@ contains
         
         implicit none 
 
+        type(yelmo_class), intent(INOUT) :: ylmo
+        integer :: n 
 
+        ! Local variables
+        integer :: k 
+
+        ! Allocate regions
+        if (allocated(ylmo%regs)) deallocate(ylmo%regs)
+        allocate(ylmo%regs(n))
+
+        ! Initialize some information
+        do k = 1, n 
+            ylmo%regs(k)%name  = ""
+            ylmo%regs(k)%fnm   = ""
+            ylmo%regs(k)%write = .FALSE. 
+        end do
+
+        return 
+
+    end subroutine yelmo_regions_init
+
+    subroutine yelmo_region_init(ylmo,n,name,mask,fnm,write)
+        ! To do, potentially. 
+        ! If we want to initialize several regions 
+        ! internally in Yelmo, to be updating them
+        ! automatically. For now, region calculations 
+        ! aside from the global domain will be specified 
+        ! by the user in the main program with 
+        ! the routines defined here. 
+        
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: ylmo
+        integer,           intent(IN)    :: n
+        character(len=*),  intent(IN)    :: name
+        logical,           intent(IN)    :: mask(:,:) 
+        character(len=*),  intent(IN), optional :: fnm 
+        logical,           intent(IN), optional :: write 
+
+        if (present(fnm))   ylmo%regs(n)%fnm   = trim(fnm)
+        if (present(write)) ylmo%regs(n)%write = .TRUE.
+        
 
 
         return 
 
-    end subroutine yregions_init
+    end subroutine yelmo_region_init
 
     subroutine calc_yregions(reg,tpo,dyn,thrm,mat,bnd,mask) 
         ! Calculate a set of regional variables (averages, totals)

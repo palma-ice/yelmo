@@ -829,6 +829,13 @@ module yelmo_defs
     type yregions_class
         ! Individual values of interest to output from a Yelmo domain 
 
+        ! Region information
+        character(len=56)  :: name 
+        logical, allocatable :: mask(:,:) 
+        
+        character(len=512) :: fnm
+        logical :: write 
+
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
         real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd
@@ -1010,6 +1017,7 @@ module yelmo_defs
         type(ybound_class)      :: bnd      ! Boundary variables to drive model
         type(ydata_class)       :: dta      ! Data variables for comparison
         type(yregions_class)    :: reg      ! Regionally aggregated variables for whole domain 
+        type(yregions_class), allocatable :: regs(:)  ! Regionally aggregated variables for whole domain 
         type(yelmo_io_tables)   :: io       ! IO variable tables
     end type
 

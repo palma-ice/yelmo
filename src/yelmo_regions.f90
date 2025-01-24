@@ -9,7 +9,7 @@ module yelmo_regions
     implicit none
     
     private
-    public :: calc_yregions
+    public :: yelmo_calc_region
     public :: yelmo_write_reg_init
     public :: yelmo_write_reg_step 
 
@@ -41,13 +41,17 @@ contains
             ylmo%regs(k)%name  = ""
             ylmo%regs(k)%fnm   = ""
             ylmo%regs(k)%write = .FALSE. 
+
+            if (allocated(ylmo%regs(k)%mask)) deallocate(ylmo%regs(k)%mask)
+            allocate(ylmo%regs(k)%mask(ylmo%grd%nx,ylmo%grd%ny))
+
         end do
 
         return 
 
     end subroutine yelmo_regions_init
 
-    subroutine yelmo_region_init(ylmo,n,name,mask,fnm,write)
+    subroutine yelmo_region_init(reg,name,mask,fnm,write)
         ! To do, potentially. 
         ! If we want to initialize several regions 
         ! internally in Yelmo, to be updating them
@@ -58,23 +62,24 @@ contains
         
         implicit none 
 
-        type(yelmo_class), intent(INOUT) :: ylmo
-        integer,           intent(IN)    :: n
-        character(len=*),  intent(IN)    :: name
-        logical,           intent(IN)    :: mask(:,:) 
-        character(len=*),  intent(IN), optional :: fnm 
-        logical,           intent(IN), optional :: write 
+        type(yregions_class), intent(INOUT) :: reg 
+        character(len=*),     intent(IN)    :: name
+        logical,              intent(IN)    :: mask(:,:) 
+        character(len=*),     intent(IN), optional :: fnm 
+        logical,              intent(IN), optional :: write 
 
-        if (present(fnm))   ylmo%regs(n)%fnm   = trim(fnm)
-        if (present(write)) ylmo%regs(n)%write = .TRUE.
+        ! Set output filename and writing choice if available
+        if (present(fnm))   reg%fnm   = trim(fnm)
+        if (present(write)) reg%write = .TRUE.
         
-
+        ! Set mask
+        reg%mask = mask
 
         return 
 
     end subroutine yelmo_region_init
 
-    subroutine calc_yregions(reg,tpo,dyn,thrm,mat,bnd,mask) 
+    subroutine yelmo_calc_region(reg,tpo,dyn,thrm,mat,bnd,mask) 
         ! Calculate a set of regional variables (averages, totals)
         ! for a given domain defined by `mask`.
 
@@ -282,7 +287,7 @@ contains
         
         return 
 
-    end subroutine calc_yregions
+    end subroutine yelmo_calc_region
 
     subroutine yelmo_write_reg_init(dom,filename,time_init,units,mask)
 
@@ -336,7 +341,7 @@ contains
             ! If a mask is provided, assume the regional 
             ! values must be calculated now.
 
-            call calc_yregions(reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask) 
+            call yelmo_calc_region(reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask) 
 
         else if (present(reg_now)) then 
             ! Assume region has been calculated and is available 

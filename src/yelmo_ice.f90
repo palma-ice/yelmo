@@ -527,7 +527,7 @@ end if
 
         ! Update regional calculations (for entire domain and subdomains)
         call yelmo_regions_update(dom)
-        
+
         ! Compare with data 
         call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%par%domain)
 
@@ -899,6 +899,18 @@ end if
         dom%tpo%now%mask_adv = 1
 
         write(*,*) "yelmo_init:: boundary initialized (loaded masks, set ref. topography)."
+        
+        ! == regions ==
+
+        ! Initialize regional averaging domains
+        call yelmo_regions_init(dom,dom%par%n_reg)
+
+        ! Initialize specific information about the global domain too
+        ! Writing to file will only take place if user-program calls yelmo_regions_write(),
+        ! which uses the flag specified below. Note currently this assumes outfldr="./" too.
+        call yelmo_region_init(dom%reg,"global",write_to_file=.TRUE.)
+
+        write(*,*) "yelmo_init:: regions initialized."
         
         ! == data == 
         
@@ -1406,6 +1418,8 @@ end if
         call nml_read(filename,group,"pc_n_redo",     par%pc_n_redo)
         call nml_read(filename,group,"pc_tol",        par%pc_tol)
         call nml_read(filename,group,"pc_eps",        par%pc_eps)
+
+        call nml_read(filename,group,"n_reg",         par%n_reg)
 
         ! Overwrite parameter values with argument definitions if available
         if (present(domain))     par%domain    = trim(domain)

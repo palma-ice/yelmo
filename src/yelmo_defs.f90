@@ -961,6 +961,9 @@ module yelmo_defs
         real(wp)            :: pc_tol 
         real(wp)            :: pc_eps  
 
+        ! Regions
+        integer             :: n_reg
+        
         ! Sigma coordinates (internal parameter)
         real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points

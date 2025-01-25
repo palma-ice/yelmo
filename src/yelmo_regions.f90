@@ -12,7 +12,8 @@ module yelmo_regions
     public :: yelmo_regions_init
     public :: yelmo_regions_update
     public :: yelmo_regions_write
-    
+    public :: yelmo_region_init
+
     !public :: yelmo_calc_region
     public :: yelmo_write_reg_init
     public :: yelmo_write_reg_step 
@@ -41,22 +42,26 @@ contains
         allocate(ylmo%reg%mask(ylmo%grd%nx,ylmo%grd%ny))
         ylmo%reg%mask = ylmo%bnd%ice_allowed
 
-        ! Allocate regions
-        if (allocated(ylmo%regs)) deallocate(ylmo%regs)
-        allocate(ylmo%regs(n))
+        if (n .gt. 0) then
 
-        ! Initialize some information
-        do k = 1, n 
-            ylmo%regs(k)%name  = ""
-            ylmo%regs(k)%fnm   = ""
-            ylmo%regs(k)%write = .FALSE. 
+            ! Allocate regions
+            if (allocated(ylmo%regs)) deallocate(ylmo%regs)
+            allocate(ylmo%regs(n))
 
-            ! Set mask to global region for now
-            if (allocated(ylmo%regs(k)%mask)) deallocate(ylmo%regs(k)%mask)
-            allocate(ylmo%regs(k)%mask(ylmo%grd%nx,ylmo%grd%ny))
-            ylmo%regs(k)%mask = ylmo%bnd%ice_allowed
+            ! Initialize some information
+            do k = 1, n 
+                ylmo%regs(k)%name  = ""
+                ylmo%regs(k)%fnm   = ""
+                ylmo%regs(k)%write = .FALSE. 
 
-        end do
+                ! Set mask to global region for now
+                if (allocated(ylmo%regs(k)%mask)) deallocate(ylmo%regs(k)%mask)
+                allocate(ylmo%regs(k)%mask(ylmo%grd%nx,ylmo%grd%ny))
+                ylmo%regs(k)%mask = ylmo%bnd%ice_allowed
+
+            end do
+
+        end if
 
         return 
 
@@ -73,6 +78,9 @@ contains
         integer :: k, n 
 
         ! First calculate the global region
+
+        ! Update global region mask in case ice_allowed is changing
+        ylmo%reg%mask = ylmo%bnd%ice_allowed
 
         call yelmo_calc_region(ylmo%reg,ylmo%tpo,ylmo%dyn,ylmo%thrm,ylmo%mat,ylmo%bnd) 
 
@@ -150,7 +158,7 @@ contains
 
     end subroutine yelmo_regions_write
 
-    subroutine yelmo_region_init(reg,name,mask,fnm,write)
+    subroutine yelmo_region_init(reg,name,write_to_file,outfldr,mask)
         ! Initialize a specific region with mask information,
         ! possible filename for writing output and flag
         ! to say whether to write to file or not. 
@@ -160,16 +168,33 @@ contains
 
         type(yregions_class), intent(INOUT) :: reg 
         character(len=*),     intent(IN)    :: name
-        logical,              intent(IN)    :: mask(:,:) 
-        character(len=*),     intent(IN), optional :: fnm 
-        logical,              intent(IN), optional :: write 
-
-        ! Set output filename and writing choice if available
-        if (present(fnm))   reg%fnm   = trim(fnm)
-        if (present(write)) reg%write = .TRUE.
+        logical,              intent(IN)    :: write_to_file
+        character(len=*),     intent(IN), optional :: outfldr
+        logical,              intent(IN), optional :: mask(:,:) 
         
-        ! Set mask
-        reg%mask = mask
+        ! Local variables
+        character(len=1024) :: outpath
+
+        if (present(outfldr)) then
+            outpath = trim(outfldr)
+        else
+            outpath = "./"
+        end if
+
+        ! Set info for region definition
+        reg%name  = trim(name)
+        reg%write = write_to_file
+
+        if (trim(reg%name) .ne. "global") then
+            reg%fnm   = trim(outpath)//"yelmo1D_"//trim(reg%name)//".nc"
+        else
+            reg%fnm   = trim(outpath)//"yelmo1D.nc"
+        end if
+
+        ! Set mask if available (sometimes easier to set outside the routine directly)
+        if (present(mask)) then
+            reg%mask = mask
+        end if
 
         return 
 
@@ -365,7 +390,7 @@ contains
             reg%uxy_b_f      = sum(dyn%now%uxy_b,mask=mask_flt)/npts_flt        ! [m/a]
 
             ! Boundary variables
-            reg%z_sl         = sum(bnd%z_sl,mask=mask_grnd)/npts_grnd             ! [m]
+            reg%z_sl         = sum(bnd%z_sl,mask=mask_flt)/npts_flt             ! [m]
             reg%bmb_shlf     = sum(tpo%now%bmb,mask=mask_flt)/npts_flt
             reg%T_shlf       = sum(bnd%T_shlf,mask=mask_flt)/npts_flt
             

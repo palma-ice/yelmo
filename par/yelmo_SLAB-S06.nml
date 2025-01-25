@@ -68,7 +68,8 @@
     pc_n_redo       = 1                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1.0               ! Predictor-corrector tolerance 
-    
+    n_reg           = 0                 ! Number of regions for 1D output
+
 /
 
 &ytopo

@@ -57,7 +57,7 @@ yelmo-static: $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests)
 
 # Test programs that use yelmo-static
 initmip : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_initmip.x tests/yelmo_initmip.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_initmip.x tests/yelmo_initmip.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_initmip.x is ready."
@@ -71,35 +71,35 @@ benchmarks : yelmo-static
 		@echo " "
 
 calving : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_calving.x tests/yelmo_calving.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_calving.x tests/yelmo_calving.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_calving.x is ready."
 		@echo " "
 
 mismip : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_mismip.x is ready."
 		@echo " "
 
 ismiphom : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_ismiphom.x tests/yelmo_ismiphom.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_ismiphom.x tests/yelmo_ismiphom.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_ismiphom.x is ready."
 		@echo " "
 
 regridding : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_ismiphom.x tests/yelmo_test_regridding.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_ismiphom.x tests/yelmo_test_regridding.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_test_regridding.x is ready."
 		@echo " "
 
 icetemp : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/test_icetemp.x tests/test_icetemp.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/test_icetemp.x tests/test_icetemp.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    test_icetemp.x is ready."
@@ -127,35 +127,35 @@ levelset : yelmo-static tests/test_levelset.f90
 		@echo " "
 
 mismip1 : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip_new.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip_new.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_mismip.x is ready."
 		@echo " "
 
 opt : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_opt.x tests/yelmo_opt.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_opt.x tests/yelmo_opt.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_opt.x is ready."
 		@echo " "
 
 trough : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_trough.x tests/yelmo_trough.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_trough.x tests/yelmo_trough.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_trough.x is ready."
 		@echo " "
 
 slab : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_slab.x tests/yelmo_slab.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_slab.x tests/yelmo_slab.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_slab.x is ready."
 		@echo " "
 
 check_sim : $(objdir)/ncio.o
-		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
+		$(FC) $(DFLAGS) $(INC_FESMUTILS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
 			$(LFLAGS) $(objdir)/ncio.o
 		@echo " "
 		@echo "    check_sim.x is ready."

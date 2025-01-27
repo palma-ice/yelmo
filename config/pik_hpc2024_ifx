@@ -4,7 +4,11 @@ INC_NC  = -I${NETCDFFI_ROOT}/include
 LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
 # the -rpath options ensure that the same shared libraries are found at runtime
 
-LISROOT = libs/fesm-utils/lis-serial
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+LISROOT = fesm-utils/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -15,14 +19,15 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 
 ifeq ($(openmp), 1)
-    # Overwrite default choices with openmp relevant choices 
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
 
-    LISROOT = libs/fesm-utils/lis-omp
+    LISROOT = fesm-utils/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
     FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
-
 endif 
 
 # Define which linear solvers to include (LIS necessary, PETSC optional)

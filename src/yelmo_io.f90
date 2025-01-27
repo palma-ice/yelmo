@@ -10,7 +10,7 @@ module yelmo_io
     
     use variable_io
     use interp2D
-    use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+    use mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
                                             gen_map_filename, nc_read_interp
     
     implicit none

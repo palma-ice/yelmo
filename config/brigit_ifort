@@ -3,7 +3,11 @@ FC  = ifort
 INC_NC  = -I/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/include
 LIB_NC  = -L/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/lib -lnetcdff -L/opt/ohpc/pub/libs/intel/impi/hdf5/1.10.5/lib -L/opt/ohpc/pub/libs/intel/impi/netcdf/4.6.3/lib -lnetcdf -lnetcdf -lhdf5_hl -lhdf5 -lz -lm
 
-LISROOT = ${HOME}/apps/lis/lis
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+LISROOT = fesm-utils/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -14,14 +18,15 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
 ifeq ($(openmp), 1)
-    # Overwrite default choices with openmp relevant choices 
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
 
-    LISROOT = ${HOME}/apps/lis/lis-omp
+    LISROOT = fesm-utils/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
-    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
-
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp
 endif 
 
 # Define which linear solvers to include (LIS necessary, PETSC optional)
@@ -33,7 +38,7 @@ ifeq ($(petsc), 1)
     LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
 endif
 
-LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
+LFLAGS  = $(LIB_NC) $(LIB_FESMUTILS) $(LIB_LINEAR) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2 -fp-model precise
 DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise

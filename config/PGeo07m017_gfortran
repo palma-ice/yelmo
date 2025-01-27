@@ -5,7 +5,11 @@ NC_FROOT=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1
 INC_NC  = -I${NC_FROOT}/include
 LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf 
 
-LISROOT = libs/fesm-utils/lis-serial
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+LISROOT = fesm-utils/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -16,9 +20,11 @@ LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 FFLAGS = -I$(objdir) -J$(objdir) -ffree-line-length-none 
 
 ifeq ($(openmp), 1)
-    # Overwrite default choices with openmp relevant choices 
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
 
-    LISROOT = libs/fesm-utils/lis-omp
+    LISROOT = fesm-utils/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -35,9 +41,7 @@ ifeq ($(petsc), 1)
     LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
 endif
 
-LFLAGS  = $(LIB_NC) $(LIB_LINEAR)
-
-#-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib
+LFLAGS  = $(LIB_NC) $(LIB_FESMUTILS) $(LIB_LINEAR)
 
 DFLAGS_NODEBUG = -O2
 DFLAGS_DEBUG   = -w -g -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG

@@ -3,11 +3,11 @@ FC = gfortran
 INC_NC = -I/usr/include
 LIB_NC = -L/usr/lib/x86_64-linux-gnu -lnetcdff -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -lnetcdf -lnetcdf -ldl -lm 
 
-YELMOROOT = /home/javier/yelmo-ucm/yelmo
-INC_YELMO = -I${YELMOROOT}/libyelmo/include 
-LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
 
-LISROOT = /home/javier/apps/lis
+LISROOT = fesm-utils/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -16,6 +16,18 @@ INC_PETSC = -I $(PETSC_DIR)/include
 LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
+
+ifeq ($(openmp), 1)
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
+
+    LISROOT = fesm-utils/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
+endif
 
 # Define which linear solvers to include (LIS necessary, PETSC optional)
 INC_LINEAR = $(INC_LIS)
@@ -26,7 +38,7 @@ ifeq ($(petsc), 1)
     LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
 endif
 
-LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
+LFLAGS  = $(LIB_NC) $(LIB_FESMUTILS) $(LIB_LINEAR) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2
 DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG

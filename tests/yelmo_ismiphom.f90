@@ -288,7 +288,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m/a",long_name="Actual ice mass balance applied", &
+        call nc_write(filename,"mb_net",ylmo%tpo%now%mb_net,units="m/a",long_name="Actual ice mass balance applied", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dzsdt",ylmo%tpo%now%dzsdt,units="m/a",long_name="Surface elevation change", &

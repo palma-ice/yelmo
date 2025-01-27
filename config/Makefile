@@ -64,8 +64,8 @@ initmip : yelmo-static
 		@echo " "
 
 benchmarks : yelmo-static
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_benchmarks.x tests/yelmo_benchmarks.f90 \
-			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_benchmarks.x tests/yelmo_benchmarks.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)
 		@echo " "
 		@echo "    yelmo_benchmarks.x is ready."
 		@echo " "

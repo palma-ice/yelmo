@@ -455,13 +455,13 @@ contains
             call nc_read(filename,vname,var2D,start=[1,1,n],count=[nx,ny,1])
 
         else 
-            ! Restart grid is different than Yelmo grid 
+            ! File's grid is different than Yelmo grid 
 
-            ! ! Load the scrip map from file (should already have been generated via cdo externally)
-            ! call map_scrip_init(mps,restart_grid_name,dom%par%grid_name, &
-            !                         method="con",fldr="maps",load=.TRUE.)
+            ! Load the scrip map from file (should already have been generated via cdo externally)
+            call map_scrip_init(mps,file_grid_name,grid_name, &
+                                    method="con",fldr="maps",load=.TRUE.)
 
-            ! call yelmo_read_interp_internal(dom,filename,time,mps) 
+            call nc_read_interp(filename,vname,var2D,start=[1,1,n],count=[nx,ny,1],mps=mps) 
             
         end if 
 

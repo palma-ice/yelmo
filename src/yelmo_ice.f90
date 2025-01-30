@@ -902,14 +902,21 @@ end if
         
         ! == regions ==
 
-        ! Initialize regional averaging domains
-        call yelmo_regions_init(dom,dom%par%n_reg)
-
-        ! Initialize specific information about the global domain too
+        ! Initialize region: global domain
         ! Writing to file will only take place if user-program calls yelmo_regions_write(),
         ! which uses the flag specified below. Note currently this assumes outfldr="./" too.
-        call yelmo_region_init(dom%reg,"global",write_to_file=.TRUE.)
+        call yelmo_region_init(dom%reg,"global",mask=dom%bnd%ice_allowed,write_to_file=.TRUE.)
 
+        ! Initialize regional averaging domains too (global region + zero subdomains for now)
+        ! If regional subdomains are desired, this call will be made explicitly outside the program
+        ! by the user. Ie,
+        ! call yelmo_regions_init(dom,n=2)
+        ! call yelmo_region_init(dom%reg(1),"Region1",mask1)
+        ! call yelmo_region_init(dom%reg(2),"Region2",mask2)
+
+        call yelmo_regions_init(dom,n=0)
+
+        
         write(*,*) "yelmo_init:: regions initialized."
         
         ! == data == 
@@ -1418,9 +1425,7 @@ end if
         call nml_read(filename,group,"pc_n_redo",     par%pc_n_redo)
         call nml_read(filename,group,"pc_tol",        par%pc_tol)
         call nml_read(filename,group,"pc_eps",        par%pc_eps)
-
-        call nml_read(filename,group,"n_reg",         par%n_reg)
-
+        
         ! Overwrite parameter values with argument definitions if available
         if (present(domain))     par%domain    = trim(domain)
         if (present(grid_name))  par%grid_name = trim(grid_name)

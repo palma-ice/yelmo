@@ -831,6 +831,7 @@ module yelmo_defs
 
         ! Region information
         character(len=56)  :: name 
+        integer :: nx, ny
         logical, allocatable :: mask(:,:) 
         
         character(len=512) :: fnm

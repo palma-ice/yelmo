@@ -37,35 +37,86 @@ contains
         ! Local variables
         integer :: k 
 
-        ! Set mask for global region where ice is allowed
-        if (allocated(ylmo%reg%mask)) deallocate(ylmo%reg%mask)
-        allocate(ylmo%reg%mask(ylmo%grd%nx,ylmo%grd%ny))
-        ylmo%reg%mask = ylmo%bnd%ice_allowed
+        ! Set internal parameter n_reg
+        ylmo%par%n_reg = n 
 
-        if (n .gt. 0) then
+        if (ylmo%par%n_reg .gt. 0) then
 
             ! Allocate regions
             if (allocated(ylmo%regs)) deallocate(ylmo%regs)
-            allocate(ylmo%regs(n))
+            allocate(ylmo%regs(ylmo%par%n_reg))
 
-            ! Initialize some information
-            do k = 1, n 
-                ylmo%regs(k)%name  = ""
-                ylmo%regs(k)%fnm   = ""
-                ylmo%regs(k)%write = .FALSE. 
-
-                ! Set mask to global region for now
-                if (allocated(ylmo%regs(k)%mask)) deallocate(ylmo%regs(k)%mask)
-                allocate(ylmo%regs(k)%mask(ylmo%grd%nx,ylmo%grd%ny))
-                ylmo%regs(k)%mask = ylmo%bnd%ice_allowed
-
+            do k = 1, ylmo%par%n_reg
+                ylmo%regs(1)%name = ""
             end do
+
+        else 
+
+            ! Allocate regions to size 1 to avoid possible errors if passing yelmo%regs(1) to yelmo_region_init.
+            if (allocated(ylmo%regs)) deallocate(ylmo%regs)
+            allocate(ylmo%regs(1))
+
+            ! Set the name of regs(1) to indicate it is not properly defined.
+            ylmo%regs(1)%name = "UNDEFINED"
 
         end if
 
         return 
 
     end subroutine yelmo_regions_init
+
+    subroutine yelmo_region_init(reg,name,mask,write_to_file,outfldr)
+        ! Initialize a specific region with mask information,
+        ! possible filename for writing output and flag
+        ! to say whether to write to file or not. 
+        ! (actual file writing is handled by user program)
+
+        implicit none 
+
+        type(yregions_class), intent(INOUT) :: reg 
+        character(len=*),     intent(IN)    :: name
+        logical,              intent(IN)    :: mask(:,:) 
+        logical,              intent(IN)    :: write_to_file
+        character(len=*),     intent(IN), optional :: outfldr
+        
+        ! Local variables
+        integer :: nx, ny
+        character(len=1024) :: outpath
+
+        nx = size(mask,1)
+        ny = size(mask,2)
+
+        ! Safety check
+        if (trim(reg%name) .eq. "UNDEFINED") then
+            write(io_unit_err,*) "yelmo_region_init:: Error: this region has not yet been allocated and defined. &
+            &First, it is necessary to call yelmo_regions_init(ylmo,n) with the desired number of subregions."
+            stop
+        end if
+        
+        if (present(outfldr)) then
+            outpath = trim(outfldr)
+        else
+            outpath = "./"
+        end if
+
+        ! Set info for region definition
+        reg%name  = trim(name)
+        reg%write = write_to_file
+
+        if (trim(reg%name) .ne. "global") then
+            reg%fnm   = trim(outpath)//"yelmo1D_"//trim(reg%name)//".nc"
+        else
+            reg%fnm   = trim(outpath)//"yelmo1D.nc"
+        end if
+
+        ! Allocate and define the region mask
+        if (allocated(reg%mask)) deallocate(reg%mask)
+        allocate(reg%mask(nx,ny))
+        reg%mask = mask
+
+        return 
+
+    end subroutine yelmo_region_init
 
     subroutine yelmo_regions_update(ylmo)
         ! Update all regions defined in the yelmo object
@@ -75,7 +126,7 @@ contains
         type(yelmo_class), intent(INOUT) :: ylmo
 
         ! Local variables
-        integer :: k, n 
+        integer :: k 
 
         ! First calculate the global region
 
@@ -86,10 +137,8 @@ contains
 
         ! Next calculate each sub region
 
-        n = size(ylmo%regs)
-
-        if (n .gt. 0) then
-            do k = 1, n 
+        if (ylmo%par%n_reg .gt. 0) then
+            do k = 1, ylmo%par%n_reg 
                 call yelmo_calc_region(ylmo%regs(k),ylmo%tpo,ylmo%dyn,ylmo%thrm,ylmo%mat,ylmo%bnd) 
             end do
         end if
@@ -139,10 +188,8 @@ contains
 
         ! Next write each sub region
 
-        n = size(ylmo%regs)
-
-        if (n .gt. 0) then
-            do k = 1, n 
+        if (ylmo%par%n_reg .gt. 0) then
+            do k = 1, ylmo%par%n_reg 
                 if (ylmo%regs(k)%write) then
 
                     if (initialize_files) then
@@ -157,48 +204,6 @@ contains
         return 
 
     end subroutine yelmo_regions_write
-
-    subroutine yelmo_region_init(reg,name,write_to_file,outfldr,mask)
-        ! Initialize a specific region with mask information,
-        ! possible filename for writing output and flag
-        ! to say whether to write to file or not. 
-        ! (actual file writing is handled by user program)
-
-        implicit none 
-
-        type(yregions_class), intent(INOUT) :: reg 
-        character(len=*),     intent(IN)    :: name
-        logical,              intent(IN)    :: write_to_file
-        character(len=*),     intent(IN), optional :: outfldr
-        logical,              intent(IN), optional :: mask(:,:) 
-        
-        ! Local variables
-        character(len=1024) :: outpath
-
-        if (present(outfldr)) then
-            outpath = trim(outfldr)
-        else
-            outpath = "./"
-        end if
-
-        ! Set info for region definition
-        reg%name  = trim(name)
-        reg%write = write_to_file
-
-        if (trim(reg%name) .ne. "global") then
-            reg%fnm   = trim(outpath)//"yelmo1D_"//trim(reg%name)//".nc"
-        else
-            reg%fnm   = trim(outpath)//"yelmo1D.nc"
-        end if
-
-        ! Set mask if available (sometimes easier to set outside the routine directly)
-        if (present(mask)) then
-            reg%mask = mask
-        end if
-
-        return 
-
-    end subroutine yelmo_region_init
 
     subroutine yelmo_calc_region(reg,tpo,dyn,thrm,mat,bnd,mask) 
         ! Calculate a set of regional variables (averages, totals)

@@ -824,10 +824,17 @@ contains
         type(ybound_class), intent(IN)    :: bnd  
 
         ! Local variables
-        integer :: i, j, nx, ny 
+        integer :: i, j, i1, j1, nx, ny 
         real(wp) :: H_w_max
         real(wp) :: H_w
 
+        integer  :: im1, ip1, jm1, jp1, nxi
+        real(wp) :: Hw_1, Hw_2, Hw_3, Hw_4, Hw_mid
+        real(wp) :: wt 
+        real(wp), allocatable :: Hw_int(:,:)
+        
+        nxi = 5
+        
         ! Error checking
 
         if (dyn%par%neff_method .lt. -1 .or. dyn%par%neff_method .gt. 5) then

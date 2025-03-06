@@ -2,6 +2,7 @@ module topography
 
     use yelmo_defs, only : wp, dp, io_unit_err, pi
     use yelmo_tools, only : get_neighbor_indices
+    use subgrid, only : calc_subgrid_array, calc_subgrid_array_cell
 
     implicit none 
 
@@ -743,8 +744,7 @@ contains
         real(wp), intent(IN)  :: rho_sw
         
         ! Local variables
-        integer  :: i, j, nx, ny
-        real(wp) :: v1, v2, v3, v4 
+        integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_eff 
         real(wp) :: f_grnd_neighb(4) 
@@ -812,28 +812,10 @@ contains
                 ! Only treat grounding line points that are fully ice-covered:  
                 ! Perform subgrid calculations 
 
-                ! Calculate values at corners (ab-nodes) and interpolate
-                
-                ! == H_ice == 
-                v1 = 0.25_wp*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jp1) + H_ice(i,jp1))
-                v2 = 0.25_wp*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jp1) + H_ice(i,jp1))
-                v3 = 0.25_wp*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jm1) + H_ice(i,jm1))
-                v4 = 0.25_wp*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jm1) + H_ice(i,jm1))
-                call calc_subgrid_array(H_ice_int,v1,v2,v3,v4,gz_nx)
-                
-                ! == z_bed == 
-                v1 = 0.25_wp*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jp1) + z_bed(i,jp1))
-                v2 = 0.25_wp*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jp1) + z_bed(i,jp1))
-                v3 = 0.25_wp*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jm1) + z_bed(i,jm1))
-                v4 = 0.25_wp*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jm1) + z_bed(i,jm1))
-                call calc_subgrid_array(z_bed_int,v1,v2,v3,v4,gz_nx)
-                
-                ! == z_sl == 
-                v1 = 0.25_wp*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jp1) + z_sl(i,jp1))
-                v2 = 0.25_wp*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jp1) + z_sl(i,jp1))
-                v3 = 0.25_wp*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jm1) + z_sl(i,jm1))
-                v4 = 0.25_wp*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jm1) + z_sl(i,jm1))
-                call calc_subgrid_array(z_sl_int,v1,v2,v3,v4,gz_nx)
+                ! Calculate subgrid values for this cell
+                call calc_subgrid_array(H_ice_int,H_ice,gz_nx,i,j,im1,ip1,jm1,jp1)
+                call calc_subgrid_array(z_bed_int,z_bed,gz_nx,i,j,im1,ip1,jm1,jp1)
+                call calc_subgrid_array(z_sl_int, z_sl, gz_nx,i,j,im1,ip1,jm1,jp1)
                 
                 ! Calculate subgrid surface elevations
                 call calc_z_srf_max(z_srf_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int,rho_ice,rho_sw)
@@ -982,14 +964,14 @@ contains
 
         implicit none
         
-        real(wp), intent(OUT) :: f_grnd(:,:)      ! aa-nodes 
-        real(wp), intent(IN)  :: H_grnd(:,:)      ! aa-nodes
-        integer,    intent(IN)  :: gz_nx        ! Number of interpolation points per side (nx*nx)
+        real(wp), intent(OUT) :: f_grnd(:,:)        ! aa-nodes 
+        real(wp), intent(IN)  :: H_grnd(:,:)        ! aa-nodes
+        integer,  intent(IN)  :: gz_nx              ! Number of interpolation points per side (nx*nx)
 
         ! Local variables
-        integer    :: i, j, nx, ny
-        real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
-        integer    :: im1, ip1, jm1, jp1 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: Hg_int(gz_nx,gz_nx)
 
         !integer, parameter :: nx_interp = 15
 
@@ -1022,17 +1004,14 @@ contains
             if (jp1 == ny+1) then
                 jp1 = 1
             end if
-  
-            ! Calculate Hg at corners (ab-nodes)
-            Hg_1 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
-            Hg_2 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
-            Hg_3 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
-            Hg_4 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
-            
-            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
+
+            if (maxval(H_grnd(im1:ip1,jm1:jp1)) .ge. 0.0 .and. minval(H_grnd(im1:ip1,jm1:jp1)) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
+                call calc_subgrid_array(Hg_int, H_grnd,gz_nx,i,j,im1,ip1,jm1,jp1)
+                
+                ! Calculate weighted fraction (assume all points have equal weight)
+                f_grnd(i,j) = real(count(Hg_int .ge. 0.0),wp) / real(gz_nx*gz_nx,wp)
 
             end if 
 
@@ -1059,6 +1038,7 @@ contains
         real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4
         real(wp) :: Hg_min, Hg_max  
         integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: Hg_int(gz_nx,gz_nx)
 
         !integer, parameter :: nx_interp = 15
 
@@ -1108,9 +1088,12 @@ contains
             if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
+                call calc_subgrid_array_cell(Hg_int,Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
-            else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then 
+                ! Calculate weighted fraction (assume all points have equal weight)
+                f_grnd(i,j) = real(count(Hg_int .ge. 0.0),wp) / real(gz_nx*gz_nx,wp)
+
+            else if (Hg_min .ge. 0.0) then 
                 ! Fully grounded point
 
                 f_grnd(i,j) = 1.0_wp 
@@ -1131,9 +1114,12 @@ contains
             if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd_acx(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
+                call calc_subgrid_array_cell(Hg_int,Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
-            else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then
+                ! Calculate weighted fraction (assume all points have equal weight)
+                f_grnd_acx(i,j) = real(count(Hg_int .ge. 0.0),wp) / real(gz_nx*gz_nx,wp)
+
+            else if (Hg_min .ge. 0.0) then
                 ! Purely grounded point 
 
                 f_grnd_acx(i,j) = 1.0_wp 
@@ -1154,9 +1140,12 @@ contains
             if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd_acy(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
+                call calc_subgrid_array_cell(Hg_int,Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
-            else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then 
+                ! Calculate weighted fraction (assume all points have equal weight)
+                f_grnd_acy(i,j) = real(count(Hg_int .ge. 0.0),wp) / real(gz_nx*gz_nx,wp)
+
+            else if (Hg_min .ge. 0.0) then 
                 ! Purely grounded point 
                     
                 f_grnd_acy(i,j) = 1.0_wp 
@@ -1920,7 +1909,7 @@ end if
 
         real(wp), allocatable :: Hg_int(:,:)
         real(wp), allocatable :: bmb_int(:,:)
-        
+
         ! Consistency check
         if (gz_Hg0 .gt. 0.0) then 
             write(io_unit_err,*) "calc_bmb_gl_pmpt:: Error: lower limit on grounding zone must be <= 0.0."
@@ -1947,18 +1936,12 @@ end if
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-            ! Calculate Hg at corners (ab-nodes)
-            Hg_1 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
-            Hg_2 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
-            Hg_3 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
-            Hg_4 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
-            
-            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. gz_Hg1 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .ge. gz_Hg1) then 
+            if (minval(H_grnd(im1:ip1,jm1:jp1)) .ge. gz_Hg1) then 
                 ! Entire cell is grounded
 
                 bmb(i,j) = bmb_grnd(i,j)
             
-            else if (max(Hg_1,Hg_2,Hg_3,Hg_4) .lt. gz_Hg0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. gz_Hg0) then 
+            else if (maxval(H_grnd(im1:ip1,jm1:jp1)) .lt. gz_Hg0) then 
                 ! Entire cell is floating
 
                 bmb(i,j) = bmb_shlf(i,j) 
@@ -1967,8 +1950,8 @@ end if
                 ! Point contains the grounding zone
                 
                 ! Calculate subgrid values of H_grnd
-                call calc_subgrid_array(Hg_int,Hg_1,Hg_2,Hg_3,Hg_4,nxi)
-                
+                call calc_subgrid_array(Hg_int,H_grnd,nxi,i,j,im1,ip1,jm1,jp1)
+
                 ! Calculate individual bmb values for each subgrid point
                 do j1 = 1, nxi
                 do i1 = 1, nxi
@@ -2002,118 +1985,6 @@ end if
         return
         
     end subroutine calc_bmb_gl_pmpt
-    
-    subroutine calc_subgrid_array(vint,v1,v2,v3,v4,nx)
-        ! Given the four corners of a cell in quadrants 1,2,3,4,
-        ! calculate the subgrid values via linear interpolation
-
-        implicit none 
-
-        real(wp), intent(OUT) :: vint(:,:)  
-        real(wp), intent(IN)  :: v1,v2,v3,v4
-        integer,    intent(IN)  :: nx                    ! Number of interpolation points 
-
-        ! Local variables 
-        integer :: i, j 
-        real(wp) :: x(nx), y(nx) 
-
-        ! Populate x,y axes for interpolation points (between 0 and 1)
-        do i = 1, nx 
-            x(i) = 0.0 + real(i-1)/real(nx-1)
-        end do 
-        y = x 
-        
-        ! Calculate interpolated value      
-        vint = 0.0 
-        do i = 1, nx 
-        do j = 1, nx 
-
-            vint(i,j) = interp_bilin_pt(v1,v2,v3,v4,x(i),y(j))
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine calc_subgrid_array
-
-    subroutine calc_grounded_fraction_cell(f_g,Hg_1,Hg_2,Hg_3,Hg_4,nx)
-        ! Given the four corners of a cell in quadrants 1,2,3,4,
-        ! calculate the grounded fraction (ie area with Hg>0)
-        !
-        ! Convention:
-        !   
-        !  Hg_2---Hg_1
-        !    |     |
-        !    |     |
-        !  Hg_3---Hg_4
-
-        implicit none 
-
-        real(wp), intent(OUT) :: f_g 
-        real(wp), intent(IN)  :: Hg_1, Hg_2, Hg_3, Hg_4
-        integer,    intent(IN)  :: nx                    ! Number of interpolation points 
-
-        ! Local variables 
-        integer  :: i, j 
-        real(wp) :: x(nx), y(nx) 
-        real(wp) :: Hg_int(nx,nx)  
-
-        ! Populate x,y axes for interpolation points (between 0 and 1)
-        do i = 1, nx 
-            x(i) = 0.0 + real(i-1)/real(nx-1)
-        end do 
-        y = x 
-
-        ! Perform interpolation of Hg onto fine grid
-        Hg_int = 0.0 
-        do i = 1, nx 
-        do j = 1, nx 
-
-            Hg_int(i,j) = interp_bilin_pt(Hg_1,Hg_2,Hg_3,Hg_4,x(i),y(j))
-
-        end do 
-        end do 
-
-        ! Calculate weighted fraction (assume all points have equal weight)
-        f_g = real(count(Hg_int .ge. 0.0),wp) / real(nx*nx,wp)
-
-        return 
-
-    end subroutine calc_grounded_fraction_cell
-
-    function interp_bilin_pt(z1,z2,z3,z4,xout,yout) result(zout)
-        ! Interpolate a point given four neighbors at corners of square (0:1,0:1)
-        ! z2    z1
-        !    x,y
-        ! z3    z4 
-        ! 
-
-        implicit none 
-
-        real(wp), intent(IN) :: z1, z2, z3, z4 
-        real(wp), intent(IN) :: xout, yout 
-        real(wp) :: zout 
-
-        ! Local variables 
-        real(wp) :: x0, x1, y0, y1 
-        real(wp) :: alpha1, alpha2, p0, p1 
-
-        x0 = 0.0 
-        x1 = 1.0 
-        y0 = 0.0 
-        y1 = 1.0 
-
-        alpha1  = (xout - x0) / (x1-x0)
-        p0      = z3 + alpha1*(z4-z3)
-        p1      = z2 + alpha1*(z1-z2)
-            
-        alpha2  = (yout - y0) / (y1-y0)
-        zout    = p0 + alpha2*(p1-p0)
-
-        return 
-
-    end function interp_bilin_pt
     
 !! f_grnd calculations from IMAU-ICE / CISM 
 

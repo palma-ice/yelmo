@@ -823,82 +823,90 @@ contains
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd  
 
-        ! Local variables 
+        ! Local variables
+        integer :: i, j, nx, ny 
         real(wp) :: H_w_max
-        real(wp), allocatable :: H_w(:,:) 
+        real(wp) :: H_w
+
+        ! Error checking
+
+        if (dyn%par%neff_method .lt. -1 .or. dyn%par%neff_method .gt. 5) then
+            write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2,3,4,5]."
+            write(*,*) "neff_method = ", dyn%par%neff_method 
+            stop
+        end if 
+
+        ! Consistency checks
 
         if (dyn%par%neff_H_w_max .lt. 0.0) then 
             ! Set the water saturation value to the parameter value
             ! obtained from the thermodynamics module. Ie, let the
             ! saturation value coincide with the maximum allowed water thickness. 
-
             H_w_max = thrm%par%H_w_max
-
         else
             ! Impose the water saturation value desired
-
             H_w_max = dyn%par%neff_H_w_max 
-
         end if
 
-        ! Calculate effective pressure N_eff [Pa]
-        select case(dyn%par%neff_method)
+        nx = size(dyn%now%N_eff,1)
+        ny = size(dyn%now%N_eff,2)
 
-            case(-1) 
-                ! Do nothing, effective pressure is calculated externally 
+        if (dyn%par%neff_method .eq. -1) then
+            ! Do nothing, effective pressure is calculated externally 
+        else if (dyn%par%neff_method .eq. 0) then
+            ! Constant value [Pa] (to scale friction coefficients)
+            dyn%now%N_eff = dyn%par%neff_const
+        else
+            ! Calculate effective pressure N_eff [Pa]
 
-            case(0)
-                ! Constant value (to scale friction coefficients)
+            do j = 1, ny
+            do i = 1, nx 
 
-                dyn%now%N_eff = dyn%par%neff_const 
+                select case(dyn%par%neff_method)
 
-            case(1)
-                ! Effective pressure == overburden pressure 
+                case(1)
+                    ! Effective pressure == overburden pressure 
 
-                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                                                                                                        bnd%c%rho_ice,bnd%c%g)
+                    dyn%now%N_eff(i,j) = calc_effective_pressure_overburden(tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j), &
+                                                                            tpo%now%f_grnd(i,j),bnd%c%rho_ice,bnd%c%g)
 
-            case(2) 
-                ! Effective pressure diminishes with marine character
-                ! following Leguy et al. (2014) 
+                case(2) 
+                    ! Effective pressure diminishes with marine character
+                    ! following Leguy et al. (2014) 
 
-                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,bnd%z_bed,bnd%z_sl, &
-                                                                thrm%now%H_w,dyn%par%neff_p,bnd%c%rho_ice,bnd%c%rho_sw,bnd%c%g)
+                    dyn%now%N_eff(i,j) = calc_effective_pressure_marine(tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),bnd%z_bed(i,j),bnd%z_sl(i,j), &
+                                                                    thrm%now%H_w(i,j),dyn%par%neff_p,bnd%c%rho_ice,bnd%c%rho_sw,bnd%c%g)
 
-            case(3)
-                ! Effective pressure as basal till pressure
-                ! following van Pelt and Bueler (2015)
+                case(3)
+                    ! Effective pressure as basal till pressure
+                    ! following van Pelt and Bueler (2015)
 
-                call calc_effective_pressure_till(dyn%now%N_eff,thrm%now%H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                                                        H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc, &
-                                                        bnd%c%rho_ice,bnd%c%g) 
+                    call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                                                H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
-            case(4)
-                ! Effective pressure as basal till pressure
-                ! following van Pelt and Bueler (2015), but
-                ! with constant imposed till water saturation value s_const
+                case(4)
+                    ! Effective pressure as basal till pressure
+                    ! following van Pelt and Bueler (2015), but
+                    ! with constant imposed till water saturation value s_const
 
-                allocate(H_w(dyn%par%nx,dyn%par%ny))
-                H_w = H_w_max*dyn%par%neff_s_const
+                    H_w = H_w_max*dyn%par%neff_s_const
 
-                call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                                                        H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc, &
-                                                        bnd%c%rho_ice,bnd%c%g) 
+                    call calc_effective_pressure_till(dyn%now%N_eff(i,j),H_w,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                                                            H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc, &
+                                                            bnd%c%rho_ice,bnd%c%g) 
 
-            case(5) 
-                ! Calculate two-valued effective pressure using till parameter neff_delta 
+                case(5) 
+                    ! Calculate two-valued effective pressure using till parameter neff_delta 
 
-                call calc_effective_pressure_two_value(dyn%now%N_eff,thrm%now%f_pmp,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-                                                                    tpo%now%f_grnd,dyn%par%neff_delta,bnd%c%rho_ice,bnd%c%g)
-                
-            case DEFAULT 
+                    call calc_effective_pressure_two_value(dyn%now%N_eff(i,j),thrm%now%f_pmp(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j), &
+                                                                        tpo%now%f_grnd(i,j),dyn%par%neff_delta,bnd%c%rho_ice,bnd%c%g)
+                    
+                end select
 
-                write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2,3]."
-                write(*,*) "neff_method = ", dyn%par%neff_method 
-                stop 
+            end do
+            end do
 
-        end select 
-        
+        end if
 
         return 
 

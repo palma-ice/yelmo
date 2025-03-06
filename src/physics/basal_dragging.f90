@@ -639,17 +639,17 @@ contains
 
     end function calc_effective_pressure_marine
 
-    subroutine calc_effective_pressure_till(N_eff,H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc,rho_ice,g)
+    elemental subroutine calc_effective_pressure_till(N_eff,H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc,rho_ice,g)
         ! Calculate the effective pressure of the till
         ! following van Pelt and Bueler (2015), Eq. 23.
         
         implicit none 
         
-        real(wp), intent(OUT) :: N_eff(:,:)         ! [Pa] Effective pressure 
-        real(wp), intent(IN)  :: H_w(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:) 
-        real(wp), intent(IN)  :: f_grnd(:,:)  
+        real(wp), intent(OUT) :: N_eff              ! [Pa] Effective pressure 
+        real(wp), intent(IN)  :: H_w
+        real(wp), intent(IN)  :: H_ice
+        real(wp), intent(IN)  :: f_ice 
+        real(wp), intent(IN)  :: f_grnd  
         real(wp), intent(IN)  :: H_w_max            ! [m] Maximum allowed water depth 
         real(wp), intent(IN)  :: N0                 ! [Pa] Reference effective pressure 
         real(wp), intent(IN)  :: delta              ! [--] Fraction of overburden pressure for saturated till
@@ -658,104 +658,83 @@ contains
         real(wp), intent(IN) :: rho_ice 
         real(wp), intent(IN) :: g
         
-        ! Local variables
-        integer :: i, j, nx, ny  
+        ! Local variables  
         real(wp) :: H_eff
         real(wp) :: P0, s 
         real(wp) :: q1 
 
-        nx = size(N_eff,1)
-        ny = size(N_eff,2) 
+        if (f_grnd .eq. 0.0_wp) then 
+            ! No effective pressure at base for floating ice
+        
+            N_eff = 0.0_wp 
 
+        else 
 
-        do j = 1, ny 
-        do i = 1, nx 
+            ! Get effective ice thickness 
+            call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
-            if (f_grnd(i,j) .eq. 0.0_wp) then 
-                ! No effective pressure at base for floating ice
-            
-                N_eff(i,j) = 0.0_wp 
+            ! Get overburden pressure 
+            P0 = rho_ice*g*H_eff
 
-            else 
+            ! Get ratio of water layer thickness to maximum
+            s  = min(H_w/H_w_max,1.0)  
 
-                ! Get effective ice thickness 
-                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
+            ! Calculate exponent in expression 
+            q1 = (e0/Cc)*(1-s)
 
-                ! Get overburden pressure 
-                P0 = rho_ice*g*H_eff
+            ! Limit exponent to reasonable values to avoid an explosion 
+            ! (eg s=1, e0=0.52, Cc=0.014 => q1=37,14)
+            q1 = min(q1,10.0_wp) 
 
-                ! Get ratio of water layer thickness to maximum
-                s  = min(H_w(i,j)/H_w_max,1.0)  
+            ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
+            ! Note: do not scale grounding-line points by f_grnd. This is done on
+            ! the beta-staggering step.
+            N_eff = min( N0*(delta*P0/N0)**s * 10**q1, P0 ) 
 
-                ! Calculate exponent in expression 
-                q1 = (e0/Cc)*(1-s)
-
-                ! Limit exponent to reasonable values to avoid an explosion 
-                ! (eg s=1, e0=0.52, Cc=0.014 => q1=37,14)
-                q1 = min(q1,10.0_wp) 
-
-                ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
-                ! Note: do not scale grounding-line points by f_grnd. This is done on
-                ! the beta-staggering step.
-                N_eff(i,j) = min( N0*(delta*P0/N0)**s * 10**q1, P0 ) 
-
-            end if  
-
-        end do 
-        end do
+        end if  
 
         return 
 
     end subroutine calc_effective_pressure_till
     
-    subroutine calc_effective_pressure_two_value(N_eff,f_pmp,H_ice,f_ice,f_grnd,delta,rho_ice,g)
+    elemental subroutine calc_effective_pressure_two_value(N_eff,f_pmp,H_ice,f_ice,f_grnd,delta,rho_ice,g)
 
         implicit none 
 
-        real(wp), intent(OUT) :: N_eff(:,:)
-        real(wp), intent(IN)  :: f_pmp(:,:) 
-        real(wp), intent(IN)  :: H_ice(:,:) 
-        real(wp), intent(IN)  :: f_ice(:,:) 
-        real(wp), intent(IN)  :: f_grnd(:,:) 
+        real(wp), intent(OUT) :: N_eff
+        real(wp), intent(IN)  :: f_pmp 
+        real(wp), intent(IN)  :: H_ice 
+        real(wp), intent(IN)  :: f_ice 
+        real(wp), intent(IN)  :: f_grnd 
         real(wp), intent(IN)  :: delta
         real(wp), intent(IN) :: rho_ice 
         real(wp), intent(IN) :: g
         
-        ! Local variables
-        integer :: i, j, nx, ny  
+        ! Local variables 
         real(wp) :: H_eff
         real(wp) :: P0, P1
 
-        nx = size(N_eff,1)
-        ny = size(N_eff,2) 
+        if (f_grnd .eq. 0.0_wp) then 
+            ! No effective pressure at base for purely floating ice
+        
+            N_eff = 0.0_wp 
 
-        do j = 1, ny 
-        do i = 1, nx 
+        else 
 
-            if (f_grnd(i,j) .eq. 0.0_wp) then 
-                ! No effective pressure at base for purely floating ice
+            ! Get effective ice thickness 
+            call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
+
+            ! Get overburden pressure 
+            P0 = rho_ice*g*H_eff
+
+            ! Calculate reduced pressure assuming full application of delta
+            P1 = P0 * delta 
+
+            ! Calculate effective pressure as a weighted average of 
+            ! P0 and P1 via f_pmp 
+            N_eff = P0*(1.0_wp-f_pmp) + P1*f_pmp
             
-                N_eff(i,j) = 0.0_wp 
-
-            else 
-
-                ! Get effective ice thickness 
-                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
-
-                ! Get overburden pressure 
-                P0 = rho_ice*g*H_eff
-
-                ! Calculate reduced pressure assuming full application of delta
-                P1 = P0 * delta 
-
-                ! Calculate effective pressure as a weighted average of 
-                ! P0 and P1 via f_pmp 
-                N_eff(i,j) = P0*(1.0_wp-f_pmp(i,j)) + P1*f_pmp(i,j)
-                
-            end if  
-
-        end do 
-        end do
+        end if  
 
         return
 

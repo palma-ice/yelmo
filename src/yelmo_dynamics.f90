@@ -10,6 +10,8 @@ module yelmo_dynamics
     use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
                             calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
 
+    use subgrid, only : calc_subgrid_array, calc_subgrid_array_cell
+
     use velocity_general
 
     use velocity_sia 
@@ -829,11 +831,14 @@ contains
         real(wp) :: H_w
 
         integer  :: im1, ip1, jm1, jp1, nxi
-        real(wp) :: Hw_1, Hw_2, Hw_3, Hw_4, Hw_mid
         real(wp) :: wt 
         real(wp), allocatable :: Hw_int(:,:)
+        real(wp), allocatable :: Neff_int(:,:)
         
         nxi = 5
+
+        allocate(Hw_int(nxi,nxi))
+        allocate(Neff_int(nxi,nxi))
         
         ! Error checking
 
@@ -888,9 +893,13 @@ contains
                     ! Effective pressure as basal till pressure
                     ! following van Pelt and Bueler (2015)
 
-                    call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                    call calc_subgrid_array(Hw_int,thrm%now%H_w,nxi,i,j,im1,ip1,jm1,jp1)
+                
+                    call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                 H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
+                    dyn%now%N_eff(i,j) = sum(Neff_int) / real(nxi*nxi,wp)
+                    
                 case(4)
                     ! Effective pressure as basal till pressure
                     ! following van Pelt and Bueler (2015), but

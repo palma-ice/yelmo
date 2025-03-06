@@ -379,6 +379,7 @@ module yelmo_defs
 
         ! Effective pressure parameters
         integer    :: neff_method
+        integer    :: neff_nxi
         real(wp)   :: neff_const
         real(wp)   :: neff_p 
         real(wp)   :: neff_H_w_max

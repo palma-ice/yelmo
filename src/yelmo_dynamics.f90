@@ -835,7 +835,8 @@ contains
         real(wp), allocatable :: Hw_int(:,:)
         real(wp), allocatable :: Neff_int(:,:)
         
-        nxi = 5
+        ! Set local variable: number of interpolation points in cell [nxi x nxi]
+        nxi = dyn%par%neff_nxi
 
         allocate(Hw_int(nxi,nxi))
         allocate(Neff_int(nxi,nxi))
@@ -893,13 +894,20 @@ contains
                     ! Effective pressure as basal till pressure
                     ! following van Pelt and Bueler (2015)
 
-                    call calc_subgrid_array(Hw_int,thrm%now%H_w,nxi,i,j,im1,ip1,jm1,jp1)
-                
-                    call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
-                                                H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
-
-                    dyn%now%N_eff(i,j) = sum(Neff_int) / real(nxi*nxi,wp)
+                    if (nxi .gt. 1) then
+                        call calc_subgrid_array(Hw_int,thrm%now%H_w,nxi,i,j,im1,ip1,jm1,jp1)
                     
+                        call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                                                    H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
+
+                        dyn%now%N_eff(i,j) = sum(Neff_int) / real(nxi*nxi,wp)
+                    else
+
+                        call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                                                    H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
+
+                    end if
+
                 case(4)
                     ! Effective pressure as basal till pressure
                     ! following van Pelt and Bueler (2015), but
@@ -986,6 +994,7 @@ contains
         call nml_read(filename,group_ytill,"cf_ref",            par%till_cf_ref,        init=init_pars)
         
         call nml_read(filename,group_yneff,"method",            par%neff_method,        init=init_pars)
+        call nml_read(filename,group_yneff,"nxi",               par%neff_nxi,           init=init_pars)
         call nml_read(filename,group_yneff,"const",             par%neff_const,         init=init_pars)
         call nml_read(filename,group_yneff,"p",                 par%neff_p,             init=init_pars)
         call nml_read(filename,group_yneff,"H_w_max",           par%neff_H_w_max,       init=init_pars)

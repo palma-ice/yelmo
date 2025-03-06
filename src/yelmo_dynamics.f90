@@ -835,13 +835,13 @@ contains
         real(wp), allocatable :: Hw_int(:,:)
         real(wp), allocatable :: Neff_int(:,:)
         
-        ! Set local variable: number of interpolation points in cell [nxi x nxi]
-        nxi = dyn%par%neff_nxi
-
-        allocate(Hw_int(nxi,nxi))
-        allocate(Neff_int(nxi,nxi))
-        
         ! Error checking
+
+        if (dyn%par%neff_nxi .lt. 1) then
+            write(*,*) "ydyn_calc_Neff:: Error: neff_nxi must be >= 1."
+            write(*,*) "neff_nxi = ", dyn%par%neff_nxi 
+            stop
+        end if
 
         if (dyn%par%neff_method .lt. -1 .or. dyn%par%neff_method .gt. 5) then
             write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2,3,4,5]."
@@ -864,6 +864,13 @@ contains
         nx = size(dyn%now%N_eff,1)
         ny = size(dyn%now%N_eff,2)
 
+        ! Set local variable: number of interpolation points in cell [nxi x nxi]
+        nxi = dyn%par%neff_nxi
+
+        allocate(Hw_int(nxi,nxi))
+        allocate(Neff_int(nxi,nxi))
+        
+        
         if (dyn%par%neff_method .eq. -1) then
             ! Do nothing, effective pressure is calculated externally 
         else if (dyn%par%neff_method .eq. 0) then

@@ -5,7 +5,8 @@ module yelmo_dynamics
     use ncio 
 
     use yelmo_defs
-    use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D
+    use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D, &
+                            aa_to_nodes
 
     use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
                             calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
@@ -835,6 +836,12 @@ contains
         real(wp), allocatable :: Hw_int(:,:)
         real(wp), allocatable :: Neff_int(:,:)
         
+        real(wp) :: wt0
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
+        real(wp) :: wt2D
+
         ! Error checking
 
         if (dyn%par%neff_nxi .lt. 1) then
@@ -865,10 +872,28 @@ contains
         ny = size(dyn%now%N_eff,2)
 
         ! Set local variable: number of interpolation points in cell [nxi x nxi]
-        nxi = dyn%par%neff_nxi
+        if (dyn%par%neff_nxi .eq. 0) then
+            ! No interpolation
+            nxi = 1
+        else if (dyn%par%neff_nxi .eq. 1) then
+            ! Guassian quadrature
+            nxi = 4
+            allocate(Hw_int(1,nxi))
+            allocate(Neff_int(1,nxi))
+            
+            wt0  = 1.0/sqrt(3.0)
+            xn   = [wt0,-wt0,-wt0, wt0]
+            yn   = [wt0, wt0,-wt0,-wt0]
+            wtn  = [1.0,1.0,1.0,1.0]
+            wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
+        else
+            ! Subgrid interpolation
+            nxi = dyn%par%neff_nxi
+            allocate(Hw_int(nxi,nxi))
+            allocate(Neff_int(nxi,nxi))
+            
+        end if
 
-        allocate(Hw_int(nxi,nxi))
-        allocate(Neff_int(nxi,nxi))
         
         
         if (dyn%par%neff_method .eq. -1) then
@@ -901,18 +926,32 @@ contains
                     ! Effective pressure as basal till pressure
                     ! following van Pelt and Bueler (2015)
 
-                    if (nxi .gt. 1) then
+                    if (dyn%par%neff_nxi .eq. 0) then
+                        ! No subgrid interpolation (nxi=1)
+                        call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                                                    H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
+                        
+                    else if (dyn%par%neff_nxi .eq. 1) then
+                        ! Subgrid interpolation using Gaussian quadrature (nxi=4 points)
+
+                        ! Get H_w on Gaussian quadrature points
+                        call aa_to_nodes(Hw_int(1,:),thrm%now%H_w,i,j,xn,yn,im1,ip1,jm1,jp1)
+
+                        call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                                                    H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
+
+                        dyn%now%N_eff(i,j) = sum(Neff_int)/wt2D
+                        
+                    else
+                        ! Subgrid interpolation using subgrid array of points (nxi=neff_nxi)
+
                         call calc_subgrid_array(Hw_int,thrm%now%H_w,nxi,i,j,im1,ip1,jm1,jp1)
                     
                         call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
                         dyn%now%N_eff(i,j) = sum(Neff_int) / real(nxi*nxi,wp)
-                    else
-
-                        call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
-                                                    H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
-
+                        
                     end if
 
                 case(4)

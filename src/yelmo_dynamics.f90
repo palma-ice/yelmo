@@ -844,8 +844,8 @@ contains
 
         ! Error checking
 
-        if (dyn%par%neff_nxi .lt. 1) then
-            write(*,*) "ydyn_calc_Neff:: Error: neff_nxi must be >= 1."
+        if (dyn%par%neff_nxi .lt. 0) then
+            write(*,*) "ydyn_calc_Neff:: Error: neff_nxi must be >= 0."
             write(*,*) "neff_nxi = ", dyn%par%neff_nxi 
             stop
         end if

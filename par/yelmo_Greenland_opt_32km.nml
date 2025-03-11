@@ -152,6 +152,7 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
+    nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
     scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
     is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field

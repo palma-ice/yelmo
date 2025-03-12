@@ -3,6 +3,7 @@
     "account"       : "megarun", 
     "jobname"       : "Yelmo",
     "omp"           : 16,
+    "mem"           : -1,
 
     "queues_file"   : ".runme/queues.json",
     "info_file"     : ".runme/yelmo_info.json",

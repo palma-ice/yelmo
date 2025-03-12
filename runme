@@ -7,6 +7,7 @@ jobrun ./runme -r -- -o output/run -p ctl.nyears=5000
 '''
 import subprocess as subp 
 import sys, os, argparse, shutil, glob, json
+from itertools import chain
 
 # Check whether runner library is installed or not:
 try:
@@ -200,6 +201,11 @@ def main():
     if exe_path in info["exe_aliases"]:
         exe_path = info["exe_aliases"].get(exe_path)
     
+    # Recover the current alias too, for use with determining relevant par_paths
+    exe_alias = next((k for k, v in info["exe_aliases"].items() if v == exe_path), None)
+
+    print("exe_alias: {}".format(exe_alias))
+
     # Also extract executable filename 
     exe_fname = os.path.basename(exe_path)
 
@@ -270,7 +276,21 @@ def main():
     ### PARAMETER FILES ###
 
     # Get list of parameter files to manage
-    par_paths = list(info["par_paths"].values())
+    #par_paths = list(info["par_paths"].values())
+
+    # Define the allowed keys
+    allowed_keys = {"", "all", "none", "na", "general", exe_alias}  # Replace with your actual keys
+
+    # Filter the dictionary and extract values only for the allowed keys
+    # Note: below method will allow each key to include a list of param files,
+    # or an individual parameter file.
+    # Flatten values: convert lists to individual items
+    par_paths = list(chain.from_iterable(
+        [v] if isinstance(v, str) else v for k, v in info["par_paths"].items() if k in allowed_keys
+    ))
+
+    #print(par_paths)  # This will contain only the values from allowed keys
+    #sys.exit()
 
     if info["par_path_as_argument"] is True:
         par_paths.append(par_path)   # add included parameter file provided at command line too

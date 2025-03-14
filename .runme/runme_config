@@ -1,7 +1,7 @@
 {
     "hpc"           : "pik_hpc2024",
     "account"       : "megarun", 
-    "jobname"       : "Yelmo",
+    "jobname"       : "yelmo",
     "omp"           : 16,
     "mem"           : -1,
 

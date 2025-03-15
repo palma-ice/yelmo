@@ -6,7 +6,7 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D, &
-                            aa_to_nodes
+                            aa_to_nodes, get_neighbor_indices
 
     use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
                             calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
@@ -827,7 +827,7 @@ contains
         type(ybound_class), intent(IN)    :: bnd  
 
         ! Local variables
-        integer :: i, j, i1, j1, nx, ny 
+        integer :: i, j, nx, ny 
         real(wp) :: H_w_max
         real(wp) :: H_w
 
@@ -835,7 +835,7 @@ contains
         real(wp) :: wt 
         real(wp), allocatable :: Hw_int(:,:)
         real(wp), allocatable :: Neff_int(:,:)
-        
+
         real(wp) :: wt0
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
@@ -892,6 +892,8 @@ contains
             allocate(Hw_int(nxi,nxi))
             allocate(Neff_int(nxi,nxi))
             
+            wt2D = real(nxi*nxi,wp)     ! Number of subgrid points to get average value
+
         end if
 
         
@@ -906,6 +908,9 @@ contains
 
             do j = 1, ny
             do i = 1, nx 
+
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,dyn%par%boundaries)
 
                 select case(dyn%par%neff_method)
 
@@ -946,11 +951,11 @@ contains
                         ! Subgrid interpolation using subgrid array of points (nxi=neff_nxi)
 
                         call calc_subgrid_array(Hw_int,thrm%now%H_w,nxi,i,j,im1,ip1,jm1,jp1)
-                    
+
                         call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
-                        dyn%now%N_eff(i,j) = sum(Neff_int) / real(nxi*nxi,wp)
+                        dyn%now%N_eff(i,j) = sum(Neff_int)/wt2D
                         
                     end if
 

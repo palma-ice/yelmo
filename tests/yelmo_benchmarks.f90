@@ -460,7 +460,7 @@ program yelmo_benchmarks
             !call yelmo_write_step(yelmo1,file2D,time) 
 
             select case(trim(experiment))
-                case("BUELER-A","BUELER-B"
+                case("BUELER-A","BUELER-B")
                     call write_step_2D_bueler(yelmo1,buel,file_compare,time)
             end select
             

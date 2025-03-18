@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/new06'
+fldr='tmp/yelmo-bench-v1.14'
 
 runopt='-r'
 #runopt='-rs'

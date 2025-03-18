@@ -585,7 +585,7 @@ contains
 
     end subroutine dome_boundaries
     
-    subroutine heino_init()
+    subroutine heino_init(H_ice)
 
         implicit none
 
@@ -600,10 +600,39 @@ contains
 
     end subroutine heino_init
 
-    subroutine heino_boundaries()
+    subroutine heino_boundaries(T_srf,smb,mask_bed,h_pre,p_ref,rPDDmelt,POSdays)
 
         implicit none
 
+        real(wp), intent(INOUT) :: T_srf(:,:)
+        real(wp), intent(INOUT) :: smb(:,:)
+        real(wp), intent(IN) :: mask_bed(:,:)
+        real(wp), intent(IN) :: h_pre
+        real(wp), intent(IN) :: p_ref
+        real(wp), intent(IN) :: rPDDmelt
+        real(wp), intent(IN) :: POSdays
+
+        ! Local variables
+        integer :: i, j, nx, ny
+        real(wp), allocatable :: m_acc(:,:)
+        real(wp), allocatable :: m_abl(:,:)
+        
+        nx = size(smb,1)
+        ny = size(smb,2)
+
+        allocate(m_acc(nx,ny))
+        allocate(m_abl(nx,ny))
+
+        ! Get surface temperature
+        ! TO DO
+        where(mask_bed .eq. 0) T_srf = 0.1
+
+
+        ! Get accumulation
+        m_acc = p_ref * exp(h_pre*T_srf)
+
+        ! Get ablation
+        m_abl = rPDDmelt * max(0.0, POSdays * (T_srf+10.0))
 
         return
 

@@ -551,7 +551,7 @@ contains
         call nc_write(filename,"dt_adv3D",ylmo%time%dt_adv3D,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
-        qtot = 23
+        qtot = 19
         allocate(vnms(qtot))
         vnms(1) = "H_ice"
         vnms(2) = "z_srf"

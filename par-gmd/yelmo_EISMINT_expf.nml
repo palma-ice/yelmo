@@ -136,7 +136,7 @@
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
     scale           = "none"            ! "none", "lin", or "exp" : scaling with elevation 
-    is_angle        = Tryue             ! cb_ref is a till strength angle?
+    is_angle        = True              ! cb_ref is a till strength angle?
     n_sd            = 1                 ! Number of samples over z_bed_sd field
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction

@@ -585,4 +585,28 @@ contains
 
     end subroutine dome_boundaries
     
+    subroutine heino_init()
+
+        implicit none
+
+        real(wp), intent(INOUT) :: H_ice(:,:)
+
+
+        H_ice = 0.0
+
+        
+
+        return
+
+    end subroutine heino_init
+
+    subroutine heino_boundaries()
+
+        implicit none
+
+
+        return
+
+    end subroutine heino_boundaries
+
 end module ice_benchmarks  

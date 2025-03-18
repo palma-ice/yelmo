@@ -456,10 +456,13 @@ program yelmo_benchmarks
 
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then 
-            !call write_step_2D(yelmo1,file2D,time=time) 
-            call yelmo_write_step(yelmo1,file2D,time) 
-            call write_step_2D_bueler(yelmo1,buel,file_compare,time)
+            call write_step_2D(yelmo1,file2D,time=time) 
+            !call yelmo_write_step(yelmo1,file2D,time) 
 
+            select case(trim(experiment))
+                case("BUELER-A","BUELER-B"
+                    call write_step_2D_bueler(yelmo1,buel,file_compare,time)
+            end select
             
         end if 
 
@@ -642,7 +645,7 @@ contains
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         ! Strain-rate and stress tensors 
-        if (.TRUE.) then
+        if (.FALSE.) then
 
             call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)

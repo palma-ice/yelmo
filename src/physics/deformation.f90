@@ -1226,6 +1226,8 @@ end if
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Limit neighbor indices to ice-covered points
+                ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
+                ! experiment at the margins. Disabled for now pending further investigation as needed.
                 ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
                 ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
                 ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
@@ -1458,6 +1460,8 @@ end if
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Limit neighbor indices to ice-covered points
+                ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
+                ! experiment at the margins. Disabled for now pending further investigation as needed.
                 ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
                 ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
                 ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 

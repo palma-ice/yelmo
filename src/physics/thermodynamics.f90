@@ -613,8 +613,7 @@ contains
 
         ! Local variables
         integer  :: i, j, nx, ny, n 
-        integer  :: im1, ip1, jm1, jp1  
-        integer  :: im1m, ip1m, jm1m, jp1m 
+        integer  :: im1, ip1, jm1, jp1 
 
         real(wp) :: wt0
         real(wp) :: xn(4) 
@@ -647,27 +646,21 @@ contains
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                ! Get neighbor indices limited to ice-covered points
-                ! im1m = im1
-                ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
-                ! ip1m = ip1
-                ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
-                ! jm1m = jm1 
-                ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
-                ! jp1m = jp1 
-                ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
-                im1m = im1
-                ip1m = ip1
-                jm1m = jm1
-                jp1m = jp1 
+                ! Limit neighbor indices to ice-covered points
+                ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
+                ! experiment at the margins. Disabled for now pending further investigation as needed.
+                ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
+                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
+                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
+                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j 
 
                 ! Get velocity components on nodes
-                call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                call acy_to_nodes(uybn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+                call acy_to_nodes(uybn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
 
                 ! Get basal stress components on nodes
-                call acx_to_nodes(taubxn,taub_acx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acx_to_nodes(taubxn,taub_acx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1,ip1,jm1,jp1)
 
                 ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
                 Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )

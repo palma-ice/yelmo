@@ -560,7 +560,6 @@ end if
         ! Local variables 
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1
-        integer  :: im1m, ip1m, jm1m, jp1m 
         integer  :: nx, ny, nz   
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
@@ -640,90 +639,82 @@ end if
         !!$omp parallel do collapse(2) private(i,j,im1,jm1,ip1,jp1,im1m,ip1m,jm1m,jp1m,k,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn) &
         !!$omp& private(eps_sq_n,ATTn,dudxn8,dudyn8,dvdxn8,dvdyn8,dudzn8,dvdzn8,eps_sq_n8,ATTn8,viscn8)
         do i = 1, nx
-            do j = 1, ny  
+        do j = 1, ny  
 
-                if (f_ice(i,j) == 1.0) then
+            if (f_ice(i,j) == 1.0) then
 
-                    ! Get neighbor indices
-                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                    ! Get neighbor indices limited to ice-covered points
-                    ! im1m = im1
-                    ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
-                    ! ip1m = ip1
-                    ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
-                    ! jm1m = jm1 
-                    ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
-                    ! jp1m = jp1 
-                    ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
-                    im1m = im1
-                    ip1m = ip1
-                    jm1m = jm1 
-                    jp1m = jp1 
+                ! Limit neighbor indices to ice-covered points
+                ! if (f_ice(im1,j) .lt. 1.0) im1 = i
+                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i
+                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j
+                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
 
-                    ! Get strain rate terms on node locations
-                    call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    
-                    call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                ! Get strain rate terms on node locations
+                call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                
+                call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
 
 if (.FALSE.) then 
     ! 2D QUADRATURE
 
-                    do k = 1, nz
-                        
-                        ! Get vertical shear strain rate terms
-                        call acx_to_nodes(dudzn,dudz(:,:,k),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                        call acy_to_nodes(dvdzn,dvdz(:,:,k),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                        
-                        ! Calculate the total effective strain rate from L19, Eq. 21 
-                        eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
-                                                    + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
+                do k = 1, nz
+                    
+                    ! Get vertical shear strain rate terms
+                    call acx_to_nodes(dudzn,dudz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(dvdzn,dvdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    
+                    ! Calculate the total effective strain rate from L19, Eq. 21 
+                    eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
+                                                + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
-                        ! Get rate factor
-                        call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                        !ATTn = ATT(i,j,k)
+                    ! Get rate factor
+                    call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    !ATTn = ATT(i,j,k)
 
-                        ! Calculate effective viscosity on nodes and averaged to center aa-node
-                        viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
-                        visc(i,j,k) = sum(viscn*wtn)/wt2D
+                    ! Calculate effective viscosity on nodes and averaged to center aa-node
+                    viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
+                    visc(i,j,k) = sum(viscn*wtn)/wt2D
 
-                    end do
+                end do
 
 else
     ! 3D QUADRATURE 
 
-                    dudxn8 = [dudxn,dudxn]
-                    dudyn8 = [dudyn,dudyn]
-                    dvdxn8 = [dvdxn,dvdxn]
-                    dvdyn8 = [dvdyn,dvdyn]
+                dudxn8 = [dudxn,dudxn]
+                dudyn8 = [dudyn,dudyn]
+                dvdxn8 = [dvdxn,dvdxn]
+                dvdyn8 = [dvdyn,dvdyn]
 
-                    do k = 1, nz
-                        
-                        ! Get vertical shear strain rate terms
-                        call acx_to_nodes_3D(dudzn8,dudz,i,j,k,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
-                        call acy_to_nodes_3D(dvdzn8,dvdz,i,j,k,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
-                        
-                        ! Calculate the total effective strain rate from L19, Eq. 21 
-                        eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
-                                                    + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
+                do k = 1, nz
+                    
+                    ! Get vertical shear strain rate terms
+                    call acx_to_nodes_3D(dudzn8,dudz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes_3D(dvdzn8,dvdz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    
+                    ! Calculate the total effective strain rate from L19, Eq. 21 
+                    eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
+                                                + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
 
-                        ! Get rate factor
-                        call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
-                        !ATTn = ATT(i,j,k)
+                    ! Get rate factor
+                    call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    !ATTn = ATT(i,j,k)
 
-                        ! Calculate effective viscosity on nodes and averaged to center aa-node
-                        viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
-                        visc(i,j,k) = sum(viscn8*wtn8)/wt3D
+                    ! Calculate effective viscosity on nodes and averaged to center aa-node
+                    viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
+                    visc(i,j,k) = sum(viscn8*wtn8)/wt3D
 
-                    end do
+                end do
 
 end if
 
-                end if
+            end if
 
-            end do
+        end do
         end do
         !!$omp end parallel do
 

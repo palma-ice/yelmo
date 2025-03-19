@@ -538,14 +538,11 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         integer  :: im2, ip2, jm2, jp2
         integer  :: nx, ny, nz_aa, nz_ac
-        real(wp) :: H_now, H_now_acx, H_now_acy 
+        real(wp) :: H_now_acx, H_now_acy 
         real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
         real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
         real(wp) :: c_x, c_y, c_x_acy, c_y_acx
         real(wp) :: h1, h2 
-        
-        real(wp), allocatable :: c_x_tmp(:,:,:)
-        real(wp), allocatable :: c_y_tmp(:,:,:)
         
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
@@ -561,9 +558,6 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
         
-        allocate(c_x_tmp(nx,ny,nz_aa))
-        allocate(c_y_tmp(nx,ny,nz_aa))
-
         !-------- Initialisation --------
 
         jvel%dxx          = 0.0_wp
@@ -714,7 +708,6 @@ end if
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-
             do k = 1, nz_aa 
 
                 ! === Calculate derivatives , no sigma-correction terms yet ===
@@ -730,10 +723,14 @@ end if
                 ! Second-order, one-sided derivatives
                 ! jvel%dxx
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
-                    if (f_ice(im1,j) .eq. 1.0 .and. im1-1 .gt. 0) then
-                        im2 = im1-1  
-                        jvel%dxx(i,j,k) = (1.0*ux(im2,j,k)-4.0*ux(im1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
-                    else 
+                    if (im1 .gt. 1) then
+                        im2 = im1-1
+                        if (f_ice(im2,j) .eq. 1.0) then  
+                            jvel%dxx(i,j,k) = (1.0*ux(im2,j,k)-4.0*ux(im1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
+                        else
+                            jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
+                        end if
+                    else
                         jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
                     end if
                 else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
@@ -778,9 +775,13 @@ end if
 
                 ! jvel%dyy
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
-                    if (f_ice(i,jm1) .eq. 1.0 .and. jm1-1 .gt. 0) then 
-                        jm2 = jm1-1  
-                        jvel%dyy(i,j,k) = (1.0*uy(i,jm2,k)-4.0*uy(i,jm1,k)+3.0*uy(i,j,k))/(2.0*dy)
+                    if (jm1 .gt. 1) then
+                        jm2 = jm1-1
+                        if (f_ice(i,jm1) .eq. 1.0) then 
+                            jvel%dyy(i,j,k) = (1.0*uy(i,jm2,k)-4.0*uy(i,jm1,k)+3.0*uy(i,j,k))/(2.0*dy)
+                        else
+                            jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
+                        end if
                     else
                         jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
                     end if
@@ -925,14 +926,11 @@ end if
         integer  :: im1, ip1, jm1, jp1 
         integer  :: im2, ip2, jm2, jp2
         integer  :: nx, ny, nz_aa, nz_ac
-        real(wp) :: H_now, H_now_acx, H_now_acy 
+        real(wp) :: H_now
         real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
         real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
         real(wp) :: c_x, c_y, c_x_acy, c_y_acx
         real(wp) :: h1, h2 
-        
-        real(wp), allocatable :: c_x_tmp(:,:,:)
-        real(wp), allocatable :: c_y_tmp(:,:,:)
         
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
@@ -948,9 +946,6 @@ end if
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
         
-        allocate(c_x_tmp(nx,ny,nz_aa))
-        allocate(c_y_tmp(nx,ny,nz_aa))
-
         !-------- Initialisation --------
 
         jvel%dzx          = 0.0_wp
@@ -966,9 +961,6 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
             ! Next, calculate dzz on ac-nodes vertically, aa-nodes horizontally
 
             if (f_ice(i,j) .eq. 1.0) then
@@ -976,8 +968,11 @@ end if
                 ! Derivatives are calculated horizontally for aa-nodes, thus, we
                 ! are only concerned with fully ice-covered points now. 
 
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
                 ! Get current ice thickness on aa-node (cell center)
-                H_now     = H_ice(i,j)
+                H_now = H_ice(i,j)
 
 if (.FALSE.) then
                 ! Use simple one-sided (upwind) derivatives to avoid complications with unequal vertical spacing 
@@ -1224,11 +1219,17 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
             if (f_ice(i,j) .eq. 1.0) then 
                 ! Ice is present here, calculate the strain-rate tensor
+
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+                ! Limit neighbor indices to ice-covered points
+                ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
+                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
+                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
+                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
 
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
@@ -1380,9 +1381,6 @@ end if
         ! in the vertical. vz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
         ! in the vertical. 
 
-
-
-
         ! Note: this routine does not appear to be as stable for, e.g., Laurentide simulations.
         ! Perhaps it deserves further investigation, but for production runs, the routine
         ! above calc_jacobian_vel_3D is recommended! 
@@ -1453,11 +1451,17 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
             if (f_ice(i,j) .eq. 1.0) then 
                 ! Ice is present here, calculate the strain-rate tensor
+
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+                ! Limit neighbor indices to ice-covered points
+                ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
+                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
+                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
+                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
 
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 

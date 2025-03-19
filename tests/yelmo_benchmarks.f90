@@ -10,11 +10,12 @@ program yelmo_benchmarks
 
     use ice_benchmarks 
     use mismip3D 
+    use timestepping
 
     implicit none 
 
-    type(yelmo_class)     :: yelmo1
-
+    type(tstep_class)      :: ts
+    type(yelmo_class)      :: yelmo1
     type(bueler_test_type) :: buel 
     
     character(len=56)  :: domain    
@@ -24,7 +25,7 @@ program yelmo_benchmarks
     character(len=56)  :: experiment
     logical    :: topo_fixed, dyn_fixed, with_bumps, low_z_sl 
     character(len=256) :: topo_fixed_file 
-    real(wp) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
+    real(wp) :: time_init, time_end, dtt, dt2D_out, dt1D_out
     real(wp) :: period, dt_test, alpha, omega, L, amp 
     real(wp) :: bumps_L, bumps_A 
     integer    :: n  
@@ -54,7 +55,6 @@ program yelmo_benchmarks
     file_compare = trim(outfldr)//"yelmo_compare.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"
 
-    
     ! Define the domain, grid and experiment from parameter file
     call nml_read(path_par,"ctrl","domain",       domain)        ! EISMINT1, EISMINT2
     call nml_read(path_par,"ctrl","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
@@ -80,6 +80,11 @@ program yelmo_benchmarks
     with_bumps = .FALSE. 
     low_z_sl   = .FALSE. 
 
+    ! === Initialize timestepping ===
+    
+    call tstep_init(ts,time_init,time_end,method="const",units="year", &
+                                            time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=1950.0_wp)
+
     ! Define the model domain based on the experiment we are running
     select case(trim(experiment))
 
@@ -89,50 +94,62 @@ program yelmo_benchmarks
             grid_name = "EISMINT1-mismip"
             nx = 73  
 
+            call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
+
         case("BUELER-A","BUELER-B")
 
             grid_name = "EISMINT-EXT"
-            nx = (2000.0 / dx) + 1      ! Domain width is 2000 km total (-1000 to 1000 km)
-            
+            nx = (2000.0 / dx) + 1          ! Domain width is 2000 km total (-1000 to 1000 km)
+            if (mod(nx,2).eq.0) nx=nx+1     ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
+
+            call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
+
         case("HALFAR")
 
             grid_name = "HALFAR"
-            nx = (80.0 / dx) + 1        ! Domain width is 60 km total (-30 to 30 km)
-            
+            nx = (80.0 / dx) + 1            ! Domain width is 60 km total (-30 to 30 km)
+            if (mod(nx,2).eq.0) nx=nx+1     ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
+
+            call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
+
         case("HALFAR-MED")
 
             grid_name = "HALFAR-MED"
-            nx = (300.0 / dx) + 1        ! Domain width is 300 km total (-150 to 150 km)
+            nx = (300.0 / dx) + 1           ! Domain width is 300 km total (-150 to 150 km)
+            if (mod(nx,2).eq.0) nx=nx+1     ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
 
+            call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
+        
+        case("HEINO")
+
+            grid_name = "HEINO"
+            nx = (500.0 / dx) + 1           ! Domain width is 500 km total (0 to 500 km)
+            x0 = 0.0
+
+            call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=x0,dx=dx,nx=nx,y0=x0,dy=dx,ny=nx)
+        
         case DEFAULT 
             ! EISMINT1, EISMINT2, dome and Bueler test grid setup 
 
             grid_name = "EISMINT"
-            nx = (1500.0 / dx) + 1     ! Domain width is 1500 km total (-750 to 750 km)
+            nx = (1500.0 / dx) + 1          ! Domain width is 1500 km total (-750 to 750 km)
+            if (mod(nx,2).eq.0) nx=nx+1     ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
 
+            call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
+            
     end select 
 
-    ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
-    if (mod(nx,2).eq.0) nx=nx+1
-    
     ! === Initialize ice sheet model =====
 
-    ! First, define grid 
-    call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
-
-
     ! Initialize data objects (without loading topography, which will be defined inline below)
-    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=ts%time,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
 
     ! Update parameter values with EISMINT choices 
     yelmo1%tpo%par%topo_fixed = topo_fixed 
 
-
-
     ! Initialize Bueler test type 
     call bueler_init(buel,yelmo1%grd%nx,yelmo1%grd%ny)
-
 
     ! === Define initial topography =====
 
@@ -283,7 +300,7 @@ program yelmo_benchmarks
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="dome",time=time,smb_max=0.5_wp,rad_el=1200.0_wp,period=period,dT_test=dT_test)
+                            experiment="dome",time=ts%time,smb_max=0.5_wp,rad_el=1200.0_wp,period=period,dT_test=dT_test)
                 
         case("mismip-stnd") 
 
@@ -299,7 +316,7 @@ program yelmo_benchmarks
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="dome",time=time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
+                            experiment="dome",time=ts%time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
                 
         case DEFAULT 
             ! EISMINT 
@@ -333,7 +350,7 @@ program yelmo_benchmarks
     call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize state variables (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,time=ts%time,thrm_method="robin")
 
     ! For dome experiment, let it equilibrate for several thousand years
     if (trim(experiment) .eq. "dome") then 
@@ -341,26 +358,26 @@ program yelmo_benchmarks
         ! Set conditions similar to EISMINT2-EXPA with smaller radius 
         call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                         yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                        experiment="dome",time=time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
+                        experiment="dome",time=ts%time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
 
-        call yelmo_update_equil(yelmo1,time_init,time_tot=real(5e3,wp), &
+        call yelmo_update_equil(yelmo1,ts%time,time_tot=real(5e3,wp), &
                                                 dt=5.0_wp,topo_fixed=.FALSE.)  
     end if 
 
     ! == Write initial state ==
      
     ! 2D file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time_init,units="years")
-    !call write_step_2D(yelmo1,file2D,time=time_init)  
-    call yelmo_write_step(yelmo1,file2D,time_init) 
+    call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
+    !call write_step_2D(yelmo1,file2D,time=ts%time)  
+    call yelmo_write_step(yelmo1,file2D,ts%time) 
             
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call yelmo_write_reg_step(yelmo1,file1D,time=time_init) 
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=ts%time) 
 
     ! Comparison file 
-    call yelmo_write_init(yelmo1,file_compare,time_init=time_init,units="years")
-    call write_step_2D_bueler(yelmo1,buel,file_compare,time_init)
+    call yelmo_write_init(yelmo1,file_compare,time_init=ts%time,units="years")
+    call write_step_2D_bueler(yelmo1,buel,file_compare,ts%time)
     
     if (dyn_fixed) then 
         ! Set yelmo parameter to fix dynamics
@@ -372,20 +389,24 @@ program yelmo_benchmarks
     rock_method_default = trim(yelmo1%thrm%par%rock_method)
 
     ! Advance timesteps
-    do n = 1, ceiling((time_end-time_init)/dtt)
+    call tstep_print_header(ts)
 
-        ! Get current time 
-        time = time_init + n*dtt
+    do while (.not. ts%is_finished)
+
+        ! == Update timestep ===
+
+        call tstep_update(ts,dtt)
+        call tstep_print(ts)
         
         ! Update bnd%enh_srf to test transition of enhancement layers in time 
-        if (time .lt. 0.5*(time_end-time_init)) then 
+        if (ts%time_elapsed .lt. 0.5*(ts%time_end-ts%time_init)) then 
             yelmo1%bnd%enh_srf = 3.0 
         else 
             yelmo1%bnd%enh_srf = 1.0 
         end if 
 
         ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
+        call yelmo_update(yelmo1,ts%time)
         
         ! == Update boundaries 
         select case(trim(experiment))
@@ -399,21 +420,21 @@ program yelmo_benchmarks
 
                 ! Update BUELER-B profile
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                      time=time,R0=750.0_wp,H0=3600.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
+                      time=ts%time,R0=750.0_wp,H0=3600.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                       rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             case("HALFAR")
 
                 ! Update BUELER-B (but with HALFAR conditions)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                      time=time,R0=21.2132_wp,H0=707.1_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
+                      time=ts%time,R0=21.2132_wp,H0=707.1_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                       rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             case("HALFAR-MED")
 
                 ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                            time=time,R0=100.0_wp,H0=800.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
+                            time=ts%time,R0=100.0_wp,H0=800.0_wp,lambda=0.0_wp,n=3.0_wp,A=1e-16_wp, &
                             rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
             
             case("mismip")
@@ -421,7 +442,7 @@ program yelmo_benchmarks
                 ! Set conditions similar to EISMINT2-EXPA with smaller radius 
                 call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="dome",time=time,smb_max=0.5_wp,rad_el=1200.0_wp,period=period,dT_test=dT_test)
+                                experiment="dome",time=ts%time,smb_max=0.5_wp,rad_el=1200.0_wp,period=period,dT_test=dT_test)
                 
             case("mismip-stnd") 
 
@@ -434,13 +455,13 @@ program yelmo_benchmarks
                 ! Set conditions similar to EISMINT2-EXPA with smaller radius 
                 call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="dome",time=time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
+                                experiment="dome",time=ts%time,smb_max=0.3_wp,rad_el=300.0_wp,period=period,dT_test=dT_test)
 
             case DEFAULT 
 
                 call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment=experiment,time=time,period=period,dT_test=dT_test)
+                                experiment=experiment,time=ts%time,period=period,dT_test=dT_test)
 
         end select 
 
@@ -455,23 +476,23 @@ program yelmo_benchmarks
         end select 
 
         ! == MODEL OUTPUT =======================================================
-        if (mod(nint(time*100),nint(dt2D_out*100))==0) then 
-            call write_step_2D(yelmo1,file2D,time=time) 
+        if (mod(nint(ts%time*100),nint(dt2D_out*100))==0) then 
+            call write_step_2D(yelmo1,file2D,time=ts%time) 
             !call yelmo_write_step(yelmo1,file2D,time) 
 
             select case(trim(experiment))
                 case("BUELER-A","BUELER-B")
-                    call write_step_2D_bueler(yelmo1,buel,file_compare,time)
+                    call write_step_2D_bueler(yelmo1,buel,file_compare,ts%time)
             end select
             
         end if 
 
-        if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+        if (mod(nint(ts%time*100),nint(dt1D_out*100))==0) then 
+            call yelmo_write_reg_step(yelmo1,file1D,time=ts%time) 
         end if 
 
-        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
-            write(*,"(a,f14.4)") "yelmo:: time = ", time
+        if (mod(ts%time,10.0)==0 .and. (.not. yelmo_log)) then
+            write(*,"(a,f14.4)") "yelmo:: time = ", ts%time
         end if 
 
     end do 
@@ -487,7 +508,7 @@ program yelmo_benchmarks
     select case(trim(experiment))
         case("BUELER-A","BUELER-B","HALFAR","HALFAR-MED")
 
-            write(*,"(a,3f10.2,10g12.3)") trim(experiment), time, dtt, yelmo1%grd%dx*1e-3, &
+            write(*,"(a,3f10.2,10g12.3)") trim(experiment), ts%time, dtt, yelmo1%grd%dx*1e-3, &
                                             buel%rmse_H_ice, buel%err_H0, buel%err_max_H_ice, buel%err_V_ice
 
         case DEFAULT 
@@ -496,16 +517,16 @@ program yelmo_benchmarks
 
 
     ! Write a restart file too
-    call yelmo_restart_write(yelmo1,file_restart,time=time)
+    call yelmo_restart_write(yelmo1,file_restart,time=ts%time)
 
     ! Finalize program
-    call yelmo_end(yelmo1,time=time)
+    call yelmo_end(yelmo1,time=ts%time)
 
     ! Stop timing 
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
     
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ts%time_end-ts%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
     
 contains
     
@@ -883,64 +904,3 @@ contains
     end subroutine write_step_2D_bueler 
 
 end program yelmo_benchmarks 
-
-
-
-! Extra code for ratefactor testing
-
-!     ! Simulations to test rate factor feedback
-!     logical :: testing_ratefactor = .FALSE. 
-!     real(wp) :: mod_time_1, mod_time_2, mod_time_3 
-!     real(wp) :: rad_max, rad_min, rad_now
-!     real(wp) :: dT_max, dT_min, dT_now
-!     real(wp) :: dsmb_max, dsmb_min, dsmb_now 
-!     real(wp) :: f_lin 
-
-!     ! Settings for transient rate factor test. 
-!     mod_time_1 = 100e3 
-!     mod_time_2 = 150e3 
-!     mod_time_3 = 200e3
-!     rad_max    = 450.0   ! Consistent with original boundary condition 
-!     rad_min    = 150.0   ! Minimum equilibrium line radius to reach (ice sheet will shrink)
-!     dT_min     =   0.0 
-!     dT_max     =  10.0 
-!     dsmb_min   =   0.0 
-!     dsmb_max   =   0.5 
-
-!     rad_now    = 450.0   ! Set radius now to default value 
-!     dT_now     =   0.0 
-!     dsmb_now   =   0.0 
-
-!                 if (testing_ratefactor) then 
-
-
-!                     if (time .ge. mod_time_1 .and. time .le. mod_time_2) then
-
-!                         f_lin = (time - mod_time_1) / (mod_time_2 - mod_time_1)
-!                         !rad_now = rad_max + f_lin * (rad_min - rad_max)
-!                         !dT_now = dT_min + f_lin * (dT_max - dT_min)
-                        
-!                         dsmb_now = dsmb_min + f_lin * (dsmb_max - dsmb_min)
-
-!                     else if (time .gt. mod_time_2 .and. time .le. mod_time_3) then
-
-!                         f_lin = (time - mod_time_2) / (mod_time_3 - mod_time_2)
-!                         !rad_now = rad_min + f_lin * (rad_max - rad_min)
-!                         !dT_now = dT_max + f_lin * (dT_min - dT_max)
-                        
-!                         dsmb_now = dsmb_max + f_lin * (dsmb_min - dsmb_max)
-                        
-!                     else
-
-!                         !dT_now   = dT_min 
-!                         dsmb_now = dsmb_min 
-
-!                     end if 
-
-! !                     if (time .ge. mod_time_1) yelmo1%mat%par%rf_method = -1 
-
-!                     write(*,*) "testing_ratefactor: ", time, rad_now, dT_now, dsmb_now, yelmo1%mat%par%rf_method  
-
-!                 end if 
-
-

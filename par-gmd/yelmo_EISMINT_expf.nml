@@ -53,7 +53,7 @@
     pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 10                ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 2.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1e-1              ! Predictor-corrector tolerance 
+    pc_eps          = 1e-2              ! Predictor-corrector tolerance 
     
 /
 

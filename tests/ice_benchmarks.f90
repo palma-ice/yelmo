@@ -585,15 +585,17 @@ contains
 
     end subroutine dome_boundaries
     
-    subroutine heino_init(H_ice)
+    subroutine heino_init(H_ice,mask)
 
         implicit none
 
         real(wp), intent(INOUT) :: H_ice(:,:)
+        real(wp), intent(INOUT) :: mask(:,:)
 
-
+        ! Set initial ice thickness to zero
         H_ice = 0.0
 
+        ! Define mask for each special region
         
 
         return

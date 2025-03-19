@@ -157,7 +157,7 @@ contains
 
         ! Next, calculate vertical velocity at each point through the column
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,k,kmid,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
+        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1,ip1,jm1,jp1,k,kmid,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
         !!$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
         !!$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa,dudxn8,dvdyn8) &
         !!$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
@@ -167,21 +167,13 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-            ! Get neighbor indices limited to ice-covered points
+            ! Limit neighbor indices to ice-covered points
             ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
             ! experiment at the margins. Disabled for now pending further investigation as needed.
-            ! im1m = im1
-            ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
-            ! ip1m = ip1
-            ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
-            ! jm1m = jm1 
-            ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
-            ! jp1m = jp1 
-            ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
-            im1m = im1
-            ip1m = ip1 
-            jm1m = jm1 
-            jp1m = jp1 
+            ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
+            ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
+            ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
+            ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j 
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -194,24 +186,24 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1,ip1,jm1,jp1)
                 dzbdx_aa = sum(dzbdxn*wtn)/wt2D
                 
-                call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1,ip1,jm1,jp1)
                 dzbdy_aa = sum(dzbdyn*wtn)/wt2D
                 
                 ! Get the centered surface gradient
-                call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1,ip1,jm1,jp1)
                 dzsdx_aa = sum(dzsdxn*wtn)/wt2D
                 
-                call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1,ip1,jm1,jp1)
                 dzsdy_aa = sum(dzsdyn*wtn)/wt2D
                 
                 ! Get the aa-node centered horizontal velocity at the base
-                call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
                 ux_aa = sum(uxn*wtn)/wt2D
                 
-                call acy_to_nodes(uyn,uy(:,:,1),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acy_to_nodes(uyn,uy(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
                 uy_aa = sum(uyn*wtn)/wt2D
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
@@ -250,18 +242,18 @@ contains
 
 if (.FALSE.) then
     ! 2D QUADRATURE
-                    call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dudx_aa = sum(dudxn*wtn)/wt2D
 
-                    call acy_to_nodes(dvdyn,jvel%dyy(:,:,kmid),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acy_to_nodes(dvdyn,jvel%dyy(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dvdy_aa = sum(dvdyn*wtn)/wt2D
 
 else 
     ! 3D QUADRATURE
-                    call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
+                    call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
                     dudx_aa = sum(dudxn8*wtn8)/wt3D
 
-                    call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
+                    call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
                     dvdy_aa = sum(dvdyn8*wtn8)/wt3D
 
 end if 
@@ -298,13 +290,13 @@ end if
                         kdn = k-1 
                     end if
                     
-                    call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
                     ux_aa = sum(uxn*wtn)/wt2D
                     
-                    call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
                     uy_aa = sum(uyn*wtn)/wt2D
                     
@@ -330,7 +322,7 @@ end if
                     ! Calculate adjusted vertical velocity for advection 
                     ! of this layer - units of m/m
                     ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
-                    uz_star(i,j,k) = uz(i,j,k)*c_z + ux_aa*c_x + uy_aa*c_y + c_t
+                    uz_star(i,j,k) = ux_aa*c_x + uy_aa*c_y + uz(i,j,k)*c_z + c_t
 
                     if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     

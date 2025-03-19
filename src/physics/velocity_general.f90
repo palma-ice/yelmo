@@ -125,7 +125,9 @@ contains
         real(wp) :: dzsdt_now
         real(wp) :: dhdt_now
         real(wp) :: dzbdt_now 
-
+        
+        logical, allocatable :: is_ice(:,:)
+        
         real(wp), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
@@ -133,6 +135,9 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1) 
         
+        allocate(is_ice(nx,ny))
+        is_ice = (f_ice .eq. 1.0)
+
         ! Get nodes and weighting 
         wt0  = 1.0/sqrt(3.0)
         xn   = [wt0,-wt0,-wt0, wt0]

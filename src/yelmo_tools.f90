@@ -512,7 +512,7 @@ contains
 
 ! ===== NEW =======================
 
-    subroutine acx_to_nodes_3D(varn,varx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+    subroutine acx_to_nodes_3D(varn,varx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1,mask)
         ! 3D !!
         ! Variable defined on acx-nodes horizontally, aa-nodes vertically. 
 
@@ -525,6 +525,7 @@ contains
         real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
         real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
         integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: nx, ny, nz_aa
@@ -538,11 +539,11 @@ contains
         nz_aa = size(varx,3) 
 
         ! Get four nodes in horizontal aa-node (middle) plane 
-        call acx_to_nodes(vx_md,varx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+        call acx_to_nodes(vx_md,varx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
 
         ! Get four nodes in plane below
         if (k .gt. 1) then 
-            call acx_to_nodes(vx_dn,varx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call acx_to_nodes(vx_dn,varx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
             wt = zn/2.0
             varn(1:4) = wt*vx_dn + (1.0-wt)*vx_md
         else 
@@ -551,7 +552,7 @@ contains
 
         ! Get four nodes in plane above
         if (k .lt. nz_aa) then 
-            call acx_to_nodes(vx_up,varx(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call acx_to_nodes(vx_up,varx(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
             wt = zn/2.0
             varn(5:8) = wt*vx_up + (1.0-wt)*vx_md
         else 
@@ -562,7 +563,7 @@ contains
 
     end subroutine acx_to_nodes_3D
 
-    subroutine acy_to_nodes_3D(varn,vary,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+    subroutine acy_to_nodes_3D(varn,vary,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1,mask)
         ! 3D !!
         ! Variable defined on acx-nodes horizontally, aa-nodes vertically. 
 
@@ -575,6 +576,7 @@ contains
         real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
         real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
         integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: nx, ny, nz_aa
@@ -588,11 +590,11 @@ contains
         nz_aa = size(vary,3)
 
         ! Get four nodes in horizontal aa-node (middle) plane 
-        call acy_to_nodes(vy_md,vary(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+        call acy_to_nodes(vy_md,vary(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
 
         ! Get four nodes in plane below
         if (k .gt. 1) then 
-            call acy_to_nodes(vy_dn,vary(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call acy_to_nodes(vy_dn,vary(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
             wt = zn/2.0
             varn(1:4) = wt*vy_dn + (1.0-wt)*vy_md
         else 
@@ -601,7 +603,7 @@ contains
 
         ! Get four nodes in plane above
         if (k .lt. nz_aa) then 
-            call acy_to_nodes(vy_up,vary(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call acy_to_nodes(vy_up,vary(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
             wt = zn/2.0
             varn(5:8) = wt*vy_up + (1.0-wt)*vy_md
         else 
@@ -612,7 +614,7 @@ contains
 
     end subroutine acy_to_nodes_3D
     
-    subroutine aa_to_nodes_3D(varn,var,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+    subroutine aa_to_nodes_3D(varn,var,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1,mask)
         ! 3D !!
         ! Variable defined on aa-nodes horizontally, aa-nodes vertically. 
 
@@ -625,6 +627,7 @@ contains
         real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
         real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
         integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: nx, ny, nz_aa
@@ -638,11 +641,11 @@ contains
         nz_aa = size(var,3) 
 
         ! Get four nodes in horizontal aa-node (middle) plane 
-        call aa_to_nodes(vv_md,var(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+        call aa_to_nodes(vv_md,var(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
 
         ! Get four nodes in plane below
         if (k .gt. 1) then 
-            call aa_to_nodes(vv_dn,var(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call aa_to_nodes(vv_dn,var(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
             wt = zn/2.0
             varn(1:4) = wt*vv_dn + (1.0-wt)*vv_md
         else 
@@ -651,7 +654,7 @@ contains
 
         ! Get four nodes in plane above
         if (k .lt. nz_aa) then 
-            call aa_to_nodes(vv_up,var(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call aa_to_nodes(vv_up,var(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
             wt = zn/2.0
             varn(5:8) = wt*vv_up + (1.0-wt)*vv_md
         else 
@@ -662,7 +665,7 @@ contains
 
     end subroutine aa_to_nodes_3D
     
-    subroutine acz_to_nodes_3D(varn,var,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+    subroutine acz_to_nodes_3D(varn,var,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1,mask)
         ! 3D !!
         ! Variable defined on aa-nodes horizontally, acz-nodes vertically. 
 
@@ -675,6 +678,7 @@ contains
         real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
         real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
         integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: nx, ny, nz_ac
@@ -688,11 +692,11 @@ contains
         nz_ac = size(var,3)
 
         ! Get four nodes in horizontal plane of top cell face
-        call aa_to_nodes(vv_up,var(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+        call aa_to_nodes(vv_up,var(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
         
         ! Get four nodes in horizontal plane of bottom cell face
         if (k .gt. 1) then 
-            call aa_to_nodes(vv_dn,var(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            call aa_to_nodes(vv_dn,var(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1,mask)
         else 
             vv_dn = vv_up 
         end if 
@@ -706,7 +710,7 @@ contains
 
     end subroutine acz_to_nodes_3D
     
-    subroutine acx_to_nodes(varn,varx,i,j,xn,yn,im1,ip1,jm1,jp1)
+    subroutine acx_to_nodes(varn,varx,i,j,xn,yn,im1,ip1,jm1,jp1,mask)
         ! 2D !!
         ! Variable defined on acx-nodes horizontally 
         ! Assumed no vertical dimension. 
@@ -718,11 +722,13 @@ contains
         real(wp), intent(IN)  :: xn(:)
         real(wp), intent(IN)  :: yn(:) 
         integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: k, nx, ny, n 
         integer  :: i0, i1, j0, j1 
         real(wp) :: v0, v1, wt 
+        real(wp) :: va, vb, vc, vd
 
         n = size(xn,1)
         
@@ -744,9 +750,33 @@ contains
                 wt = (1.0 + (1.0+yn(k)) ) / 2.0 
             end if
 
-            ! Get left and right-side 
-            v0 = (1.0-wt)*varx(im1,j0) + wt*varx(im1,j1)
-            v1 = (1.0-wt)*varx(i,j0)   + wt*varx(i,j1)
+            if (present(mask)) then
+                ! Limit neighbors to within mask
+
+                write(io_unit_err,*) "acx_to_nodes:: Error: mask is not yet working properly. &
+                &Do not include a mask argument."
+                stop
+
+                ! Get left and right-side 
+                va = varx(im1,j0)
+                if (.not. mask(im1,j0)) va = varx(i,j)
+                vb = varx(im1,j1)
+                if (.not. mask(im1,j1)) vb = varx(i,j)
+                vc = varx(i,j0)
+                if (.not. mask(i,j0)) vc = varx(i,j)
+                vd = varx(i,j1)
+                if (.not. mask(i,j1)) vd = varx(i,j)
+                
+                ! Get left and right-side 
+                v0 = (1.0-wt)*va + wt*vb
+                v1 = (1.0-wt)*vc + wt*vd
+            else
+                ! Use all values
+
+                ! Get left and right-side 
+                v0 = (1.0-wt)*varx(im1,j0) + wt*varx(im1,j1)
+                v1 = (1.0-wt)*varx(i,j0)   + wt*varx(i,j1)
+            end if
             
             ! Interpolate horizontally to the node location 
             wt = (1.0 + xn(k)) / 2.0
@@ -758,7 +788,7 @@ contains
 
     end subroutine acx_to_nodes
 
-    subroutine acy_to_nodes(varn,vary,i,j,xn,yn,im1,ip1,jm1,jp1)
+    subroutine acy_to_nodes(varn,vary,i,j,xn,yn,im1,ip1,jm1,jp1,mask)
         ! 2D !!
         ! Variable defined on acy-nodes horizontally 
         ! Assumed no vertical dimension. 
@@ -770,11 +800,13 @@ contains
         real(wp), intent(IN)  :: xn(:)
         real(wp), intent(IN)  :: yn(:) 
         integer,  intent(IN)  :: im1, ip1, jm1, jp1
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: k, nx, ny, n 
         integer  :: i0, i1, j0, j1  
         real(wp) :: v0, v1, wt 
+        real(wp) :: va, vb, vc, vd
 
         n = size(xn,1)
         
@@ -796,10 +828,34 @@ contains
                 wt = (1.0 + (1.0+xn(k)) ) / 2.0 
             end if
 
-            ! Get top and bottom-side 
-            v0 = (1.0-wt)*vary(i0,jm1) + wt*vary(i1,jm1);
-            v1 = (1.0-wt)*vary(i0,j)   + wt*vary(i1,j);
-            
+            if (present(mask)) then
+                ! Limit neighbors to within mask
+
+                write(io_unit_err,*) "acx_to_nodes:: Error: mask is not yet working properly. &
+                &Do not include a mask argument."
+                stop
+
+                ! Get left and right-side 
+                va = vary(i0,jm1)
+                if (.not. mask(i0,jm1)) va = vary(i,j)
+                vb = vary(i1,jm1)
+                if (.not. mask(i1,jm1)) vb = vary(i,j)
+                vc = vary(i0,j)
+                if (.not. mask(i0,j)) vc = vary(i,j)
+                vd = vary(i1,j)
+                if (.not. mask(i1,j)) vd = vary(i,j)
+                
+                ! Get left and right-side 
+                v0 = (1.0-wt)*va + wt*vb
+                v1 = (1.0-wt)*vc + wt*vd
+            else
+                ! Use all values
+
+                ! Get top and bottom-side 
+                v0 = (1.0-wt)*vary(i0,jm1) + wt*vary(i1,jm1);
+                v1 = (1.0-wt)*vary(i0,j)   + wt*vary(i1,j);
+            end if
+                
             ! Interpolate vertically to the node location 
             wt = (1.0 + yn(k)) / 2.0;
             varn(k) = (1.0-wt)*v0 + wt*v1;
@@ -810,7 +866,7 @@ contains
 
     end subroutine acy_to_nodes
     
-    subroutine aa_to_nodes(varn,var,i,j,xn,yn,im1,ip1,jm1,jp1)
+    subroutine aa_to_nodes(varn,var,i,j,xn,yn,im1,ip1,jm1,jp1,mask)
         ! 2D !!
         ! Variable defined on aa-nodes horizontally 
         ! Assumed no vertical dimension. 
@@ -822,11 +878,13 @@ contains
         real(wp), intent(IN)  :: xn(:)
         real(wp), intent(IN)  :: yn(:) 
         integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+        logical,  intent(IN), optional :: mask(:,:)
 
         ! Local variables 
         integer  :: k, nx, ny, n 
         integer  :: i0, i1, j0, j1 
         real(wp) :: v0, v1, wt 
+        real(wp) :: va, vb, vc, vd
 
         n = size(xn,1)
         
@@ -856,10 +914,35 @@ contains
                 i1 = i
             end if
 
-            ! Get left and right-side 
-            v0 = (1.0-wt)*var(i0,j0) + wt*var(i0,j1)
-            v1 = (1.0-wt)*var(i1,j0) + wt*var(i1,j1)
-            
+            if (present(mask)) then
+                ! Limit neighbors to within mask
+
+                write(io_unit_err,*) "acx_to_nodes:: Error: mask is not yet working properly. &
+                &Do not include a mask argument."
+                stop
+                
+                ! Get left and right-side 
+                va = var(i0,j0)
+                if (.not. mask(i0,j0)) va = var(i,j)
+                vb = var(i0,j1)
+                if (.not. mask(i0,j1)) vb = var(i,j)
+                vc = var(i1,j0)
+                if (.not. mask(i1,j0)) vc = var(i,j)
+                vd = var(i1,j1)
+                if (.not. mask(i1,j1)) vd = var(i,j)
+                
+                ! Get left and right-side 
+                v0 = (1.0-wt)*va + wt*vb
+                v1 = (1.0-wt)*vc + wt*vd
+
+            else
+                ! Use all values
+
+                ! Get left and right-side 
+                v0 = (1.0-wt)*var(i0,j0) + wt*var(i0,j1)
+                v1 = (1.0-wt)*var(i1,j0) + wt*var(i1,j1)
+            end if
+
             ! Interpolate horizontally to the node location 
             wt = abs(xn(k)) / 2.0
             varn(k) = (1.0-wt)*v0 + wt*v1

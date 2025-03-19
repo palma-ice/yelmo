@@ -1183,7 +1183,8 @@ end if
         real(wp) :: lxz, lzx, lyz, lzy
         real(wp) :: shear_squared  
         real(wp), allocatable :: fact_z(:)
-        
+        logical, allocatable :: is_ice(:,:)
+
         real(wp) :: wt0
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
@@ -1206,6 +1207,9 @@ end if
         ny    = size(H_ice,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
+        
+        allocate(is_ice(nx,ny))
+        is_ice = (f_ice .eq. 1.0)
         
         ! Calculate all strain rate tensor components on aa-nodes (horizontally and vertically)
         ! dxx = dxx

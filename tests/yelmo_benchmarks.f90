@@ -368,8 +368,8 @@ program yelmo_benchmarks
      
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
-    !call write_step_2D(yelmo1,file2D,time=ts%time)  
-    call yelmo_write_step(yelmo1,file2D,ts%time) 
+    call write_step_2D(yelmo1,file2D,time=ts%time)  
+    !call yelmo_write_step(yelmo1,file2D,ts%time) 
             
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)

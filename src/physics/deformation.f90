@@ -179,6 +179,8 @@ contains
         ! de   => from Greve and Blatter (2009), Eq. 6.53
         ! visc => from Greve and Blatter (2009), Eq. 4.22 
 
+        ! TO DO: add node calculations, at least of ATT...
+
         implicit none
         
         real(wp), intent(IN)  :: de(:,:,:)          ! [a^-1] second-invariant of the strain rate tensor

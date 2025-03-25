@@ -1478,15 +1478,12 @@ end if
         real(wp) :: ddan(8) 
         real(wp) :: ddbn(8) 
 
-        type(gq2D_class) :: gq2D
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .FALSE.
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
-        if (use_gq3D) call gq3D_init(gq3D)
+        call gq3D_init(gq3D)
 
         ! Get nodes and weighting 
         wt0  = 1.0/sqrt(3.0)
@@ -1589,28 +1586,23 @@ end if
                     ddn = 0.5*(ddan+ddbn)
                     strn%dxy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
-! ajr: need to implement gq3D_to_nodes: acz case!!
-                    stop "acz case!"
-
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call acx_to_nodes_3D(ddan,jvel%dxz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    call acz_to_nodes_3D(ddbn,jvel%dzx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    !ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    call gq3D_to_nodes(gq3D,ddan,jvel%dxz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes(gq3D,ddbn,jvel%dzx,dx,dy,dz0,dz1,"acz",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt3D
+                    strn%dxz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call acy_to_nodes_3D(ddan,jvel%dyz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    call acz_to_nodes_3D(ddbn,jvel%dzy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    !ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    call gq3D_to_nodes(gq3D,ddan,jvel%dyz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes(gq3D,ddbn,jvel%dzy,dx,dy,dz0,dz1,"acz",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt3D
+                    strn%dyz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call acy_to_nodes_3D(ddn,jvel%dyy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    strn%dyy(i,j,k) = sum(ddn*wtn)/wt3D
+                    call gq3D_to_nodes(gq3D,ddn,jvel%dyy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    strn%dyy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! TEST - set shear strain terms to zero
                     !strn%dxz(i,j,k) =  0.0 

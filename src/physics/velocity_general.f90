@@ -134,8 +134,9 @@ contains
 
         type(gq2D_class) :: gq2D
         type(gq3D_class) :: gq3D
-        real(wp) :: dz0, dz1 
-        logical, parameter :: use_gq3D = .FALSE.
+        real(wp) :: dz0, dz1
+        integer  :: km1, kp1
+        logical, parameter :: use_gq3D = .TRUE.
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
@@ -286,7 +287,7 @@ contains
                     ! Get dudz/dvdz values at vertical aa-nodes, in order
                     ! to vertically integrate each cell up to ac-node border.
 
-if (.TRUE.) then
+if (.not. use_gq3D) then
     ! 2D QUADRATURE
                     ! call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
                     ! dudx_aa = sum(dudxn*wtn)/wt2D
@@ -302,11 +303,28 @@ if (.TRUE.) then
 
 else 
     ! 3D QUADRATURE
-                    call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn8*wtn8)/wt3D
+                    ! call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
+                    ! dudx_aa = sum(dudxn8*wtn8)/wt3D
 
-                    call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn8*wtn8)/wt3D
+                    ! call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
+                    ! dvdy_aa = sum(dvdyn8*wtn8)/wt3D
+
+                    km1 = kmid-1
+                    kp1 = kmid+1
+                    if (kmid .eq. 1)  km1 = 1
+                    if (kmid .eq. nz_aa) kp1 = nz_aa
+                    
+                    if (kmid .gt. 1) then
+                        dz0 = H_ice(i,j)*(zeta_aa(kmid) - zeta_aa(km1))
+                    else
+                        dz0 = H_ice(i,j)*(zeta_aa(2) - zeta_aa(1))
+                    end if
+
+                    call gq3D_to_nodes(gq3D,dudxn8,jvel%dxx,dx,dy,dz0,dz1,"acx",i,j,kmid,im1,ip1,jm1,jp1,km1,kp1)
+                    dudx_aa = sum(dudxn8*gq3D%wt)/gq3D%wt_tot
+
+                    call gq3D_to_nodes(gq3D,dvdyn8,jvel%dyy,dx,dy,dz0,dz1,"acy",i,j,kmid,im1,ip1,jm1,jp1,km1,kp1)
+                    dvdy_aa = sum(dvdyn8*gq3D%wt)/gq3D%wt_tot
 
 end if 
 

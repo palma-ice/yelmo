@@ -8,17 +8,20 @@ program yelmo_trough
     use ncio 
     use yelmo 
     use deformation 
+    use timestepping
 
     implicit none 
 
-    type(yelmo_class)     :: yelmo1
+    type(tstep_class) :: ts
+    type(yelmo_class) :: yelmo1
 
     character(len=56)  :: domain, grid_name  
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par 
     character(len=56)  :: experiment, res  
-    real(wp) :: time_init, time_end, time, dtt, dt1D_out, dt2D_out   
-    integer    :: n
+    real(wp) :: time_init, time_end, dt1D_out, dt2D_out
+    real(wp) :: dtt
+    integer  :: n
 
     ! Control parameters 
     real(wp) :: dx 
@@ -81,6 +84,11 @@ program yelmo_trough
     call nml_read(path_par,"ctrl","smb_const",    smb_const)     ! [m/yr]  Surface mass balance
     call nml_read(path_par,"ctrl","Qgeo_const",   Qgeo_const)    ! [mW/m2] Geothermal heat flux
     
+    ! === Initialize timestepping ===
+    
+    call tstep_init(ts,time_init,time_end,method="const",units="year", &
+                                            time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=1950.0_wp)
+
     
     ! Define default grid name for completeness 
     grid_name = trim(domain)
@@ -96,7 +104,7 @@ program yelmo_trough
     ! === Initialize ice sheet model =====
 
     ! Initialize data objects
-    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE., &
+    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=ts%time,load_topo=.FALSE., &
                         domain=domain,grid_name=grid_name)
 
     ! Load boundary values
@@ -114,7 +122,7 @@ program yelmo_trough
     call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize output file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time_init,units="years")
+    call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
     
     ! Intialize topography 
     select case(trim(domain)) 
@@ -229,24 +237,28 @@ program yelmo_trough
     call define_calving_front(yelmo1%bnd%calv_mask,yelmo1%grd%x*1e-3,x_cf)
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=ts%time,thrm_method="robin-cold")
 
     ! Write initial state 
-    call write_step_2D(yelmo1,file2D,time=time_init) 
+    call write_step_2D(yelmo1,file2D,time=ts%time) 
 
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call yelmo_write_reg_step(yelmo1,file1D,time=time)  
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=ts%time)  
     
     ! Advance timesteps
-    do n = 1, ceiling((time_end-time_init)/dtt)
+    call tstep_print_header(ts)
 
-        ! Get current time 
-        time = time_init + n*dtt
+    do while (.not. ts%is_finished)
 
+        ! == Update timestep ===
+
+        call tstep_update(ts,dtt)
+        call tstep_print(ts)
+        
 if (.FALSE.) then
-        !if (trim(domain) .eq. "SLAB-SHELF" .and. time .ge. 3e3) then 
-        if (trim(domain) .eq. "TROUGH-F17" .and. time .ge. 3e3) then 
+        !if (trim(domain) .eq. "SLAB-SHELF" .and. ts%time_elapsed .ge. 3e3) then 
+        if (trim(domain) .eq. "TROUGH-F17" .and. ts%time_elapsed .ge. 3e3) then 
 
             ! ! Define calving front 
             ! x_cf = 540.0_wp 
@@ -259,19 +271,19 @@ if (.FALSE.) then
 end if 
 
         ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
+        call yelmo_update(yelmo1,ts%time)
 
         ! == MODEL OUTPUT =======================================================
-        if (mod(nint(time*100),nint(dt2D_out*100))==0) then  
-            call write_step_2D(yelmo1,file2D,time=time)    
+        if (mod(nint(ts%time_elapsed*100),nint(dt2D_out*100))==0) then  
+            call write_step_2D(yelmo1,file2D,time=ts%time)    
         end if 
 
-        if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+        if (mod(nint(ts%time_elapsed*100),nint(dt1D_out*100))==0) then 
+            call yelmo_write_reg_step(yelmo1,file1D,time=ts%time) 
         end if
 
-        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
-            write(*,"(a,f14.4)") "yelmo:: time = ", time
+        if (mod(ts%time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
+            write(*,"(a,f14.4)") "yelmo:: time = ", ts%time
         end if  
 
     end do 
@@ -281,13 +293,13 @@ end if
     write(*,*) "nz, H0 = ", yelmo1%par%nz_aa, maxval(yelmo1%tpo%now%H_ice)
 
     ! Finalize program
-    call yelmo_end(yelmo1,time=time)
+    call yelmo_end(yelmo1,time=ts%time)
 
     ! Stop timing 
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
     
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*ts%time_elapsed)/(cpu_dtime/3600.0), " kiloyears / hr"
     
 contains
     

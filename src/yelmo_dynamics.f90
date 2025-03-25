@@ -31,6 +31,9 @@ module yelmo_dynamics
     use basal_dragging  
     use grounding_line_flux 
 
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes
+
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
     
     implicit none
@@ -842,6 +845,11 @@ contains
         real(wp) :: wtn(4)
         real(wp) :: wt2D
 
+        type(gq2D_class) :: gq2D
+
+        ! Initialize gaussian quadrature calculations
+        call gq2D_init(gq2D)
+
         ! Error checking
 
         if (dyn%par%neff_nxi .lt. 0) then
@@ -940,12 +948,13 @@ contains
                         ! Subgrid interpolation using Gaussian quadrature (nxi=4 points)
 
                         ! Get H_w on Gaussian quadrature points
-                        call aa_to_nodes(Hw_int(1,:),thrm%now%H_w,i,j,xn,yn,im1,ip1,jm1,jp1)
-
+                        !call aa_to_nodes(Hw_int(1,:),thrm%now%H_w,i,j,xn,yn,im1,ip1,jm1,jp1)
+                        call gq2D_to_nodes(gq2D,Hw_int(1,:),thrm%now%H_w,dyn%par%dx,dyn%par%dy,"aa",i,j,im1,ip1,jm1,jp1)
+                    
                         call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
-                        dyn%now%N_eff(i,j) = sum(Neff_int)/wt2D
+                        dyn%now%N_eff(i,j) = sum(Neff_int(1,:)*gq2D%wt)/gq2D%wt_tot
                         
                     else
                         ! Subgrid interpolation using subgrid array of points (nxi=neff_nxi)

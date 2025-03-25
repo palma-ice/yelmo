@@ -199,7 +199,15 @@ contains
 
             ! ajr: checking for EISMINT
             !dzbdt_now = 0.0 
-
+            ! Note that using the approximation above (dzbdt_now = dzsdt_now - dhdt_now)
+            ! to determine dzbdt instead of passing it directly can lead to numerical errors
+            ! related mainly to the use of the predictor-corrector method. In EISMINT, for example,
+            ! it is possible to calculate a negative velocity at the base of the ice sheet
+            ! related to dzbdt, when by definition, it is zero in the EISMINT experiments. It
+            ! is a (small) artifact of this indirect approach.
+            ! So far, I see no major harm in it, and the error diminishes in steady-state cases.
+            ! But it should be considered in the future.
+            
             if (f_ice(i,j) .eq. 1.0) then
 
                 H_now  = H_ice(i,j) 
@@ -313,7 +321,7 @@ else
                     kp1 = kmid+1
                     if (kmid .eq. 1)  km1 = 1
                     if (kmid .eq. nz_aa) kp1 = nz_aa
-                    
+
                     if (kmid .gt. 1) then
                         dz0 = H_ice(i,j)*(zeta_aa(kmid) - zeta_aa(km1))
                     else

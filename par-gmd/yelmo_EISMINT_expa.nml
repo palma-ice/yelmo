@@ -144,7 +144,7 @@
     z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.1              ! [-- or deg] Minimum value of cf
-    cf_ref          =  10               ! [-- or deg] Reference/const/max value of cf
+    cf_ref          =  30               ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 

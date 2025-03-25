@@ -10,14 +10,14 @@ runopt='-r'
 make benchmarks
 
 # EISMINT1 moving margin, EXPA and EXPF
-./runme ${runopt} -q priority -w 1 -e benchmarks -o ${fldr}/moving -n par-gmd/yelmo_EISMINT_moving.nml
-./runme ${runopt} -q priority -w 5 -e benchmarks -o ${fldr}/expa   -n par-gmd/yelmo_EISMINT_expa.nml
-./runme ${runopt} -q priority -w 5 -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml
+./runme ${runopt} -q 12h -w 1:00:00 -e benchmarks -o ${fldr}/moving -n par-gmd/yelmo_EISMINT_moving.nml
+./runme ${runopt} -q 12h -w 5:00:00 -e benchmarks -o ${fldr}/expa   -n par-gmd/yelmo_EISMINT_expa.nml
+./runme ${runopt} -q 12h -w 5:00:00 -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml
 
 # EISMINT1-moving margin with DIVA solvers
 # Note ydyn.solver="diva-noslip" is broken, as well as too high friction values, eg ydyn.beta_const=1e6
-./runme ${runopt} -q priority -w 1 -e benchmarks -o ${fldr}/moving-diva-noslip -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva-noslip" ctrl.time_end=30e3 ctrl.dt2D_out=200
-./runme ${runopt} -q priority -w 1 -e benchmarks -o ${fldr}/moving-diva -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva" ydyn.beta_method=0 ydyn.beta_const=1e4 ctrl.time_end=30e3 ctrl.dt2D_out=200
+./runme ${runopt} -q 12h -w  1:00:00 -e benchmarks -o ${fldr}/moving-diva-noslip -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva-noslip" ctrl.time_end=30e3 ctrl.dt2D_out=200
+./runme ${runopt} -q 12h -w  1:00:00 -e benchmarks -o ${fldr}/moving-diva -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva" ydyn.beta_method=0 ydyn.beta_const=1e4 ctrl.time_end=30e3 ctrl.dt2D_out=200
 
 # EISMINT1 EXPA with SSA velocity turned on for testing symmetry (not part of GMD suite of tests)
 ./runme ${runopt} -e benchmarks -o ${fldr}/expssa -n par/yelmo_EISMINT_ssa.nml
@@ -39,8 +39,8 @@ jobrun ./runme ${runopt} -e benchmarks -n par-gmd/yelmo_EISMINT_moving.nml -p ei
 make initmip
 
 # Antarctica present-day and LGM simulations (now with ydyn.solver='diva' by default)
-./runme ${runopt} -q short -w 5 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
-./runme ${runopt} -q short -w 5 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
+./runme ${runopt} -q short -w 5:00:00 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
+./runme ${runopt} -q short -w 5:00:00 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
 
 # Or to run via batch call:
 jobrun ./runme -rs -e initmip -n par-gmd/yelmo_Antarctica.nml -a -o ${fldr}/ant -p ctrl.clim_nm="clim_pd","clim_lgm"
@@ -55,9 +55,9 @@ jobrun ./runme -rs -e initmip -n par-gmd/yelmo_Antarctica.nml -a -o ${fldr}/ant 
 make mismip
 
 # For faster, less high-resolution simulations:
-jobrun ./runme -rs -q short -w 24 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 ctrl.dx=2.5,5.0,10.0,20.0
-jobrun ./runme -rs -q short -w 24 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 ctrl.dx=2.5,5.0,10.0,20.0
-jobrun ./runme -rs -q short -w 24 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 ctrl.dx=2.5,5.0,10.0,20.0
+jobrun ./runme -rs -q short -w 24:00:00 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 ctrl.dx=2.5,5.0,10.0,20.0
+jobrun ./runme -rs -q short -w 24:00:00 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 ctrl.dx=2.5,5.0,10.0,20.0
+jobrun ./runme -rs -q short -w 24:00:00 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 ctrl.dx=2.5,5.0,10.0,20.0
 
 # Trough simulation (not part of GMD suite of tests)
 # MISMIP+ benchmark tests
@@ -69,7 +69,7 @@ make trough
 ./runme -rs -e trough -o ${fldr}/mismip+ -n par/yelmo_MISMIP+.nml
 
 # MISMIP+ ensemble (hybrid,diva), run on the cluster:
-jobrun ./runme -rs -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva"
+jobrun ./runme -rs -q priority -w 5:00:00 -e trough -n par/yelmo_MISMIP+.nml -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva"
 
 
 # F17
@@ -77,8 +77,8 @@ jobrun ./runme -rs -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -o ${fldr
 
 # ssa, dx=2km, [u0=100, cf_ref=5,10,20]:
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-ssa -p ydyn.solver="ssa"
-./runme -rs -q medium -w 48 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx1 -p ctrl.dx=1.0
-./runme -rs -q short  -w 24 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx2 -p ctrl.dx=2.0
+./runme -rs -q medium -w 48:00:00 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx1 -p ctrl.dx=1.0
+./runme -rs -q short  -w 24:00:00 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx2 -p ctrl.dx=2.0
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf5.0  -p ydyn.beta_u0=100 ytill.cf_ref=5.0
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf10.0 -p ydyn.beta_u0=100 ytill.cf_ref=10.0
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf20.0 -p ydyn.beta_u0=100 ytill.cf_ref=20.0

@@ -29,7 +29,7 @@ $(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o $(objd
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/discharge.o: $(srcdir)/physics/discharge.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -82,7 +82,7 @@ $(objdir)/topography.o: $(srcdir)/physics/topography.f90 $(objdir)/yelmo_defs.o 
 
 $(objdir)/velocity_general.o: $(srcdir)/physics/velocity_general.f90 $(objdir)/yelmo_defs.o \
 								$(objdir)/solver_ssa_ac.o $(objdir)/deformation.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/velocity_general.o
@@ -96,7 +96,7 @@ $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
 						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \

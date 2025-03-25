@@ -13,6 +13,8 @@ module velocity_diva
                         picard_calc_error, picard_calc_error_angle,  &
                         picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes
 
     implicit none 
 
@@ -601,6 +603,16 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
+        type(gq2D_class) :: gq2D
+        type(gq3D_class) :: gq3D
+        real(wp) :: dz0, dz1
+        integer  :: km1, kp1
+        logical, parameter :: use_gq3D = .TRUE.
+
+        ! Initialize gaussian quadrature calculations
+        call gq2D_init(gq2D)
+        if (use_gq3D) call gq3D_init(gq3D)
+
         nx = size(visc,1)
         ny = size(visc,2)
         nz = size(visc,3)
@@ -653,32 +665,43 @@ end if
                 ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
 
                 ! Get strain rate terms on node locations
-                call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                ! call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                ! call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
                 
-                call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                ! call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                ! call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
 
-if (.FALSE.) then 
+                call gq2D_to_nodes(gq2D,dudxn,dudx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes(gq2D,dudyn,dudy,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                
+                call gq2D_to_nodes(gq2D,dvdxn,dvdx,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes(gq2D,dvdyn,dvdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+
+if (.not. use_gq3D) then 
     ! 2D QUADRATURE
 
                 do k = 1, nz
                     
                     ! Get vertical shear strain rate terms
-                    call acx_to_nodes(dudzn,dudz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    call acy_to_nodes(dvdzn,dvdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    ! call acx_to_nodes(dudzn,dudz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    ! call acy_to_nodes(dvdzn,dvdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+
+                    call gq2D_to_nodes(gq2D,dudzn,dudz(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes(gq2D,dvdzn,dvdz(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
                                                 + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
                     ! Get rate factor
-                    call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    !call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes(gq2D,ATTn,ATT(:,:,k),dx,dy,"aa",i,j,im1,ip1,jm1,jp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
-                    visc(i,j,k) = sum(viscn*wtn)/wt2D
+                    !visc(i,j,k) = sum(viscn*wtn)/wt2D
+                    visc(i,j,k) = sum(viscn*gq2D%wt)/gq2D%wt_tot
 
                 end do
 
@@ -692,22 +715,42 @@ else
 
                 do k = 1, nz
                     
+                    km1 = k-1
+                    kp1 = k+1
+                    if (k .eq. 1)  km1 = 1
+                    if (k .eq. nz) kp1 = nz
+
+                    if (k .gt. 1) then
+                        dz0 = H_ice(i,j)*(zeta_aa(k) - zeta_aa(km1))
+                    else
+                        dz0 = H_ice(i,j)*(zeta_aa(2) - zeta_aa(1))
+                    end if
+
+                    if (k .lt. nz) then
+                        dz1 = H_ice(i,j)*(zeta_aa(kp1) - zeta_aa(k))
+                    else
+                        dz1 = H_ice(i,j)*(zeta_aa(nz) - zeta_aa(nz-1))
+                    end if
+                    
                     ! Get vertical shear strain rate terms
-                    call acx_to_nodes_3D(dudzn8,dudz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    call acy_to_nodes_3D(dvdzn8,dvdz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    !call acx_to_nodes_3D(dudzn8,dudz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    !call acy_to_nodes_3D(dvdzn8,dvdz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    call gq3D_to_nodes(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
                                                 + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
 
                     ! Get rate factor
-                    call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    !call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    call gq3D_to_nodes(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,"aa",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
-                    visc(i,j,k) = sum(viscn8*wtn8)/wt3D
-
+                    !visc(i,j,k) = sum(viscn8*wtn8)/wt3D
+                    visc(i,j,k) = sum(viscn8*gq3D%wt)/gq3D%wt_tot
                 end do
 
 end if

@@ -2,8 +2,7 @@ module velocity_sia
     
     use yelmo_defs, only : sp, dp, wp, yelmo_use_omp, TOL_UNDERFLOW 
     
-    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, aa_to_nodes, &
-                    acx_to_nodes_3D, acy_to_nodes_3D, aa_to_nodes_3D, &
+    use yelmo_tools, only : get_neighbor_indices, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
                     calc_vertical_integrated_2D, stagger_aa_ab
 

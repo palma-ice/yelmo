@@ -20,6 +20,9 @@ module basal_dragging
 
     use topography, only : calc_H_eff 
 
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes
+
     implicit none 
 
 
@@ -835,6 +838,14 @@ contains
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
+        type(gq2D_class) :: gq2D
+        real(wp) :: dx_tmp, dy_tmp
+
+        ! Initialize gaussian quadrature calculations
+        call gq2D_init(gq2D)
+        dx_tmp = 1.0
+        dy_tmp = 1.0 
+
         nx = size(beta,1)
         ny = size(beta,2)
         
@@ -885,12 +896,17 @@ contains
                     
                     ! Get c_bed on nodes
                     
-                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    !cbn(1:4) = c_bed(i,j) 
+                    ! call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    ! !cbn(1:4) = c_bed(i,j) 
 
-                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                
+                    ! call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    ! call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+
+                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
+                    
+                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+
                 end if 
                 
                 ! Calculate magnitude of basal velocity on nodes
@@ -898,8 +914,8 @@ contains
 
                 ! Calculate basal friction
                 betan     = c_bed(i,j) * (uxyn / u_0)**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(wtn*betan)/wt2D
-
+                !beta(i,j) = sum(betan*wtn)/wt2D
+                beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
             else
                 ! Assign minimum velocity value, no staggering for simplicity
 
@@ -955,6 +971,14 @@ contains
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
+        type(gq2D_class) :: gq2D
+        real(wp) :: dx_tmp, dy_tmp
+
+        ! Initialize gaussian quadrature calculations
+        call gq2D_init(gq2D)
+        dx_tmp = 1.0
+        dy_tmp = 1.0 
+
         nx = size(beta,1)
         ny = size(beta,2)
         
@@ -1005,12 +1029,17 @@ contains
                 else
                     ! Get c_bed on nodes
                     
-                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    !cbn(1:4) = c_bed(i,j) 
+                    ! call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    ! !cbn(1:4) = c_bed(i,j) 
 
-                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                
+                    ! call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    ! call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+
+                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
+                    
+                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+
                 end if 
                 
                 ! Calculate magnitude of basal velocity on nodes
@@ -1018,7 +1047,8 @@ contains
 
                 ! Calculate basal friction
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(wtn*betan)/wt2D
+                !beta(i,j) = sum(betan*wtn)/wt2D
+                beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
 
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 

@@ -833,6 +833,7 @@ contains
         integer :: i, j, nx, ny 
         real(wp) :: H_w_max
         real(wp) :: H_w
+        real(wp) :: H_eff
 
         integer  :: im1, ip1, jm1, jp1, nxi
         real(wp) :: wt 
@@ -939,9 +940,12 @@ contains
                     ! Effective pressure as basal till pressure
                     ! following van Pelt and Bueler (2015)
 
+                    H_eff = tpo%now%H_ice_dyn(i,j)
+                    !if (tpo%now%H_ice_dyn(i,j) .gt. 0.0) H_eff = max(tpo%now%H_ice_dyn(i,j),100.0)
+
                     if (dyn%par%neff_nxi .eq. 0) then
                         ! No subgrid interpolation (nxi=1)
-                        call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                        call calc_effective_pressure_till(dyn%now%N_eff(i,j),thrm%now%H_w(i,j),H_eff,tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
                         
                     else if (dyn%par%neff_nxi .eq. 1) then
@@ -951,7 +955,7 @@ contains
                         !call aa_to_nodes(Hw_int(1,:),thrm%now%H_w,i,j,xn,yn,im1,ip1,jm1,jp1)
                         call gq2D_to_nodes(gq2D,Hw_int(1,:),thrm%now%H_w,dyn%par%dx,dyn%par%dy,"aa",i,j,im1,ip1,jm1,jp1)
                     
-                        call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                        call calc_effective_pressure_till(Neff_int,Hw_int,H_eff,tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
                         dyn%now%N_eff(i,j) = sum(Neff_int(1,:)*gq2D%wt)/gq2D%wt_tot
@@ -961,7 +965,7 @@ contains
 
                         call calc_subgrid_array(Hw_int,thrm%now%H_w,nxi,i,j,im1,ip1,jm1,jp1)
 
-                        call calc_effective_pressure_till(Neff_int,Hw_int,tpo%now%H_ice_dyn(i,j),tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
+                        call calc_effective_pressure_till(Neff_int,Hw_int,H_eff,tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)
 
                         dyn%now%N_eff(i,j) = sum(Neff_int)/wt2D

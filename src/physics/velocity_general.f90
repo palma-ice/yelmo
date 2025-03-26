@@ -136,7 +136,7 @@ contains
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .TRUE.
+        logical, parameter :: use_gq3D = .FALSE.
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
@@ -207,7 +207,7 @@ contains
             ! is a (small) artifact of this indirect approach.
             ! So far, I see no major harm in it, and the error diminishes in steady-state cases.
             ! But it should be considered in the future.
-            
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 H_now  = H_ice(i,j) 

@@ -607,7 +607,7 @@ end if
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .TRUE.
+        logical, parameter :: use_gq3D = .FALSE.
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)

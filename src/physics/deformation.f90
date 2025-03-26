@@ -1436,14 +1436,7 @@ end if
         ! Note: this routine does not appear to be as stable for, e.g., Laurentide simulations.
         ! Perhaps it deserves further investigation, but for production runs, the routine
         ! above calc_jacobian_vel_3D is recommended! 
-
-        ! ajr, 2024-11-18: instability may lie in the fact that Gaussian Quadrature is not
-        ! performed properly in 3D due to the uneven nature of the sigma-coordinates in the vertical.
-        ! In this case, including the det|J| term is important to rescale quantities properly.
-        ! An example of this done well is in CISM2.1. See Eq. 6.25 of the documentation and
-        ! surrounding text and equations. This should be implemented here, eventually, if
-        ! this routine will be used.
-
+        
         implicit none
         
         type(strain_3D_class), intent(INOUT) :: strn            ! [yr^-1] on aa-nodes (3D)

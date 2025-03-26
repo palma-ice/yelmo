@@ -903,7 +903,8 @@ contains
                     ! call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
 
                     call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
-                    
+                    !cbn(1:4) = c_bed(i,j)
+
                     call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
                     call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
 
@@ -1036,7 +1037,8 @@ contains
                     ! call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
 
                     call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
-                    
+                    !cbn(1:4) = c_bed(i,j) 
+
                     call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
                     call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
 

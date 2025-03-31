@@ -275,11 +275,7 @@ contains
                 ! Set stability limit on basal uz value.
                 ! This only gets applied in rare cases when something
                 ! is going wrong in the model. 
-                if (uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min 
-
-                if (i .eq. 30 .and. j .eq. 30) then
-                    write(*,"(a6,2i2,6f10.3)") "check", i, j, uz(i,j,1), dzbdt_now, uz_grid, f_bmb*bmb(i,j), ux_aa*dzbdx_aa, uy_aa*dzbdy_aa
-                end if
+                if (uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min
 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
@@ -1977,7 +1973,8 @@ end if
         logical,  intent(IN) :: log 
 
         ! Local variables
-        integer :: i, j, nx, ny, k  
+        integer :: i, j, nx, ny, k
+        real(dp) :: tmpx, tmpy
         real(dp) :: res1, res2
         
         real(wp) :: ux_resid_max 
@@ -1989,6 +1986,9 @@ end if
         real(wp), parameter :: vel_tol = 1e-5               ! [m/yr] only consider points with velocity above this tolerance limit
         integer,  parameter :: norm_method = 1              ! See note above.
         
+        nx = size(ux,1)
+        ny = size(ux,2)
+
         ! Count how many points should be checked for convergence
         nx_check = count(abs(ux).gt.vel_tol .and. mask_acx)
         ny_check = count(abs(uy).gt.vel_tol .and. mask_acy)
@@ -1999,11 +1999,33 @@ end if
 
                 case(1)
                     
-                    res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
-                               + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+                    res1 = 0.0
+                    res2 = 0.0
 
-                    res2 = sqrt( sum((ux_prev)*(ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
-                               + sum((uy_prev)*(uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+                    do j = 1, ny
+                    do i = 1, nx
+
+                            if (abs(ux(i,j)) .gt. vel_tol .and. mask_acx(i,j)) then
+                                tmpx = ux(i,j)-ux_prev(i,j)
+                                tmpy = uy(i,j)-uy_prev(i,j)
+                                if (dabs(tmpx) .lt. TOL_UNDERFLOW) tmpx = 0.0
+                                if (dabs(tmpy) .lt. TOL_UNDERFLOW) tmpy = 0.0
+                                res1 = res1 + tmpx*tmpx + tmpy*tmpy
+
+                                tmpx = ux_prev(i,j)
+                                tmpy = uy_prev(i,j)
+                                if (dabs(tmpx) .lt. TOL_UNDERFLOW) tmpx = 0.0
+                                if (dabs(tmpy) .lt. TOL_UNDERFLOW) tmpy = 0.0
+                                res2 = res2 + tmpx*tmpx + tmpy*tmpy
+                            end if
+                    end do
+                    end do
+
+                    ! res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
+                    !            + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+
+                    ! res2 = sqrt( sum((ux_prev)*(ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
+                    !            + sum((uy_prev)*(uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
 
                     resid = res1/(res2+du_reg)
 

@@ -1705,14 +1705,10 @@ end if
         real(wp), allocatable :: dvdy(:,:) 
         
         type(gq2D_class) :: gq2D
-        type(gq3D_class) :: gq3D
-        real(wp) :: dz0, dz1 
-        logical, parameter :: use_gq3D = .FALSE.
+        real(wp) :: dz0, dz1
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
-        if (use_gq3D) call gq3D_init(gq3D)
-
         
         nx = size(ux,1)
         ny = size(ux,2)

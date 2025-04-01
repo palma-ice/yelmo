@@ -616,6 +616,8 @@ contains
         
         real(wp), allocatable :: Qs(:,:,:)
 
+        real(wp), parameter :: eps = 1e-6
+        
         nx = size(Q_strn,1)
         ny = size(Q_strn,2)
         nz = size(Q_strn,3)
@@ -641,22 +643,22 @@ contains
 
                     ! Horizontal derivatives
 
-                    dQsdT_x = (Qs(ip1,j,k) - Qs(im1,j,k)) / (T(ip1,j,k) - T(im1,j,k))
-                    dQsdT_y = (Qs(i,jp1,k) - Qs(i,jm1,k)) / (T(i,jp1,k) - T(i,jm1,k))
+                    dQsdT_x = (Qs(ip1,j,k) - Qs(im1,j,k)) / (T(ip1,j,k) - T(im1,j,k) + eps)
+                    dQsdT_y = (Qs(i,jp1,k) - Qs(i,jm1,k)) / (T(i,jp1,k) - T(i,jm1,k) + eps)
                     
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
                     if (f_ice(im1,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
-                        dQsdT_x = (Qs(i,j,k) - Qs(im1,j,k)) / (T(i,j,k) - T(im1,j,k))
+                        dQsdT_x = (Qs(i,j,k) - Qs(im1,j,k)) / (T(i,j,k) - T(im1,j,k) + eps)
                     else if (f_ice(im1,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
-                        dQsdT_x = (Qs(ip1,j,k) - Qs(i,j,k)) / (T(ip1,j,k) - T(i,j,k))
+                        dQsdT_x = (Qs(ip1,j,k) - Qs(i,j,k)) / (T(ip1,j,k) - T(i,j,k) + eps)
                     else if (f_ice(im1,j) .lt. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
                         dQsdT_x = 0.0
                     end if
 
                     if (f_ice(i,jm1) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
-                        dQsdT_y = (Qs(i,j,k) - Qs(i,jm1,k)) / (T(i,j,k) - T(i,jm1,k))
+                        dQsdT_y = (Qs(i,j,k) - Qs(i,jm1,k)) / (T(i,j,k) - T(i,jm1,k) + eps)
                     else if (f_ice(i,jm1) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
-                        dQsdT_y = (Qs(i,jp1,k) - Qs(i,j,k)) / (T(i,jp1,k) - T(i,j,k))
+                        dQsdT_y = (Qs(i,jp1,k) - Qs(i,j,k)) / (T(i,jp1,k) - T(i,j,k) + eps)
                     else if (f_ice(i,jm1) .lt. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
                         dQsdT_x = 0.0
                     end if
@@ -664,11 +666,11 @@ contains
                     ! Vertical derivatives
 
                     if (k .eq. 1) then
-                        dQsdT_z = (Qs(i,j,k+1) - Qs(i,j,k)) / (T(i,j,k+1) - T(i,j,k))
+                        dQsdT_z = (Qs(i,j,k+1) - Qs(i,j,k)) / (T(i,j,k+1) - T(i,j,k) + eps)
                     else if (k .eq. nz) then
-                        dQsdT_z = (Qs(i,j,k) - Qs(i,j,k-1)) / (T(i,j,k) - T(i,j,k-1))
+                        dQsdT_z = (Qs(i,j,k) - Qs(i,j,k-1)) / (T(i,j,k) - T(i,j,k-1) + eps)
                     else
-                        dQsdT_z = (Qs(i,j,k+1) - Qs(i,j,k-1)) / (T(i,j,k+1) - T(i,j,k-1))
+                        dQsdT_z = (Qs(i,j,k+1) - Qs(i,j,k-1)) / (T(i,j,k+1) - T(i,j,k-1) + eps)
                     end if
 
                     ! Get thet total magnitude of the gradient and save it in output array
@@ -681,6 +683,8 @@ contains
 
         end do
         end do
+
+        write(*,*) "dQsdT: ", minval(dQsdT), maxval(dQsdT)
 
         return
 

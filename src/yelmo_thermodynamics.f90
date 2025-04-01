@@ -36,7 +36,7 @@ contains
         real(wp), allocatable :: H_w_now(:,:)
         real(wp), allocatable :: dTdz_b_now(:,:)
         
-        logical, parameter :: calculate_Q_strn_derivative = .TRUE.
+        logical, parameter :: calculate_Q_strn_derivative = .FALSE.
 
         nx = thrm%par%nx
         ny = thrm%par%ny

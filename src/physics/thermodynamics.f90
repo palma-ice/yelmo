@@ -4,7 +4,7 @@ module thermodynamics
     ! Note: once icetemp is working well, this module could be 
     ! remerged into icetemp as one module. 
 
-    use yelmo_defs, only : wp, pi, TOL_UNDERFLOW 
+    use yelmo_defs, only : wp, dp, pi, TOL_UNDERFLOW 
 
     use yelmo_tools, only : get_neighbor_indices, set_boundaries_3D_aa
     
@@ -612,12 +612,12 @@ contains
         ! Local variables
         integer  :: i, j, k, nx, ny, nz, n 
         integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: dQsdT_x, dQsdT_y, dQsdT_z
+        real(dp) :: dQsdT_x, dQsdT_y, dQsdT_z
         
-        real(wp), allocatable :: Qs(:,:,:)
+        real(dp), allocatable :: Qs(:,:,:)
 
-        real(wp), parameter :: eps = 1e-6
-        
+        real(wp), parameter :: eps = 1e-4
+
         nx = size(Q_strn,1)
         ny = size(Q_strn,2)
         nz = size(Q_strn,3)
@@ -674,7 +674,7 @@ contains
                     end if
 
                     ! Get thet total magnitude of the gradient and save it in output array
-
+                    
                     dQsdT(i,j,k) = sqrt(dQsdT_x*dQsdT_x + dQsdT_y*dQsdT_y + dQsdT_z*dQsdT_z)
 
                 end do
@@ -684,7 +684,7 @@ contains
         end do
         end do
 
-        write(*,*) "dQsdT: ", minval(dQsdT), maxval(dQsdT)
+        !write(*,*) "dQsdT: ", minval(dQsdT), maxval(dQsdT)
 
         return
 

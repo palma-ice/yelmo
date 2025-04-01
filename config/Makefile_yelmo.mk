@@ -91,7 +91,7 @@ $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
 						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \

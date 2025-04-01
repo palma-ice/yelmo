@@ -122,7 +122,7 @@ end select
         end if 
         
         ! Get rate of change of strain heating too
-        if (dt .gt. 0.0) then 
+        if (dt .gt. 0.0) then
             thrm%now%dQsdt = (thrm%now%Q_strn - thrm%now%dQsdt) / dt 
         else 
             thrm%now%dQsdt = 0.0 

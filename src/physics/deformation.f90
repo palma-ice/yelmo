@@ -12,8 +12,7 @@ module deformation
     use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, &
                         jacobian_3D_class, strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : get_neighbor_indices, &
-                    calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
-                    acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, acz_to_nodes_3D
+                    calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt
     use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
                                     gq3D_class, gq3D_init, gq3D_to_nodes
 
@@ -1189,31 +1188,24 @@ end if
         real(wp), allocatable :: fact_z(:)
         logical, allocatable :: is_ice(:,:)
 
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: wt2D
-        
         real(wp) :: ddn(4) 
         real(wp) :: ddan(4) 
         real(wp) :: ddbn(4) 
 
+        real(wp) :: wtn(4)
+        real(wp) :: wt2D 
+
+        logical, parameter :: use_gq = .TRUE.
+
         type(gq2D_class) :: gq2D
-        type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1 
-        logical, parameter :: use_gq3D = .TRUE.
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
-        if (use_gq3D) call gq3D_init(gq3D)
 
-        ! Get nodes and weighting 
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
+        ! For simple staggering
         wtn  = [1.0,1.0,1.0,1.0]
-        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
+        wt2D = sum(wtn)
 
         ! Determine sizes and allocate local variables 
         nx    = size(H_ice,1)
@@ -1242,51 +1234,11 @@ end if
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                ! Limit neighbor indices to ice-covered points
-                ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
-                ! experiment at the margins. Disabled for now pending further investigation as needed.
-                ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
-                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
-                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
-                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
-
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
 
-if (.TRUE.) then 
+if (use_gq) then 
     ! Use quadrature points
-                    ! ! Get dxx on aa-nodes 
-                    ! call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! strn%dxx(i,j,k) = sum(ddn*wtn)/wt2D
-
-                    ! ! Get dxy and dyx on aa-nodes 
-                    ! call acx_to_nodes(ddan,jvel%dxy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! call acy_to_nodes(ddbn,jvel%dyx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! ddn = 0.5*(ddan+ddbn)
-                    ! strn%dxy(i,j,k) = sum(ddn*wtn)/wt2D
-
-                    ! ! Get dxz and dzx on aa-nodes 
-                    ! ! (but also get dzx on aa-nodes vertically)
-                    ! call acx_to_nodes(ddan,jvel%dxz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
-                    ! ddn  = 0.5*(ddan+ddbn)
-                    ! strn%dxz(i,j,k) = sum(ddn*wtn)/wt2D
-
-                    ! ! Get dyz and dzy on aa-nodes 
-                    ! ! (but also get dzy on aa-nodes vertically)
-                    ! call acy_to_nodes(ddan,jvel%dyz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
-                    ! ddn  = 0.5*(ddan+ddbn)
-                    ! strn%dyz(i,j,k) = sum(ddn*wtn)/wt2D
-
-                    ! ! Get dyy on aa-nodes 
-                    ! call acy_to_nodes(ddn,jvel%dyy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! strn%dyy(i,j,k) = sum(ddn*wtn)/wt2D
-
-                    !call gq2D_to_nodes(gq2D,dudyn,dudy,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                
-                    !call gq2D_to_nodes(gq2D,dvdxn,dvdx,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-
 
                     ! Get dxx on aa-nodes 
                     call gq2D_to_nodes(gq2D,ddn,jvel%dxx(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
@@ -1460,13 +1412,6 @@ end if
         real(wp) :: shear_squared  
         real(wp), allocatable :: fact_z(:)
         
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: zn
-        real(wp) :: wtn(8)
-        real(wp) :: wt3D
-        
         real(wp) :: ddn(8) 
         real(wp) :: ddan(8) 
         real(wp) :: ddbn(8) 
@@ -1478,14 +1423,6 @@ end if
         ! Initialize gaussian quadrature calculations
         call gq3D_init(gq3D)
 
-        ! Get nodes and weighting 
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
-        zn   = wt0
-        wtn  = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt3D = 8.0   ! Volume of square [-1:1,-1:1, -1:1]=> 2x2x2 => 8
-        
         ! Determine sizes and allocate local variables 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
@@ -1509,48 +1446,8 @@ end if
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                ! Limit neighbor indices to ice-covered points
-                ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
-                ! experiment at the margins. Disabled for now pending further investigation as needed.
-                ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
-                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
-                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
-                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
-
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
-
-                    ! Use quadrature points in 3D space (8 quadrature points)
-
-                    ! ! Get dxx on aa-nodes 
-                    ! call acx_to_nodes_3D(ddn,jvel%dxx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! strn%dxx(i,j,k) = sum(ddn*wtn)/wt3D
-
-                    ! ! Get dxy and dyx on aa-nodes 
-                    ! call acx_to_nodes_3D(ddan,jvel%dxy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! call acy_to_nodes_3D(ddbn,jvel%dyx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! ddn = 0.5*(ddan+ddbn)
-                    ! strn%dxy(i,j,k) = sum(ddn*wtn)/wt3D
-
-                    ! ! Get dxz and dzx on aa-nodes 
-                    ! ! (but also get dzx on aa-nodes vertically)
-                    ! call acx_to_nodes_3D(ddan,jvel%dxz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! call acz_to_nodes_3D(ddbn,jvel%dzx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! !ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
-                    ! ddn  = 0.5*(ddan+ddbn)
-                    ! strn%dxz(i,j,k) = sum(ddn*wtn)/wt3D
-
-                    ! ! Get dyz and dzy on aa-nodes 
-                    ! ! (but also get dzy on aa-nodes vertically)
-                    ! call acy_to_nodes_3D(ddan,jvel%dyz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! call acz_to_nodes_3D(ddbn,jvel%dzy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! !ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
-                    ! ddn  = 0.5*(ddan+ddbn)
-                    ! strn%dyz(i,j,k) = sum(ddn*wtn)/wt3D
-
-                    ! ! Get dyy on aa-nodes 
-                    ! call acy_to_nodes_3D(ddn,jvel%dyy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! strn%dyy(i,j,k) = sum(ddn*wtn)/wt3D
 
                     km1 = k-1
                     kp1 = k+1
@@ -1690,10 +1587,6 @@ end if
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1
         integer  :: nx, ny
-        real(wp) :: wt0 
-        real(wp) :: xn(4)
-        real(wp) :: yn(4)
-        real(wp) :: wtn(4) 
         real(wp) :: dudxn(4)
         real(wp) :: dudyn(4)
         real(wp) :: dvdxn(4)
@@ -1721,9 +1614,7 @@ end if
 
         ! === First calculate the horizontal strain rate ===
 
-
         call calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
-
 
         ! === Next perform interpolations to get strain rate tensor components on aa-nodes ===
 
@@ -1737,11 +1628,6 @@ end if
         strn2D%div      = 0.0 
         strn2D%f_shear  = 0.0       ! Always zero in this case
 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dudxn,dudyn,dvdxn,dvdyn)
         do j=1, ny
         do i=1, nx
@@ -1750,13 +1636,6 @@ end if
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
-                
-                ! Get strain rate terms on node locations
-                ! call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                
-                ! call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
                 
                 call gq2D_to_nodes(gq2D,dudxn,dudx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
                 call gq2D_to_nodes(gq2D,dudyn,dudy,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)

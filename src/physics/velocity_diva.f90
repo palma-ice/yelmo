@@ -1,8 +1,7 @@
 module velocity_diva
 
     use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, aa_to_nodes, &
-                    acx_to_nodes_3D, acy_to_nodes_3D, aa_to_nodes_3D, &
+    use yelmo_tools, only : get_neighbor_indices, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D

@@ -12,16 +12,11 @@ module basal_dragging
     
     use yelmo_defs, only : sp, dp, wp, prec, pi, TOL_UNDERFLOW, io_unit_err, degrees_to_radians
 
-    use yelmo_tools, only : get_neighbor_indices, stagger_aa_acx, stagger_aa_acy, &
-                    acx_to_nodes, acy_to_nodes, aa_to_nodes, &
-                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
-                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
-                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
+    use yelmo_tools, only : get_neighbor_indices
 
     use topography, only : calc_H_eff 
 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes
 
     implicit none 
 
@@ -822,18 +817,12 @@ contains
         ! Local variables
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1 
-        integer  :: im1m, ip1m, jm1m, jp1m 
         real(wp) :: uxy_b
         real(wp) :: uxn(4) 
         real(wp) :: uyn(4) 
         real(wp) :: uxyn(4) 
         real(wp) :: cbn(4)
         real(wp) :: betan(4)
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: wt2D
 
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
@@ -852,32 +841,11 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
         
-        ! Get nodes and weighting 
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
-        wtn  = [1.0,1.0,1.0,1.0]
-        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
-
         do j = 1, ny
         do i = 1, nx
 
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-            ! Get neighbor indices limited to ice-covered points
-            ! im1m = im1
-            ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
-            ! ip1m = ip1
-            ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
-            ! jm1m = jm1 
-            ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
-            ! jp1m = jp1 
-            ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
-            im1m = im1
-            ip1m = ip1
-            jm1m = jm1 
-            jp1m = jp1 
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point
@@ -896,12 +864,6 @@ contains
                     
                     ! Get c_bed on nodes
                     
-                    ! call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    ! !cbn(1:4) = c_bed(i,j) 
-
-                    ! call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    ! call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-
                     call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j)
 
@@ -915,7 +877,6 @@ contains
 
                 ! Calculate basal friction
                 betan     = c_bed(i,j) * (uxyn / u_0)**q * (1.0_wp / uxyn)
-                !beta(i,j) = sum(betan*wtn)/wt2D
                 beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
             else
                 ! Assign minimum velocity value, no staggering for simplicity
@@ -963,11 +924,6 @@ contains
         real(wp) :: uxyn(4) 
         real(wp) :: cbn(4)
         real(wp) :: betan(4)
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: wt2D
 
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
@@ -986,33 +942,12 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
 
-        ! Get nodes and weighting 
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
-        wtn  = [1.0,1.0,1.0,1.0]
-        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
-
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b)
         do j = 1, ny
         do i = 1, nx
 
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-            ! Get neighbor indices limited to ice-covered points
-            ! im1m = im1
-            ! if (f_ice(im1,j) .lt. 1.0) im1m = i  
-            ! ip1m = ip1
-            ! if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
-            ! jm1m = jm1 
-            ! if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
-            ! jp1m = jp1 
-            ! if (f_ice(i,jp1) .lt. 1.0) jp1m = j
-            im1m = im1
-            ip1m = ip1
-            jm1m = jm1 
-            jp1m = jp1 
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point
@@ -1030,12 +965,6 @@ contains
                 else
                     ! Get c_bed on nodes
                     
-                    ! call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    ! !cbn(1:4) = c_bed(i,j) 
-
-                    ! call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-                    ! call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
-
                     call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j) 
 
@@ -1049,7 +978,6 @@ contains
 
                 ! Calculate basal friction
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
-                !beta(i,j) = sum(betan*wtn)/wt2D
                 beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
 
             else

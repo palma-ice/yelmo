@@ -112,17 +112,8 @@ contains
         real(wp) :: dudzn(4) 
         real(wp) :: dvdzn(4) 
         
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: wt2D 
-
         real(wp) :: dudxn8(8) 
         real(wp) :: dvdyn8(8) 
-        real(wp) :: zn 
-        real(wp) :: wtn8(8)
-        real(wp) :: wt3D 
 
         real(wp) :: dzsdt_now
         real(wp) :: dhdt_now
@@ -149,19 +140,7 @@ contains
         
         allocate(is_ice(nx,ny))
         is_ice = (f_ice .eq. 1.0)
-
-        ! Get nodes and weighting 
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
-        wtn  = [1.0,1.0,1.0,1.0]
-        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
-
-        ! Get nodes and weighting 
-        zn   = wt0
-        wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt3D = 8.0   ! Volume of square [-1:1,-1:1, -1:1]=> 2x2x2 => 8
-
+        
         ! Initialize vertical velocity to zero 
         uz = 0.0 
 
@@ -184,14 +163,6 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-            ! Limit neighbor indices to ice-covered points
-            ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
-            ! experiment at the margins. Disabled for now pending further investigation as needed.
-            ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
-            ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
-            ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
-            ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j 
-
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
             dhdt_now  = dhdt(i,j) 
@@ -212,29 +183,6 @@ contains
 
                 H_now  = H_ice(i,j) 
                 H_inv = 1.0/H_now 
-
-                ! ! Get the centered ice-base gradient
-                ! call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! dzbdx_aa = sum(dzbdxn*wtn)/wt2D
-                
-                ! call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! dzbdy_aa = sum(dzbdyn*wtn)/wt2D
-                
-                ! ! Get the centered surface gradient
-                ! call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! dzsdx_aa = sum(dzsdxn*wtn)/wt2D
-                
-                ! call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! dzsdy_aa = sum(dzsdyn*wtn)/wt2D
-                
-                ! ! Get the aa-node centered horizontal velocity at the base
-                ! call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! ux_aa = sum(uxn*wtn)/wt2D
-                
-                ! call acy_to_nodes(uyn,uy(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! uy_aa = sum(uyn*wtn)/wt2D
-                
-                ! -----
 
                 ! Get the centered ice-base gradient
                 call gq2D_to_nodes(gq2D,dzbdxn,dzbdx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
@@ -293,11 +241,6 @@ contains
 
 if (.not. use_gq3D) then
     ! 2D QUADRATURE
-                    ! call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! dudx_aa = sum(dudxn*wtn)/wt2D
-
-                    ! call acy_to_nodes(dvdyn,jvel%dyy(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! dvdy_aa = sum(dvdyn*wtn)/wt2D
 
                     call gq2D_to_nodes(gq2D,dudxn,jvel%dxx(:,:,kmid),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
                     dudx_aa = sum(dudxn*gq2D%wt)/gq2D%wt_tot
@@ -307,11 +250,6 @@ if (.not. use_gq3D) then
 
 else 
     ! 3D QUADRATURE
-                    ! call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! dudx_aa = sum(dudxn8*wtn8)/wt3D
-
-                    ! call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ! dvdy_aa = sum(dvdyn8*wtn8)/wt3D
 
                     km1 = kmid-1
                     kp1 = kmid+1
@@ -363,16 +301,6 @@ end if
                         kup = k 
                         kdn = k-1 
                     end if
-                    
-                    ! call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! uxn = 0.5_wp*(uxn_up+uxn_dn)
-                    ! ux_aa = sum(uxn*wtn)/wt2D
-                    
-                    ! call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! uyn = 0.5_wp*(uyn_up+uyn_dn)
-                    ! uy_aa = sum(uyn*wtn)/wt2D
                     
                     call gq2D_to_nodes(gq2D,uxn_up,ux(:,:,kup),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
                     call gq2D_to_nodes(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)

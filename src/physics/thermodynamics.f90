@@ -6,9 +6,10 @@ module thermodynamics
 
     use yelmo_defs, only : wp, pi, TOL_UNDERFLOW 
 
-    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
-                            set_boundaries_3D_aa
+    use yelmo_tools, only : get_neighbor_indices, set_boundaries_3D_aa
     
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes
+
     implicit none 
 
     private  
@@ -615,12 +616,6 @@ contains
         integer  :: i, j, nx, ny, n 
         integer  :: im1, ip1, jm1, jp1 
 
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: wt2D
-
         real(wp) :: uxbn(4)
         real(wp) :: uybn(4)
         real(wp) :: taubxn(4)
@@ -628,14 +623,16 @@ contains
         real(wp) :: Qbn(4)
         real(wp) :: Qb_aa 
 
+        type(gq2D_class) :: gq2D
+        real(wp) :: dx_tmp, dy_tmp
+
+        ! Initialize gaussian quadrature calculations
+        call gq2D_init(gq2D)
+        dx_tmp = 1.0
+        dy_tmp = 1.0 
+
         nx = size(Q_b,1)
         ny = size(Q_b,2)
-
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
-        wtn  = [1.0,1.0,1.0,1.0]
-        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
         do j = 1, ny 
         do i = 1, nx
@@ -646,25 +643,17 @@ contains
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                ! Limit neighbor indices to ice-covered points
-                ! ajr: note that this approach right now leads to assymetry in EISMINT_moving
-                ! experiment at the margins. Disabled for now pending further investigation as needed.
-                ! if (f_ice(im1,j) .lt. 1.0) im1 = i  
-                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i  
-                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j 
-                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j 
-
-                ! Get velocity components on nodes
-                call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
-                call acy_to_nodes(uybn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
-
-                ! Get basal stress components on nodes
-                call acx_to_nodes(taubxn,taub_acx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1,ip1,jm1,jp1)
-
+                ! Get basal velocity and basal stress components on nodes
+                
+                call gq2D_to_nodes(gq2D,uxbn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes(gq2D,uybn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                
+                call gq2D_to_nodes(gq2D,taubxn,taub_acx,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes(gq2D,taubyn,taub_acy,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                
                 ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
                 Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )
-                Qb_aa = sum(Qbn*wtn)/wt2D
+                Qb_aa = sum(Qbn*gq2D%wt)/gq2D%wt_tot
 
                 ! Ensure Q_b is strictly positive 
                 if (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 

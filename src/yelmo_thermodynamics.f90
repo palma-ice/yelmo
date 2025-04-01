@@ -36,6 +36,8 @@ contains
         real(wp), allocatable :: H_w_now(:,:)
         real(wp), allocatable :: dTdz_b_now(:,:)
         
+        logical, parameter :: calculate_Q_strn_derivative = .TRUE.
+
         nx = thrm%par%nx
         ny = thrm%par%ny
 
@@ -90,12 +92,6 @@ select case("nodes")
 
 end select
         
-        ! Smooth basal frictional heating 
-        if (thrm%par%n_sm_qb .gt. 0) then 
-            call smooth_gauss_2D(thrm%now%Q_b,thrm%par%dx,real(thrm%par%n_sm_qb,wp), &
-                                    tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
-        end if 
-
         ! Calculate internal strain heating
 
         if (thrm%par%use_strain_sia) then 
@@ -113,16 +109,14 @@ end select
 
         end if 
         
-        ! Smooth strain heating 
-        if (thrm%par%n_sm_qstrn .gt. 0) then 
-            call smooth_gauss_3D(thrm%now%Q_strn,thrm%par%dx,real(thrm%par%n_sm_qstrn,wp), &
-                                        tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
-        end if 
-        
         ! Diagnose rate of change of strain heating w.r.t. temperature (dQsdT)
-        call calc_strain_heating_temp_derivative(thrm%now%dQsdT,thrm%now%Q_strn,thrm%now%T_ice,thrm%now%cp,tpo%now%H_ice,tpo%now%f_ice, &
-                                                    thrm%par%z%zeta_aa,bnd%c%rho_ice,thrm%par%dx,thrm%par%dy,thrm%par%boundaries)
-        
+        if (calculate_Q_strn_derivative) then
+            call calc_strain_heating_temp_derivative(thrm%now%dQsdT,thrm%now%Q_strn,thrm%now%T_ice,thrm%now%cp,tpo%now%H_ice,tpo%now%f_ice, &
+                                                        thrm%par%z%zeta_aa,bnd%c%rho_ice,thrm%par%dx,thrm%par%dy,thrm%par%boundaries)
+        else
+            thrm%now%dQsdT = 0.0
+        end if
+
         ! Ensure that Q_rock is defined. At initialization, 
         ! it may have a value of zero. In this case, set equal 
         ! to Q_geo to be consistent with equilibrium bedrock conditions. 
@@ -653,8 +647,6 @@ end if
         call nml_read(filename,group,"solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,group,"gamma",          par%gamma,            init=init_pars)
         call nml_read(filename,group,"use_strain_sia", par%use_strain_sia,   init=init_pars)
-        call nml_read(filename,group,"n_sm_qstrn",     par%n_sm_qstrn,       init=init_pars)
-        call nml_read(filename,group,"n_sm_qb",        par%n_sm_qb,          init=init_pars)
         call nml_read(filename,group,"use_const_cp",   par%use_const_cp,     init=init_pars)
         call nml_read(filename,group,"const_cp",       par%const_cp,         init=init_pars)
         call nml_read(filename,group,"use_const_kt",   par%use_const_kt,     init=init_pars)

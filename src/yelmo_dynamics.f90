@@ -1031,7 +1031,6 @@ contains
         call nml_read(filename,group_ydyn,"beta_gl_f",          par%beta_gl_f,          init=init_pars)
         call nml_read(filename,group_ydyn,"taud_gl_method",     par%taud_gl_method,     init=init_pars)
         call nml_read(filename,group_ydyn,"H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
-        call nml_read(filename,group_ydyn,"n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,group_ydyn,"beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,group_ydyn,"eps_0",              par%eps_0,              init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)

@@ -350,8 +350,7 @@ module yelmo_defs
         integer    :: beta_gl_stag          ! Beta grounding-line staggering method 
         real(wp)   :: beta_gl_f             ! Fraction of beta at gl 
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 
-        real(wp)   :: H_grnd_lim 
-        integer    :: n_sm_beta 
+        real(wp)   :: H_grnd_lim  
         real(wp)   :: beta_min              ! Minimum allowed value of beta
         real(wp)   :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
         character(len=256) :: ssa_lis_opt 
@@ -616,8 +615,6 @@ module yelmo_defs
         integer             :: nzr_ac    ! Number of vertical points in bedrock (layer boundaries)
         real(wp)            :: gamma  
         logical             :: use_strain_sia 
-        integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
-        integer             :: n_sm_qb       ! Standard deviation (in points) for Gaussian smoothing of basal heating
         logical             :: use_const_cp 
         real(wp)            :: const_cp 
         logical             :: use_const_kt 

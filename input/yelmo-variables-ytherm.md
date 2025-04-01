@@ -10,7 +10,7 @@
 |  6 | f_pmp             | xc, yc            | -            | Fraction of cell at pressure melting point    |
 |  7 | bmb_grnd          | xc, yc            | m/yr         | Grounded basal mass balance                   |
 |  8 | Q_strn            | xc, yc, zeta      | W m^-3       | Internal strain heat production               |
-|  9 | dQsdt             | xc, yc, zeta      | W m^-3 yr^-1 | Rate of change of internal heat production    |
+|  9 | dQsdT             | xc, yc, zeta      | yr^-1        | Change of internal heat production w.r.t. T   |
 | 10 | Q_b               | xc, yc            | mW m^-2      | Basal friction heat production                |
 | 11 | Q_ice_b           | xc, yc            | mW m^-2      | Basal ice heat flux                           |
 | 12 | T_prime_b         | xc, yc            | K            | Homologous temperature at the base            |

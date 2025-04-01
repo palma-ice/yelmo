@@ -120,8 +120,8 @@ end select
         end if 
         
         ! Diagnose rate of change of strain heating w.r.t. temperature (dQsdT)
-        call calc_strain_heating_temp_derivative(thrm%now%dQsdT,thrm%now%Q_strn,thrm%now%T_ice,thrm%now%cp,tpo%now%H_ice,tpo%now%f_ice, &
-                                                    thrm%par%z%zeta_aa,bnd%c%rho_ice,thrm%par%dx,thrm%par%dx,thrm%par%boundaries)
+        ! call calc_strain_heating_temp_derivative(thrm%now%dQsdT,thrm%now%Q_strn,thrm%now%T_ice,thrm%now%cp,tpo%now%H_ice,tpo%now%f_ice, &
+        !                                             thrm%par%z%zeta_aa,bnd%c%rho_ice,thrm%par%dx,thrm%par%dx,thrm%par%boundaries)
 
         ! Ensure that Q_rock is defined. At initialization, 
         ! it may have a value of zero. In this case, set equal 

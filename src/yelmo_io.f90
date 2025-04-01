@@ -930,7 +930,7 @@ contains
         call nc_read_interp(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)    
         call nc_read_interp(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps)      
-        call nc_read_interp(filename,"dQsdt",       dom%thrm%now%dQsdt,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps)      
+        call nc_read_interp(filename,"dQsdT",       dom%thrm%now%dQsdT,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1],mps=mps)      
         call nc_read_interp(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)         
         call nc_read_interp(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)         
         call nc_read_interp(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
@@ -1663,8 +1663,8 @@ contains
             case("Q_strn") ! 3D
                 call nc_write(filename,trim(v%varname),ylmo%thrm%now%Q_strn(i1:i2,j1:j2,:), &
                             start=[1,1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("dQsdt") ! 3D
-                call nc_write(filename,trim(v%varname),ylmo%thrm%now%dQsdt(i1:i2,j1:j2,:), &
+            case("dQsdT") ! 3D
+                call nc_write(filename,trim(v%varname),ylmo%thrm%now%dQsdT(i1:i2,j1:j2,:), &
                             start=[1,1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("Q_b")
                 call nc_write(filename,trim(v%varname),ylmo%thrm%now%Q_b(i1:i2,j1:j2), &

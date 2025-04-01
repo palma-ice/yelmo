@@ -613,7 +613,7 @@ contains
         integer  :: i, j, k, nx, ny, nz, n 
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: dQsdT_x, dQsdT_y, dQsdT_z
-
+        
         real(wp), allocatable :: Qs(:,:,:)
 
         nx = size(Q_strn,1)
@@ -639,7 +639,8 @@ contains
 
                 do k = 1, nz
 
-                    ! Calculate the derivative in each direction
+                    ! Horizontal derivatives
+
                     dQsdT_x = (Qs(ip1,j,k) - Qs(im1,j,k)) / (T(ip1,j,k) - T(im1,j,k))
                     dQsdT_y = (Qs(i,jp1,k) - Qs(i,jm1,k)) / (T(i,jp1,k) - T(i,jm1,k))
                     
@@ -648,17 +649,31 @@ contains
                         dQsdT_x = (Qs(i,j,k) - Qs(im1,j,k)) / (T(i,j,k) - T(im1,j,k))
                     else if (f_ice(im1,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
                         dQsdT_x = (Qs(ip1,j,k) - Qs(i,j,k)) / (T(ip1,j,k) - T(i,j,k))
+                    else if (f_ice(im1,j) .lt. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
+                        dQsdT_x = 0.0
                     end if
 
                     if (f_ice(i,jm1) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
                         dQsdT_y = (Qs(i,j,k) - Qs(i,jm1,k)) / (T(i,j,k) - T(i,jm1,k))
                     else if (f_ice(i,jm1) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
                         dQsdT_y = (Qs(i,jp1,k) - Qs(i,j,k)) / (T(i,jp1,k) - T(i,j,k))
+                    else if (f_ice(i,jm1) .lt. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
+                        dQsdT_x = 0.0
                     end if
-                    
+
                     ! Vertical derivatives
 
-                    ! TO DO
+                    if (k .eq. 1) then
+                        dQsdT_z = (Qs(i,j,k+1) - Qs(i,j,k)) / (T(i,j,k+1) - T(i,j,k))
+                    else if (k .eq. nz) then
+                        dQsdT_z = (Qs(i,j,k) - Qs(i,j,k-1)) / (T(i,j,k) - T(i,j,k-1))
+                    else
+                        dQsdT_z = (Qs(i,j,k+1) - Qs(i,j,k-1)) / (T(i,j,k+1) - T(i,j,k-1))
+                    end if
+
+                    ! Get thet total magnitude of the gradient and save it in output array
+
+                    dQsdT(i,j,k) = sqrt(dQsdT_x*dQsdT_x + dQsdT_y*dQsdT_y + dQsdT_z*dQsdT_z)
 
                 end do
 

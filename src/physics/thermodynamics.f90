@@ -616,7 +616,7 @@ contains
         
         real(dp), allocatable :: Qs(:,:,:)
 
-        real(wp), parameter :: eps = 1e-4
+        real(wp), parameter :: eps = 1e-5
 
         nx = size(Q_strn,1)
         ny = size(Q_strn,2)
@@ -675,6 +675,10 @@ contains
 
                     ! Get thet total magnitude of the gradient and save it in output array
                     
+                    if (abs(dQsdT_x) .lt. TOL_UNDERFLOW) dQsdT_x = 0.0_dp
+                    if (abs(dQsdT_y) .lt. TOL_UNDERFLOW) dQsdT_y = 0.0_dp
+                    if (abs(dQsdT_z) .lt. TOL_UNDERFLOW) dQsdT_z = 0.0_dp
+
                     dQsdT(i,j,k) = sqrt(dQsdT_x*dQsdT_x + dQsdT_y*dQsdT_y + dQsdT_z*dQsdT_z)
 
                 end do

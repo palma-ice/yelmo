@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/yelmo-bench-2025-04-01'
+fldr='tmp/yelmo-bench-2025-04-02'
 
 runopt='-rs'
 
@@ -11,7 +11,7 @@ make benchmarks
 # EISMINT1 moving margin, EXPA and EXPF
 ./runme ${runopt} -q 12h -w 1:00:00 -e benchmarks -o ${fldr}/moving -n par-gmd/yelmo_EISMINT_moving.nml
 ./runme ${runopt} -q 12h -w 5:00:00 -e benchmarks -o ${fldr}/expa   -n par-gmd/yelmo_EISMINT_expa.nml
-./runme ${runopt} -q 12h -w 5:00:00 -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml
+./runme ${runopt} -q 12h -w 5:00:00 -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml -p ctrl.dt2D_out=1000
 
 # EISMINT1-moving margin with DIVA solvers
 # Note ydyn.solver="diva-noslip" is broken, as well as too high friction values, eg ydyn.beta_const=1e6

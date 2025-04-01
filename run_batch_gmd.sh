@@ -1,9 +1,9 @@
 #!/bin/bash
 
-fldr='tmp/yelmo-bench-v1.14'
+fldr='tmp/yelmo-bench-2025-04-01'
 
+#runopt='-r'
 runopt='-r'
-#runopt='-rs'
 
 ### BENCHMARK TESTS ###
 

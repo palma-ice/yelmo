@@ -566,16 +566,6 @@ end if
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
 
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: wt2D
-
-        real(wp) :: zn 
-        real(wp) :: wtn8(8)
-        real(wp) :: wt3D
-
         real(wp) :: dudxn(4)
         real(wp) :: dudyn(4)
         real(wp) :: dvdxn(4)
@@ -596,10 +586,10 @@ end if
         real(wp) :: ATTn8(8)
         real(wp) :: viscn8(8)
 
-        real(wp), allocatable :: dudx(:,:) 
-        real(wp), allocatable :: dudy(:,:) 
-        real(wp), allocatable :: dvdx(:,:) 
-        real(wp), allocatable :: dvdy(:,:) 
+        real(wp), allocatable :: dudx(:,:,:) 
+        real(wp), allocatable :: dudy(:,:,:) 
+        real(wp), allocatable :: dvdx(:,:,:) 
+        real(wp), allocatable :: dvdy(:,:,:) 
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
@@ -617,10 +607,10 @@ end if
         ny = size(visc,2)
         nz = size(visc,3)
         
-        allocate(dudx(nx,ny))
-        allocate(dudy(nx,ny))
-        allocate(dvdx(nx,ny))
-        allocate(dvdy(nx,ny))
+        allocate(dudx(nx,ny,nz))
+        allocate(dudy(nx,ny,nz))
+        allocate(dvdx(nx,ny,nz))
+        allocate(dvdy(nx,ny,nz))
 
         ! Calculate exponents 
         p1 = (1.0 - n_glen)/(2.0*n_glen)
@@ -631,24 +621,21 @@ end if
 
         ! Populate strain rates over the whole domain on acx- and acy-nodes
 
-        call calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
+        call calc_strain_rate_horizontal_2D(dudx(:,:,1),dudy(:,:,1),dvdx(:,:,1),dvdy(:,:,1),ux,uy,f_ice,dx,dy,boundaries)
+
+        ! Populate the remaining layers vertically (used when use_gq3D==.TRUE.)
+        do k = 2, nz
+            dudx(:,:,k) = dudx(:,:,1)
+            dudy(:,:,k) = dudy(:,:,1)
+            dvdx(:,:,k) = dvdx(:,:,1)
+            dvdy(:,:,k) = dvdy(:,:,1)
+        end do
 
         ! Calculate visc_eff on aa-nodes
 
         visc = visc_min
 
-        wt0  = 1.0/sqrt(3.0)
-        xn   = [wt0,-wt0,-wt0, wt0]
-        yn   = [wt0, wt0,-wt0,-wt0]
-        wtn  = [1.0,1.0,1.0,1.0]
-        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
-
-
-        zn   = wt0 
-        wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt3D = 8.0   ! Volume of square [-1:1,-1:1, -1:1]=> 2x2x2 => 8
-
-        !!$omp parallel do collapse(2) private(i,j,im1,jm1,ip1,jp1,im1m,ip1m,jm1m,jp1m,k,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn) &
+        !!$omp parallel do collapse(2) private(i,j,im1,jm1,ip1,jp1,k,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn) &
         !!$omp& private(eps_sq_n,ATTn,dudxn8,dudyn8,dvdxn8,dvdyn8,dudzn8,dvdzn8,eps_sq_n8,ATTn8,viscn8)
         do i = 1, nx
         do j = 1, ny  
@@ -658,34 +645,20 @@ end if
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                ! Limit neighbor indices to ice-covered points
-                ! if (f_ice(im1,j) .lt. 1.0) im1 = i
-                ! if (f_ice(ip1,j) .lt. 1.0) ip1 = i
-                ! if (f_ice(i,jm1) .lt. 1.0) jm1 = j
-                ! if (f_ice(i,jp1) .lt. 1.0) jp1 = j
-
-                ! Get strain rate terms on node locations
-                ! call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                
-                ! call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                ! call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-
-                call gq2D_to_nodes(gq2D,dudxn,dudx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dudyn,dudy,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                
-                call gq2D_to_nodes(gq2D,dvdxn,dvdx,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dvdyn,dvdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-
 if (.not. use_gq3D) then 
     ! 2D QUADRATURE
+
+                ! Get horizontal strain rate terms
+                ! (same for all layers, so just get them once for all layers)
+                call gq2D_to_nodes(gq2D,dudxn,dudx(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes(gq2D,dudyn,dudy(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                
+                call gq2D_to_nodes(gq2D,dvdxn,dvdx(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes(gq2D,dvdyn,dvdy(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
 
                 do k = 1, nz
                     
                     ! Get vertical shear strain rate terms
-                    ! call acx_to_nodes(dudzn,dudz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! call acy_to_nodes(dvdzn,dvdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-
                     call gq2D_to_nodes(gq2D,dudzn,dudz(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
                     call gq2D_to_nodes(gq2D,dvdzn,dvdz(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
                     
@@ -694,24 +667,17 @@ if (.not. use_gq3D) then
                                                 + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
                     ! Get rate factor
-                    !call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call gq2D_to_nodes(gq2D,ATTn,ATT(:,:,k),dx,dy,"aa",i,j,im1,ip1,jm1,jp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
-                    !visc(i,j,k) = sum(viscn*wtn)/wt2D
                     visc(i,j,k) = sum(viscn*gq2D%wt)/gq2D%wt_tot
 
                 end do
 
 else
     ! 3D QUADRATURE 
-
-                dudxn8 = [dudxn,dudxn]
-                dudyn8 = [dudyn,dudyn]
-                dvdxn8 = [dvdxn,dvdxn]
-                dvdyn8 = [dvdyn,dvdyn]
 
                 do k = 1, nz
                     
@@ -732,9 +698,14 @@ else
                         dz1 = H_ice(i,j)*(zeta_aa(nz) - zeta_aa(nz-1))
                     end if
                     
+                    ! Get horizontal strain rate terms
+                    call gq3D_to_nodes(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+
+                    call gq3D_to_nodes(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+
                     ! Get vertical shear strain rate terms
-                    !call acx_to_nodes_3D(dudzn8,dudz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    !call acy_to_nodes_3D(dvdzn8,dvdz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
                     call gq3D_to_nodes(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     call gq3D_to_nodes(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     
@@ -743,13 +714,11 @@ else
                                                 + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
 
                     ! Get rate factor
-                    !call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
                     call gq3D_to_nodes(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,"aa",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
-                    !visc(i,j,k) = sum(viscn8*wtn8)/wt3D
                     visc(i,j,k) = sum(viscn8*gq3D%wt)/gq3D%wt_tot
                 end do
 

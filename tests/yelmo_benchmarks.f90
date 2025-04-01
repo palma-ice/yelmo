@@ -394,7 +394,7 @@ program yelmo_benchmarks
         ! == Update timestep ===
 
         call tstep_update(ts,dtt,verbose=.FALSE.)
-        
+
         ! Update bnd%enh_srf to test transition of enhancement layers in time 
         if (ts%time_elapsed .lt. 0.5*(ts%time_end-ts%time_init)) then 
             yelmo1%bnd%enh_srf = 3.0 
@@ -628,7 +628,10 @@ contains
         
         call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K yr-1",long_name="Strain heating", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+        call nc_write(filename,"dQsdT",ylmo%thrm%now%dQsdT,units="yr-1",long_name="Strain heating derivative w.r.t. temperature", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &

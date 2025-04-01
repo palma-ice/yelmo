@@ -484,9 +484,9 @@ contains
 
         implicit none
 
-        real(wp), intent(INOUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
-        real(wp), intent(IN)    :: de(:,:,:)          ! nx,ny,nz_aa [a-1] Effective strain rate 
-        real(wp), intent(IN)    :: visc(:,:,:)        ! nx,ny,nz_aa [Pa a-1] Viscosity
+        real(wp), intent(INOUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [J yr-1 m-3] Heat production
+        real(wp), intent(IN)    :: de(:,:,:)          ! nx,ny,nz_aa [yr-1] Effective strain rate 
+        real(wp), intent(IN)    :: visc(:,:,:)        ! nx,ny,nz_aa [Pa yr-1] Viscosity
         real(wp), intent(IN)    :: cp(:,:,:)          ! nx,ny,nz_aa [J kg-1 K-1] Specific heat capacity
         real(wp), intent(IN)    :: rho_ice            ! [kg m-3] Ice density 
         real(wp), intent(IN)    :: beta1              ! Timestepping weighting parameter
@@ -521,9 +521,9 @@ contains
 
         implicit none
 
-        real(wp), intent(INOUT) :: Q_strn(:,:,:)    ! nx,ny,nz_aa  [Pa m a-1 ??] Heat production
-        real(wp), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity x-direction
-        real(wp), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity y-direction
+        real(wp), intent(INOUT) :: Q_strn(:,:,:)    ! nx,ny,nz_aa  [J yr-1 m-3] Heat production
+        real(wp), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa  [m yr-1] Velocity x-direction
+        real(wp), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa  [m yr-1] Velocity y-direction
         real(wp), intent(IN)    :: dzsdx(:,:)       ! nx,ny        [m m-1] Surface slope x-direction
         real(wp), intent(IN)    :: dzsdy(:,:)       ! nx,ny        [m m-1] Surface slope y-direction
         real(wp), intent(IN)    :: cp(:,:,:)        ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
@@ -595,14 +595,16 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_strain_heating_temp_derivative(dQsdT,Q_strn,T,H_ice,f_ice,zeta_aa,dx,dy,boundaries)
+    subroutine calc_strain_heating_temp_derivative(dQsdT,Q_strn,T,cp,H_ice,f_ice,zeta_aa,rho_ice,dx,dy,boundaries)
 
         real(wp), intent(INOUT) :: dQsdT(:,:,:)         ! [yr-1] d(Q_strn)/d(T), aa-nodes
-        real(wp), intent(IN)    :: Q_strn(:,:,:)        ! [K yr-1] Strain heating, aa-nodes
+        real(wp), intent(IN)    :: Q_strn(:,:,:)        ! [J yr-1 m-3] Strain heating, aa-nodes
         real(wp), intent(IN)    :: T(:,:,:)             ! [K] Temperature, aa-nodes
+        real(wp), intent(IN)    :: cp(:,:,:)            ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
         real(wp), intent(IN)    :: H_ice(:,:)
         real(wp), intent(IN)    :: f_ice(:,:)           ! [--] Ice area fraction
         real(wp), intent(IN)    :: zeta_aa(:)           ! [--] 
+        real(wp), intent(IN)    :: rho_ice              ! [kg m-3] Ice density 
         real(wp), intent(IN)    :: dx                   ! [m] x-direction grid spacing
         real(wp), intent(IN)    :: dy                   ! [m] y-direction grid spacing
         character(len=*), intent(IN) :: boundaries 
@@ -612,9 +614,17 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: dQsdT_x, dQsdT_y, dQsdT_z
 
+        real(wp), allocatable :: Qs(:,:,:)
+
         nx = size(Q_strn,1)
         ny = size(Q_strn,2)
         nz = size(Q_strn,3)
+
+        ! Get strain heating in units of K/yr
+        ! [J yr-1 m-3] / ([kg m-3]*[J/kg/K]) => [K/yr]
+
+        allocate(Qs(nx,ny,nz))
+        Qs = Q_strn/(rho_ice*cp)
 
         dQsdT = 0.0
 
@@ -630,20 +640,20 @@ contains
                 do k = 1, nz
 
                     ! Calculate the derivative in each direction
-                    dQsdT_x = (Q_strn(ip1,j,k) - Q_strn(im1,j,k)) / (T(ip1,j,k) - T(im1,j,k))
-                    dQsdT_y = (Q_strn(i,jp1,k) - Q_strn(i,jm1,k)) / (T(i,jp1,k) - T(i,jm1,k))
+                    dQsdT_x = (Qs(ip1,j,k) - Qs(im1,j,k)) / (T(ip1,j,k) - T(im1,j,k))
+                    dQsdT_y = (Qs(i,jp1,k) - Qs(i,jm1,k)) / (T(i,jp1,k) - T(i,jm1,k))
                     
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
                     if (f_ice(im1,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
-                        dQsdT_x = (Q_strn(i,j,k) - Q_strn(im1,j,k)) / (T(i,j,k) - T(im1,j,k))
+                        dQsdT_x = (Qs(i,j,k) - Qs(im1,j,k)) / (T(i,j,k) - T(im1,j,k))
                     else if (f_ice(im1,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
-                        dQsdT_x = (Q_strn(ip1,j,k) - Q_strn(i,j,k)) / (T(ip1,j,k) - T(i,j,k))
+                        dQsdT_x = (Qs(ip1,j,k) - Qs(i,j,k)) / (T(ip1,j,k) - T(i,j,k))
                     end if
 
                     if (f_ice(i,jm1) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
-                        dQsdT_y = (Q_strn(i,j,k) - Q_strn(i,jm1,k)) / (T(i,j,k) - T(i,jm1,k))
+                        dQsdT_y = (Qs(i,j,k) - Qs(i,jm1,k)) / (T(i,j,k) - T(i,jm1,k))
                     else if (f_ice(i,jm1) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
-                        dQsdT_y = (Q_strn(i,jp1,k) - Q_strn(i,j,k)) / (T(i,jp1,k) - T(i,j,k))
+                        dQsdT_y = (Qs(i,jp1,k) - Qs(i,j,k)) / (T(i,jp1,k) - T(i,j,k))
                     end if
                     
                     ! Vertical derivatives

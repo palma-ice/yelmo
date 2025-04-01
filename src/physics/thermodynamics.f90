@@ -21,6 +21,7 @@ module thermodynamics
     public :: calc_advec_horizontal_column_quick
     public :: calc_strain_heating
     public :: calc_strain_heating_sia
+    public :: calc_strain_heating_temp_derivative
     public :: calc_specific_heat_capacity
     public :: calc_thermal_conductivity
     public :: calc_T_pmp
@@ -594,6 +595,72 @@ contains
 
     end subroutine calc_strain_heating_sia
 
+    subroutine calc_strain_heating_temp_derivative(dQsdT,Q_strn,T,H_ice,f_ice,zeta_aa,dx,dy,boundaries)
+
+        real(wp), intent(INOUT) :: dQsdT(:,:,:)         ! [yr-1] d(Q_strn)/d(T), aa-nodes
+        real(wp), intent(IN)    :: Q_strn(:,:,:)        ! [K yr-1] Strain heating, aa-nodes
+        real(wp), intent(IN)    :: T(:,:,:)             ! [K] Temperature, aa-nodes
+        real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: f_ice(:,:)           ! [--] Ice area fraction
+        real(wp), intent(IN)    :: zeta_aa(:)           ! [--] 
+        real(wp), intent(IN)    :: dx                   ! [m] x-direction grid spacing
+        real(wp), intent(IN)    :: dy                   ! [m] y-direction grid spacing
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, k, nx, ny, nz, n 
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: dQsdT_x, dQsdT_y, dQsdT_z
+
+        nx = size(Q_strn,1)
+        ny = size(Q_strn,2)
+        nz = size(Q_strn,3)
+
+        dQsdT = 0.0
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            if (f_ice(i,j) .eq. 1.0) then 
+                ! Fully ice-covered point 
+
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+                do k = 1, nz
+
+                    ! Calculate the derivative in each direction
+                    dQsdT_x = (Q_strn(ip1,j,k) - Q_strn(im1,j,k)) / (T(ip1,j,k) - T(im1,j,k))
+                    dQsdT_y = (Q_strn(i,jp1,k) - Q_strn(i,jm1,k)) / (T(i,jp1,k) - T(i,jm1,k))
+                    
+                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+                    if (f_ice(im1,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
+                        dQsdT_x = (Q_strn(i,j,k) - Q_strn(im1,j,k)) / (T(i,j,k) - T(im1,j,k))
+                    else if (f_ice(im1,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
+                        dQsdT_x = (Q_strn(ip1,j,k) - Q_strn(i,j,k)) / (T(ip1,j,k) - T(i,j,k))
+                    end if
+
+                    if (f_ice(i,jm1) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
+                        dQsdT_y = (Q_strn(i,j,k) - Q_strn(i,jm1,k)) / (T(i,j,k) - T(i,jm1,k))
+                    else if (f_ice(i,jm1) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
+                        dQsdT_y = (Q_strn(i,jp1,k) - Q_strn(i,j,k)) / (T(i,jp1,k) - T(i,j,k))
+                    end if
+                    
+                    ! Vertical derivatives
+
+                    ! TO DO
+
+                end do
+
+            end if
+
+        end do
+        end do
+
+        return
+
+    end subroutine calc_strain_heating_temp_derivative
+
     subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,sec_year,boundaries)
         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
@@ -644,7 +711,7 @@ contains
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Get basal velocity and basal stress components on nodes
-                
+
                 call gq2D_to_nodes(gq2D,uxbn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
                 call gq2D_to_nodes(gq2D,uybn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
                 

@@ -389,14 +389,11 @@ program yelmo_benchmarks
     rock_method_default = trim(yelmo1%thrm%par%rock_method)
 
     ! Advance timesteps
-    call tstep_print_header(ts)
-
     do while (.not. ts%is_finished)
 
         ! == Update timestep ===
 
-        call tstep_update(ts,dtt)
-        call tstep_print(ts)
+        call tstep_update(ts,dtt,verbose=.FALSE.)
         
         ! Update bnd%enh_srf to test transition of enhancement layers in time 
         if (ts%time_elapsed .lt. 0.5*(ts%time_end-ts%time_init)) then 

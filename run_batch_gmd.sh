@@ -2,8 +2,7 @@
 
 fldr='tmp/yelmo-bench-2025-04-01'
 
-#runopt='-r'
-runopt='-r'
+runopt='-rs'
 
 ### BENCHMARK TESTS ###
 
@@ -20,7 +19,7 @@ make benchmarks
 ./runme ${runopt} -q 12h -w  1:00:00 -e benchmarks -o ${fldr}/moving-diva -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva" ydyn.beta_method=0 ydyn.beta_const=1e4 ctrl.time_end=30e3 ctrl.dt2D_out=200
 
 # EISMINT1 EXPA with SSA velocity turned on for testing symmetry (not part of GMD suite of tests)
-./runme ${runopt} -e benchmarks -o ${fldr}/expssa -n par/yelmo_EISMINT_ssa.nml
+./runme ${runopt} -q 12h -w  1:00:00 -e benchmarks -o ${fldr}/expssa -n par/yelmo_EISMINT_ssa.nml
 
 # Ensemble of HALFAR simulations with various values of 
 # dx to test numerical convergence with analytical solution

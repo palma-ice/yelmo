@@ -1,127 +1,44 @@
-module calving
-    ! Definitions for various calving laws 
+module calving_ac
+    ! Definitions for various calving laws on ac nodes. 
+    ! This will be used for flux calving (lsf) 
 
     use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW
     use yelmo_tools, only : get_neighbor_indices
     use topography, only : calc_H_eff 
 
     implicit none 
-
-
     private 
 
-    public :: apply_calving_rate_thin
-
-    public :: calc_calving_rate_tongues
-    public :: calc_calving_rate_kill 
+    ! TO DO
+    !public :: apply_calving_rate_thin
+    !public :: calc_calving_rate_tongues
+    !public :: calc_calving_rate_kill 
     
     ! Calving related stress/strain routines 
-    public :: calc_eps_eff
-    public :: calc_tau_eff
+    !public :: calc_eps_eff
+    public :: calc_tau_eff_ac
 
+    ! TO DO
     ! Floating calving routines 
-    public :: define_calving_thickness_threshold
-    public :: calc_calving_rate_threshold
+    !public :: define_calving_thickness_threshold
+    !public :: calc_calving_rate_threshold
 
-    public :: define_calving_stress_factor
-    public :: calc_calving_rate_vonmises_l19
+    !public :: define_calving_stress_factor
+    !public :: calc_calving_rate_vonmises_v23
 
-    public :: calc_calving_rate_eigen
+    !public :: calc_calving_rate_eigen
     
     ! Grounded calving routines 
-    public :: calc_calving_ground_rate_stress_b12
-    public :: calc_calving_ground_rate_stdev
+    ! TO DO
+    !public :: calc_calving_ground_rate_stress_b12
+    !public :: calc_calving_ground_rate_stdev
+
+    !=== CalvMIP calving rates ===
+    public :: calvmip_exp1
+    public :: calvmip_exp2
+    public :: calvmip_advection
 
 contains 
-
-    subroutine mb_calving_rate(mb_calv,calv_rate,H_ice,f_ice,f_grnd,dx,boundaries)
-        ! Convert the calving rate into a basal-mass balance component.
-
-        implicit none 
-
-        real(wp), intent(OUT) :: mb_calv(:,:)
-        real(wp), intent(IN)  :: calv_rate(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: f_grnd(:,:)  
-        real(wp), intent(IN)  :: dx
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer  :: i, j
-        integer  :: im1, jm1, ip1, jp1
-        integer  :: nx, ny 
-        real(wp) :: dy   
-        real(wp) :: calv_now
-        real(wp) :: H_eff 
-        real(wp) :: wt
-        
-        real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        ! Assume square grid cells 
-        dy = dx 
-
-        mb_calv = 0.0_wp
-
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
-        do j = 1, ny
-            do i = 1, nx  
-            
-                ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                    
-                if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
-                    ! Floating ice point, calculate calving rate at the margin 
-        
-                    ! How many calving-fronts for this cell?
-                    wt = 0.0 
-                    if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) wt = wt + 1.0_wp
-                    if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) wt = wt + 1.0_wp
-                    if (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) wt = wt + 1.0_wp
-                    if (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.0.0) wt = wt + 1.0_wp
-        
-                    if (wt .gt. 0.0_wp) then 
-                        ! Point is at calving front 
-        
-                        ! Get effective ice thickness
-                        call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
-        
-                        ! Convert to vertical height change spread over the whole cell
-                        ! Volume calved, V = H_eff*calv_ref*dx
-                        ! Area of grid cell, A = dx*dy
-                        ! Height change spread over cell, 
-                        !   calv = V/A = H_eff*calv_ref*dx / (dx*dy)
-                        !   calv = H_eff*calv_ref / (dy)
-                        ! Using sqrt(dx*dy) in the denominator accounts for the case
-                        ! where dx != dy. If dx=dy, then expresion below is equivalent to above.
-
-                        calv_now = (H_eff*calv_rate) / sqrt(dx*dy)
-            
-                        ! Apply calving limit
-                        mb_calv(i,j) = -min(calv_now,calv_lim)
-        
-                    end if 
-    
-                end if
-        
-            end do
-        end do
-
-        return
-
-    end subroutine mb_calving_rate
-
-    subroutine flux_calving_rate(clv_rate_x,clv_rate_y)
-        ! Subdivide the calving rate into x and y component.
-    
-        
-    
-        return
-    
-    end subroutine flux_calving_rate
 
     ! ===================================================================
     !
@@ -129,39 +46,9 @@ contains
     !
     ! ===================================================================
 
-    elemental subroutine define_calving_stress_factor(kt,z_bed_corr,kt_shallow,kt_deep,z_shallow,z_deep)
-        ! Scale stress factor with depth. Physical meaning?
-
-        implicit none
-
-        real(wp), intent(OUT) :: kt
-        real(wp), intent(IN)  :: z_bed_corr      ! [m] Bed elevation relative to sea level height (negative value)
-        real(wp), intent(IN)  :: kt_shallow
-        real(wp), intent(IN)  :: kt_deep
-        real(wp), intent(IN)  :: z_shallow 
-        real(wp), intent(IN)  :: z_deep
-
-        ! Local variables
-        integer :: i, j, nx, ny 
-
-        if(z_bed_corr .le. z_deep) then
-            ! Deep water
-            kt = kt_deep
-        else if(z_bed_corr .ge. z_shallow) then
-            ! Shallow water
-            kt = kt_shallow
-        else 
-            ! Linear interpolation between thickness thresholds
-            kt = kt_deep + &
-                    (kt_shallow - kt_deep) * (z_bed_corr - z_deep)/(z_shallow - z_deep)
-        end if
-
-        return
-            
-    end subroutine define_calving_stress_factor
-
-    subroutine calc_eps_eff(eps_eff,eps_eig_1,eps_eig_2,f_ice,boundaries)
-        ! Effective stran rate based. Levermann et al. (2012)
+    ! TO DO
+    subroutine calc_eps_eff_ac(eps_eff,eps_eig_1,eps_eig_2,f_ice,boundaries)
+        ! Effective strain rate based. Levermann et al. (2012)
 
         implicit none 
 
@@ -213,7 +100,6 @@ contains
             else 
                 ! Stresses are available at this margin point. 
                 ! Calculate the effective strain rate directly.
-
                 eps_eff(i,j) = eps_eig_1(i,j) * eps_eig_2(i,j)
                 
             end if 
@@ -224,9 +110,9 @@ contains
 
         return 
 
-    end subroutine calc_eps_eff
+    end subroutine calc_eps_eff_ac
     
-    subroutine calc_tau_eff(tau_eff,tau_eig_1,tau_eig_2,f_ice,w2,boundaries)
+    subroutine calc_tau_eff_ac(tau_eff,tau_eig_1,tau_eig_2,f_ice,w2,boundaries)
         ! Effective stress rates. Based on additional of principal stresses.
 
         implicit none 
@@ -291,9 +177,9 @@ contains
 
         return 
 
-    end subroutine calc_tau_eff
+    end subroutine calc_tau_eff_ac
     
-    elemental function calc_tau_eff_now(teig1,teig2,w2) result(tau_eff) 
+    elemental function calc_tau_eff_now_ac(teig1,teig2,w2) result(tau_eff) 
 
         implicit none 
 
@@ -311,7 +197,7 @@ contains
 
         return 
 
-    end function calc_tau_eff_now
+    end function calc_tau_eff_now_ac
 
     ! ===================================================================
     !
@@ -319,34 +205,6 @@ contains
     !
     ! ===================================================================
     
-    elemental subroutine define_calving_thickness_threshold(H_calv,z_bed_corr,H_calv_shallow,H_calv_deep,z_shallow,z_deep)
-        ! Calving thickness threshold based on ocean depth. Physical meaning?
-
-        implicit none
-
-        real(wp), intent(OUT) :: H_calv
-        real(wp), intent(IN)  :: z_bed_corr      ! [m] Bed elevation relative to sea level height (negative value)
-        real(wp), intent(IN)  :: H_calv_shallow
-        real(wp), intent(IN)  :: H_calv_deep
-        real(wp), intent(IN)  :: z_shallow 
-        real(wp), intent(IN)  :: z_deep
-
-        if(z_bed_corr .le. z_deep) then
-            ! Deep water
-            H_calv = H_calv_deep
-        else if(z_bed_corr .ge. z_shallow) then
-            ! Shallow water
-            H_calv = H_calv_shallow
-        else 
-            ! Linear interpolation between thickness thresholds
-            H_calv = H_calv_deep + &
-                    (H_calv_shallow - H_calv_deep) * (z_bed_corr - z_deep)/(z_shallow - z_deep)
-        end if
-
-        return
-        
-    end subroutine define_calving_thickness_threshold
-
     subroutine calc_calving_rate_threshold(mb_calv,H_ice,f_ice,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
@@ -444,7 +302,7 @@ contains
     
     end subroutine calc_calving_rate_vonmises_l19
 
-    subroutine calc_calving_rate_vonmises_v23(mb_calv,tau_eff,tau_ice,uxy_bar)
+    subroutine calc_calving_rate_vonmises_v23(mb_calv,tau_eff,tau_ice,ux_ac,vy_ac)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Wilner et al. (2023)
         ! Eq. 2.
@@ -455,7 +313,8 @@ contains
         real(wp), intent(OUT) :: mb_calv(:,:) 
         real(wp), intent(IN)  :: tau_eff(:,:)
         real(wp), intent(IN)  :: tau_ice
-        real(wp), intent(IN)  :: uxy_bar(:,:)
+        real(wp), intent(IN)  :: ux_ac(:,:)
+        real(wp), intent(IN)  :: vy_ac(:,:)
 
         ! Local variables 
         integer  :: i, j
@@ -968,4 +827,215 @@ contains
             
         end subroutine calc_calving_rate_tongues
 
-end module calving
+        ! ===================================================================
+    !
+    !                      CalvMIP experiments
+    !
+    ! ===================================================================
+
+    subroutine calvmip_exp1(crx_ac,cry_ac,ux_ac,vy_ac,lsf_aa,Hgrnd_aa,dx,boundaries)
+        ! Experiment 1 of CalvMIP
+        implicit none
+    
+        real(wp), intent(OUT) :: crx_ac(:,:),cry_ac(:,:)   ! Calving rates on ac-nodes
+        real(wp), intent(IN)  :: ux_ac(:,:),vy_ac(:,:)     ! Velocities on ac-nodes
+        real(wp), intent(IN)  :: lsf_aa(:,:)               ! LSF mask on aa-nodes
+        real(wp), intent(IN)  :: Hgrnd_aa(:,:)             ! Grounded above or below sea-level
+        real(wp), intent(IN)  :: dx                        ! Ice resolution
+        character(len=*), intent(IN)  :: boundaries        ! Boundary conditions to impose
+    
+        ! Local variables
+        integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
+        real(wp) :: r
+    
+        ! points inside the radius 750km should have no calving rate
+        nx = size(ux_ac,1)
+        ny = size(ux_ac,2)
+    
+        ! test for LSF improvement
+        crx_ac = 0.0_wp !-ux_ac !0.0_wp
+        cry_ac = 0.0_wp !-vy_ac !0.0_wp
+    
+        r = 0.0_wp
+        do j = 1, ny
+        do i = 1, nx
+    
+            ! 1st. No calving for land-based grounded points (assymetry?)
+            !call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                
+            ! x-direction
+            !if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(ip1,j) .gt. 0.0) then
+            !    crx_ac(i,j) = 0.0_wp
+            !else if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(im1,j) .gt. 0.0) then
+            !    crx_ac(im1,j) = 0.0_wp
+            !end if
+    
+            ! y-direction
+            !if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(i,jp1) .gt. 0.0) then
+            !    cry_ac(i,j) = 0.0_wp
+            !else if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(i,jm1) .gt. 0.0) then
+            !    cry_ac(i,jm1) = 0.0_wp
+            !end if
+    
+            ! 2nd. Below radius, no calving at the front
+            ! aa-nodes indices
+            r = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
+    
+            ! inland points
+            !if (r .lt. 750e3) then
+            !
+            !    ! x-direction
+            !    if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
+            !        crx_ac(i,j)   = 0.0
+            !        crx_ac(im1,j) = 0.0
+            !    else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
+            !        crx_ac(im1,j) = 0.0
+            !        crx_ac(i,j)   = 0.0
+            !    end if
+            !    
+            !    ! y-direction
+            !    if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
+            !       cry_ac(i,j)   = 0.0
+            !        cry_ac(i,jm1) = 0.0
+            !    else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
+            !        cry_ac(i,jm1) = 0.0
+            !        cry_ac(i,j)   = 0.0
+            !    end if
+            !end if
+    
+            ! border points
+            if (r .ge. 750e3) then
+                !crx_ac(i,j) = -ux_ac(i,j)
+                !cry_ac(i,j) = -vy_ac(i,j)
+                    
+                ! check direction
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                ! x-direction
+                if (0.5*(nx+1)-i .lt. 0.0) crx_ac(i,j)   = -ux_ac(i,j) 
+                if (0.5*(nx+1)-i .gt. 0.0) crx_ac(im1,j) = -ux_ac(im1,j)
+                ! y-direction
+                if (0.5*(ny+1)-j .lt. 0.0) cry_ac(i,j)   = -vy_ac(i,j) 
+                if (0.5*(ny+1)-j .gt. 0.0) cry_ac(i,jm1) = -vy_ac(i,jm1)
+    
+                ! border points
+                ! x-direction
+                !if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
+                !    crx_ac(i,j)   = -ux_ac(i,j)
+                !else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
+                !    crx_ac(im1,j) = -ux_ac(im1,j)   
+                !end if
+                
+                ! y-direction
+                !if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
+                !    cry_ac(i,j)   = -vy_ac(i,j)
+                !else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
+                !    cry_ac(i,jm1) = -vy_ac(i,jm1)
+                !end if
+                
+            end if
+    
+        end do
+        end do
+    
+        !interpolate calving rates to inland ice
+        !if (SUM(crx_ac) /= 0.0) then
+        !    where(crx_ac .eq. 0.0) crx_ac = -ux_ac
+        !end if
+        !if (SUM(cry_ac) /= 0.0) then
+        !   where(cry_ac .eq. 0.0) cry_ac = -vy_ac
+        !end if
+        !call interpolatex_missing_iterative(crx_ac,ux_ac)
+        !call interpolatey_missing_iterative(cry_ac,vy_ac)
+    
+        return
+    
+    end subroutine calvmip_exp1
+    
+    subroutine calvmip_exp2(crx_ac,cry_ac,ux_ac,vy_ac,time,boundaries)
+        ! Experiment 2 of CalvMIP
+    
+        implicit none
+    
+        real(wp), intent(OUT) :: crx_ac(:,:), cry_ac(:,:)
+        real(wp), intent(IN)  :: ux_ac(:,:),vy_ac(:,:)
+        real(wp), intent(IN)  :: time
+        character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
+    
+        ! local variables
+        integer :: i, j, im1, ip1, jm1, jp1, nx, ny
+        real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
+        real(wp)              :: wv   
+    
+        nx = size(ux_ac,1)
+        ny = size(ux_ac,2) 
+    
+        wv = 300.0 * sin(2.0 * pi * time / 1000.0) 
+    
+        do j = 1, ny
+        do i = 1, nx
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+    
+            ! define over whole domain
+            ! x-direction
+            if(ux_ac(i,j) .gt. 0.0_wp) then
+                crx_ac(i,j) = MIN(-(ux_ac(i,j)+wv),0.0_wp)
+            else if (ux_ac(i,j) .lt. 0.0_wp) then
+                crx_ac(i,j) = MAX(-(ux_ac(i,j)-wv),0.0_wp)
+            else
+                crx_ac(i,j) = 0.0_wp
+            end if
+    
+            ! y-direction
+            if(vy_ac(i,j) .gt. 0.0_wp) then
+                cry_ac(i,j) = MIN(-(vy_ac(i,j)+wv),0.0_wp)
+            else if (vy_ac(i,j) .lt. 0.0_wp) then
+                cry_ac(i,j) = MAX(-(vy_ac(i,j)-wv),0.0_wp)
+            else
+                cry_ac(i,j) = 0.0_wp
+            end if
+    
+        end do
+        end do
+    
+        return
+    
+    end subroutine calvmip_exp2
+    
+    subroutine calvmip_advection(crx_ac,cry_ac,ux_ac,vy_ac,time)
+    ! Advection test
+    
+        implicit none
+    
+        real(wp), intent(OUT) :: crx_ac(:,:),cry_ac(:,:)   ! Calving rates on ac-nodes
+        real(wp), intent(IN)  :: ux_ac(:,:),vy_ac(:,:)     ! Velocities on ac-nodes
+        real(wp), intent(IN)  :: time
+    
+        ! Local variables
+        real(wp) :: advection, dx
+        real(wp) :: xc, yc
+        integer  :: i,j,nx,ny
+        real(wp), parameter   :: pi = acos(-1.0)  
+        
+        advection = 0.707107*1000.0
+        dx = 1000.0 
+        nx = size(ux_ac,1)
+        ny = size(ux_ac,2) 
+        xc = 25
+        yc = 25
+    
+        do j=1,ny
+        do i=1,nx
+            crx_ac(i,j) = advection*((0.001*(i-1)*dx-xc)/nx)*sin(2*pi*time/10)
+            cry_ac(i,j) = advection*((0.001*(j-1)*dx-yc)/ny)*sin(2*pi*time/10)
+        end do
+        end do
+    
+        ! test for LSF improvement
+        !crx_ac = -ux_ac + advection
+        !cry_ac = -vy_ac + advection
+    
+        return
+
+    end subroutine calvmip_advection
+
+end module calving_ac

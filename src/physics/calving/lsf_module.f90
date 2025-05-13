@@ -1,4 +1,4 @@
-module yelmo_lsf
+module lsf_module
 
     use yelmo_defs,        only : sp, dp, wp, prec, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
     use yelmo_tools,       only : get_neighbor_indices
@@ -23,11 +23,6 @@ module yelmo_lsf
     public :: LSFadvection
     public :: LSFupdate
     public :: LSFborder
-
-    !=== CalvMIP calving rates ===
-    public :: calvmip_exp1
-    public :: calvmip_exp2
-    public :: calvmip_advection
 
     !=== Total CMB_flt (aesthetics) ===
     public :: calc_cmb_flt
@@ -63,36 +58,6 @@ contains
         return
         
     end subroutine LSFinit
-
-    subroutine LSFadvection(LSF,zbed,dx)
-        
-        implicit none
-
-        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask
-        real(wp), intent(IN)  :: zbed(:,:)    
-        real(wp), intent(IN)  :: dx            ! Model resolution
-    
-        ! Internal variables
-        real(wp) :: rc, xc, yc
-        integer  :: i,j,nx,ny
-
-        nx = size(zbed,1)
-        ny = size(zbed,2)
-        rc = 12.5
-        xc = 25
-        yc = 25 
-
-        do j=1,ny
-        do i=1,nx
-
-        LSF(i,j) = ((0.001*(i-1)*dx-xc)**2+(0.001*(j-1)*dx-yc)**2)**0.5 -rc 
-
-        end do
-        end do
-
-        return
-
-    end subroutine LSFadvection
 
     subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
 
@@ -214,217 +179,6 @@ contains
         return
 
     end subroutine LSFborder
-
-    ! ===================================================================
-    !
-    !                      CalvMIP experiments
-    !
-    ! ===================================================================
-
-    subroutine calvmip_exp1(crx_ac,cry_ac,ux_ac,vy_ac,lsf_aa,Hgrnd_aa,dx,boundaries)
-        ! Experiment 1 of CalvMIP
-        implicit none
-    
-        real(wp), intent(OUT) :: crx_ac(:,:),cry_ac(:,:)   ! Calving rates on ac-nodes
-        real(wp), intent(IN)  :: ux_ac(:,:),vy_ac(:,:)     ! Velocities on ac-nodes
-        real(wp), intent(IN)  :: lsf_aa(:,:)               ! LSF mask on aa-nodes
-        real(wp), intent(IN)  :: Hgrnd_aa(:,:)             ! Grounded above or below sea-level
-        real(wp), intent(IN)  :: dx                        ! Ice resolution
-        character(len=*), intent(IN)  :: boundaries        ! Boundary conditions to impose
-    
-        ! Local variables
-        integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
-        real(wp) :: r
-    
-        ! points inside the radius 750km should have no calving rate
-        nx = size(ux_ac,1)
-        ny = size(ux_ac,2)
-    
-        ! test for LSF improvement
-        crx_ac = 0.0_wp !-ux_ac !0.0_wp
-        cry_ac = 0.0_wp !-vy_ac !0.0_wp
-    
-        r = 0.0_wp
-        do j = 1, ny
-        do i = 1, nx
-    
-            ! 1st. No calving for land-based grounded points (assymetry?)
-            !call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                
-            ! x-direction
-            !if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(ip1,j) .gt. 0.0) then
-            !    crx_ac(i,j) = 0.0_wp
-            !else if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(im1,j) .gt. 0.0) then
-            !    crx_ac(im1,j) = 0.0_wp
-            !end if
-    
-            ! y-direction
-            !if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(i,jp1) .gt. 0.0) then
-            !    cry_ac(i,j) = 0.0_wp
-            !else if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(i,jm1) .gt. 0.0) then
-            !    cry_ac(i,jm1) = 0.0_wp
-            !end if
-    
-            ! 2nd. Below radius, no calving at the front
-            ! aa-nodes indices
-            r = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
-    
-            ! inland points
-            !if (r .lt. 750e3) then
-            !
-            !    ! x-direction
-            !    if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
-            !        crx_ac(i,j)   = 0.0
-            !        crx_ac(im1,j) = 0.0
-            !    else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
-            !        crx_ac(im1,j) = 0.0
-            !        crx_ac(i,j)   = 0.0
-            !    end if
-            !    
-            !    ! y-direction
-            !    if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
-            !       cry_ac(i,j)   = 0.0
-            !        cry_ac(i,jm1) = 0.0
-            !    else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
-            !        cry_ac(i,jm1) = 0.0
-            !        cry_ac(i,j)   = 0.0
-            !    end if
-            !end if
-    
-            ! border points
-            if (r .ge. 750e3) then
-                !crx_ac(i,j) = -ux_ac(i,j)
-                !cry_ac(i,j) = -vy_ac(i,j)
-                    
-                ! check direction
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                ! x-direction
-                if (0.5*(nx+1)-i .lt. 0.0) crx_ac(i,j)   = -ux_ac(i,j) 
-                if (0.5*(nx+1)-i .gt. 0.0) crx_ac(im1,j) = -ux_ac(im1,j)
-                ! y-direction
-                if (0.5*(ny+1)-j .lt. 0.0) cry_ac(i,j)   = -vy_ac(i,j) 
-                if (0.5*(ny+1)-j .gt. 0.0) cry_ac(i,jm1) = -vy_ac(i,jm1)
-    
-                ! border points
-                ! x-direction
-                !if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
-                !    crx_ac(i,j)   = -ux_ac(i,j)
-                !else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
-                !    crx_ac(im1,j) = -ux_ac(im1,j)   
-                !end if
-                
-                ! y-direction
-                !if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
-                !    cry_ac(i,j)   = -vy_ac(i,j)
-                !else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
-                !    cry_ac(i,jm1) = -vy_ac(i,jm1)
-                !end if
-                
-            end if
-    
-        end do
-        end do
-    
-        !interpolate calving rates to inland ice
-        !if (SUM(crx_ac) /= 0.0) then
-        !    where(crx_ac .eq. 0.0) crx_ac = -ux_ac
-        !end if
-        !if (SUM(cry_ac) /= 0.0) then
-        !   where(cry_ac .eq. 0.0) cry_ac = -vy_ac
-        !end if
-        !call interpolatex_missing_iterative(crx_ac,ux_ac)
-        !call interpolatey_missing_iterative(cry_ac,vy_ac)
-    
-        return
-    
-    end subroutine calvmip_exp1
-    
-    subroutine calvmip_exp2(crx_ac,cry_ac,ux_ac,vy_ac,time,boundaries)
-        ! Experiment 2 of CalvMIP
-    
-        implicit none
-    
-        real(wp), intent(OUT) :: crx_ac(:,:), cry_ac(:,:)
-        real(wp), intent(IN)  :: ux_ac(:,:),vy_ac(:,:)
-        real(wp), intent(IN)  :: time
-        character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
-    
-        ! local variables
-        integer :: i, j, im1, ip1, jm1, jp1, nx, ny
-        real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
-        real(wp)              :: wv   
-    
-        nx = size(ux_ac,1)
-        ny = size(ux_ac,2) 
-    
-        wv = 300.0 * sin(2.0 * pi * time / 1000.0) 
-    
-        do j = 1, ny
-        do i = 1, nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-    
-            ! define over whole domain
-            ! x-direction
-            if(ux_ac(i,j) .gt. 0.0_wp) then
-                crx_ac(i,j) = MIN(-(ux_ac(i,j)+wv),0.0_wp)
-            else if (ux_ac(i,j) .lt. 0.0_wp) then
-                crx_ac(i,j) = MAX(-(ux_ac(i,j)-wv),0.0_wp)
-            else
-                crx_ac(i,j) = 0.0_wp
-            end if
-    
-            ! y-direction
-            if(vy_ac(i,j) .gt. 0.0_wp) then
-                cry_ac(i,j) = MIN(-(vy_ac(i,j)+wv),0.0_wp)
-            else if (vy_ac(i,j) .lt. 0.0_wp) then
-                cry_ac(i,j) = MAX(-(vy_ac(i,j)-wv),0.0_wp)
-            else
-                cry_ac(i,j) = 0.0_wp
-            end if
-    
-        end do
-        end do
-    
-        return
-    
-    end subroutine calvmip_exp2
-    
-    subroutine calvmip_advection(crx_ac,cry_ac,ux_ac,vy_ac,time)
-    ! Advection test
-    
-        implicit none
-    
-        real(wp), intent(OUT) :: crx_ac(:,:),cry_ac(:,:)   ! Calving rates on ac-nodes
-        real(wp), intent(IN)  :: ux_ac(:,:),vy_ac(:,:)     ! Velocities on ac-nodes
-        real(wp), intent(IN)  :: time
-    
-        ! Local variables
-        real(wp) :: advection, dx
-        real(wp) :: xc, yc
-        integer  :: i,j,nx,ny
-        real(wp), parameter   :: pi = acos(-1.0)  
-        
-        advection = 0.707107*1000.0
-        dx = 1000.0 
-        nx = size(ux_ac,1)
-        ny = size(ux_ac,2) 
-        xc = 25
-        yc = 25
-    
-        do j=1,ny
-        do i=1,nx
-            crx_ac(i,j) = advection*((0.001*(i-1)*dx-xc)/nx)*sin(2*pi*time/10)
-            cry_ac(i,j) = advection*((0.001*(j-1)*dx-yc)/ny)*sin(2*pi*time/10)
-        end do
-        end do
-    
-        ! test for LSF improvement
-        !crx_ac = -ux_ac + advection
-        !cry_ac = -vy_ac + advection
-    
-        return
-
-    end subroutine calvmip_advection
 
     ! ===================================================================
     !
@@ -745,4 +499,35 @@ contains
 
     end subroutine apply_tendency_lsf
 
-end module yelmo_lsf
+    ! Advection test (works)
+    subroutine LSFadvection(LSF,zbed,dx)
+        
+        implicit none
+    
+        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask
+        real(wp), intent(IN)  :: zbed(:,:)    
+        real(wp), intent(IN)  :: dx            ! Model resolution
+        
+        ! Internal variables
+        real(wp) :: rc, xc, yc
+        integer  :: i,j,nx,ny
+    
+        nx = size(zbed,1)
+        ny = size(zbed,2)
+        rc = 12.5
+        xc = 25
+        yc = 25 
+    
+        do j=1,ny
+        do i=1,nx
+    
+        LSF(i,j) = ((0.001*(i-1)*dx-xc)**2+(0.001*(j-1)*dx-yc)**2)**0.5 -rc 
+    
+        end do
+        end do
+    
+        return
+    
+    end subroutine LSFadvection
+
+end module lsf_module

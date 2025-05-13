@@ -867,11 +867,12 @@ end if
 
     end subroutine calc_ytopo_rates
     
-    subroutine ytopo_par_load(par,filename,group,nx,ny,dx,init)
+    subroutine ytopo_par_load(par,filename,group,group_ycalv,nx,ny,dx,init)
 
         type(ytopo_param_class), intent(OUT) :: par
         character(len=*),        intent(IN)  :: filename
         character(len=*),        intent(IN)  :: group       ! Usually "ytopo"
+        character(len=*),        intent(IN)  :: group_ycalv ! calving group
         integer,                 intent(IN)  :: nx, ny 
         real(wp),                intent(IN)  :: dx  
         logical, optional,       intent(IN)  :: init 
@@ -885,8 +886,6 @@ end if
         ! Store parameter values in output object
         call nml_read(filename,group,"solver",            par%solver,           init=init_pars)
         call nml_read(filename,group,"surf_gl_method",    par%surf_gl_method,   init=init_pars)
-        call nml_read(filename,group,"calv_flt_method",   par%calv_flt_method,  init=init_pars)
-        call nml_read(filename,group,"calv_grnd_method",  par%calv_grnd_method, init=init_pars)
         call nml_read(filename,group,"bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
         call nml_read(filename,group,"fmb_method",        par%fmb_method,       init=init_pars)
         call nml_read(filename,group,"dmb_method",        par%dmb_method,       init=init_pars)
@@ -897,13 +896,6 @@ end if
         call nml_read(filename,group,"topo_rel",          par%topo_rel,         init=init_pars)
         call nml_read(filename,group,"topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
         call nml_read(filename,group,"topo_rel_field",    par%topo_rel_field,   init=init_pars)
-        call nml_read(filename,group,"calv_tau",          par%calv_tau,         init=init_pars)
-        call nml_read(filename,group,"calv_thin",         par%calv_thin,        init=init_pars)
-        call nml_read(filename,group,"H_min_grnd",        par%H_min_grnd,       init=init_pars)
-        call nml_read(filename,group,"H_min_flt",         par%H_min_flt,        init=init_pars)
-        call nml_read(filename,group,"sd_min",            par%sd_min,           init=init_pars)
-        call nml_read(filename,group,"sd_max",            par%sd_max,           init=init_pars)
-        call nml_read(filename,group,"calv_grnd_max",     par%calv_grnd_max,    init=init_pars)
         call nml_read(filename,group,"grad_lim",          par%grad_lim,         init=init_pars)
         call nml_read(filename,group,"grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
         call nml_read(filename,group,"dist_grz",          par%dist_grz,         init=init_pars)
@@ -914,11 +906,6 @@ end if
         call nml_read(filename,group,"fmb_scale",         par%fmb_scale,        init=init_pars)
         call nml_read(filename,group,"k2",                par%k2,               init=init_pars)
         call nml_read(filename,group,"w2",                par%w2,               init=init_pars)
-        call nml_read(filename,group,"kt_ref",            par%kt_ref,           init=init_pars)
-        call nml_read(filename,group,"kt_deep",           par%kt_deep,          init=init_pars)
-        call nml_read(filename,group,"Hc_ref",            par%Hc_ref,           init=init_pars)
-        call nml_read(filename,group,"Hc_ref_thin",       par%Hc_ref_thin,      init=init_pars)
-        call nml_read(filename,group,"Hc_deep",           par%Hc_deep,          init=init_pars)
         call nml_read(filename,group,"zb_deep_0",         par%zb_deep_0,        init=init_pars)
         call nml_read(filename,group,"zb_deep_1",         par%zb_deep_1,        init=init_pars)
         call nml_read(filename,group,"zb_sigma",          par%zb_sigma,         init=init_pars)
@@ -928,8 +915,25 @@ end if
         call nml_read(filename,group,"dmb_m_d",           par%dmb_m_d,          init=init_pars)
         call nml_read(filename,group,"dmb_m_r",           par%dmb_m_r,          init=init_pars)
         
-        ! === Set internal parameters =====
-
+        ! === read calving routine ===
+        call nml_read(filename,group_ycalv,"use_lsf",           par%use_lsf,            init=init_pars)
+        call nml_read(filename,group_ycalv,"dt_lsf",            par%dt_lsf,             init=init_pars)        
+        call nml_read(filename,group_ycalv,"calv_flt_method",   par%calv_flt_method,    init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_grnd_method",  par%calv_grnd_method,   init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_tau",          par%calv_tau,           init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_thin",         par%calv_thin,          init=init_pars)
+        call nml_read(filename,group_ycalv,"H_min_grnd",        par%H_min_grnd,         init=init_pars)
+        call nml_read(filename,group_ycalv,"H_min_flt",         par%H_min_flt,          init=init_pars)
+        call nml_read(filename,group_ycalv,"sd_min",            par%sd_min,             init=init_pars)
+        call nml_read(filename,group_ycalv,"sd_max",            par%sd_max,             init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_grnd_max",     par%calv_grnd_max,      init=init_pars)        
+        call nml_read(filename,group_ycalv,"kt_ref",            par%kt_ref,             init=init_pars)
+        call nml_read(filename,group_ycalv,"kt_deep",           par%kt_deep,            init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref",            par%Hc_ref,             init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref_thin",       par%Hc_ref_thin,        init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_deep",           par%Hc_deep,            init=init_pars)
+        
+        ! === Set internal parameters ====
         par%nx  = nx 
         par%ny  = ny 
         par%dx  = dx 

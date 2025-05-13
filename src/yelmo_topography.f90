@@ -8,7 +8,9 @@ module yelmo_topography
     use yelmo_tools 
     
     use mass_conservation
-    use calving
+    use calving_aa
+    use calving_ac
+    use lsf_module
     use topography 
     use discharge
 
@@ -226,8 +228,17 @@ end if
 
                     tpo%now%mb_net = tpo%now%smb + tpo%now%bmb + tpo%now%fmb + tpo%now%dmb 
 
+                    ! === calving ===
                     ! Calculate and apply calving
-                    call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
+                    if (tpo%par%use_lsf) then
+                        ! Level-set function as calving
+                        call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                        ! jablasco: dont delete, eliminate as bmb for stability
+                        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
+                    else
+                        ! Mass balance calving
+                        call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
+                    end
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -596,6 +607,100 @@ end if
         return
 
     end subroutine calc_ytopo_calving
+
+    ! jablasco: lsf routine
+    subroutine calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time_now)
+
+        implicit none
+    
+        type(ytopo_class),  intent(INOUT) :: tpo
+        type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd
+        real(wp),           intent(IN)    :: dt
+        real(wp), optional, intent(IN)    :: time_now
+    
+        ! Local variables
+        integer :: i, j, nx, ny
+        real(wp), allocatable :: var_dot(:,:)
+    
+        nx = size(tpo%now%H_ice,1)
+        ny = size(tpo%now%H_ice,2)
+       
+        allocate(var_dot(nx,ny))
+        var_dot = 0.0 ! check influence
+    
+        ! === Floating calving laws ===
+      
+        select case(trim(tpo%par%calv_flt_method))
+    
+            case("zero","none")
+    
+                tpo%now%cmb_flt_x = 0.0_wp
+                tpo%now%cmb_flt_y = 0.0_wp
+                tpo%now%cmb_flt   = 0.0_wp
+    
+            case("equil")
+                ! For an equilibrated ice sheet calving rate should be opposite to ice velocity
+                tpo%now%cmb_flt_x = -1*dyn%now%ux_bar
+                tpo%now%cmb_flt_y = -1*dyn%now%uy_bar
+    
+            case("vm16")
+     
+                call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2, &
+                                  tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
+                ! convert tau_max in a parameter
+                ! jablasco: change!
+                !call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice, &
+                !                                    tpo%now%f_grnd,tpo%now%tau_eff,tpo%par%dx,tau_max=0.75e6)
+    
+            ! TO DO
+            ! Add new laws
+    
+            ! === CalvMIP ===
+            case("exp1","exp3")
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
+                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+    
+            case("exp2","exp4")
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
+                !call calc_cmb_border(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%lsf,tpo%par%boundaries)
+                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+    
+            case("advection")
+                call calvmip_advection(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
+                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+    
+            case DEFAULT
+    
+                write(*,*) "calc_ytopo:: Error: floating calving method not recognized."
+                write(*,*) "calv_flt_method = ", trim(tpo%par%calv_flt_method)
+                stop
+    
+        end select
+    
+        ! === Marine terminating calving laws ===
+        ! MICI should be a marine terminating calving law (only for grounding-line points?)
+    
+        ! === Land terminating calving laws ===
+        ! For the moment we will assume no calving laws for land-terminating ice points
+    
+        ! === Merge all calving law ===
+        ! The idea is to merge then all calving-rates
+    
+    
+        ! === LSF advection ===
+        ! advect LSF mask based on the calving law
+        !call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
+    
+        call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'expl-upwind',tpo%par%boundaries)
+    
+        return
+    
+    end subroutine calc_ytopo_calving_lsf
 
     subroutine calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
         ! Calculate adjustments to surface elevation, bedrock elevation
@@ -1011,7 +1116,11 @@ end if
         allocate(now%dmb(nx,ny))
         allocate(now%cmb(nx,ny))
         allocate(now%cmb_flt(nx,ny))
+        allocate(now%cmb_flt_x(nx,ny))
+        allocate(now%cmb_flt_y(nx,ny))
         allocate(now%cmb_grnd(nx,ny))
+        allocate(now%lsf(nx,ny))       
+        allocate(now%dlsf(nx,ny))
         
         allocate(now%bmb_ref(nx,ny))
         allocate(now%fmb_ref(nx,ny))
@@ -1090,7 +1199,11 @@ end if
         now%dmb         = 0.0
         now%cmb         = 0.0
         now%cmb_flt     = 0.0
+        now%cmb_flt_x   = 0.0
+        now%cmb_flt_y   = 0.0
         now%cmb_grnd    = 0.0
+        now%lsf         = 1.0 ! init to 0.0?       
+        now%dlsf        = 0.0
         
         now%bmb_ref     = 0.0  
         now%fmb_ref     = 0.0
@@ -1179,7 +1292,11 @@ end if
         if (allocated(now%dmb))         deallocate(now%dmb)
         if (allocated(now%cmb))         deallocate(now%cmb)
         if (allocated(now%cmb_flt))     deallocate(now%cmb_flt)
+        if (allocated(now%cmb_flt_x))   deallocate(now%cmb_flt_x)
+        if (allocated(now%cmb_flt_y))   deallocate(now%cmb_flt_y)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
+        if (allocated(now%lsf))         deallocate(now%lsf)       
+        if (allocated(now%dlsf))        deallocate(now%dlsf)
         
         if (allocated(now%bmb_ref))     deallocate(now%bmb_ref)
         if (allocated(now%fmb_ref))     deallocate(now%fmb_ref)

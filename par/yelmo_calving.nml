@@ -17,6 +17,7 @@
     grid_path       = "none"
     phys_const      = "EISMINT"
     experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
+<<<<<<< HEAD
     nml_ytopo       = "ytopo"
     nml_ydyn        = "ydyn"
     nml_ytill       = "ytill"
@@ -27,6 +28,9 @@
     nml_init_topo   = "yelmo_init_topo"
     nml_data        = "yelmo_data"
     restart         = "no"
+=======
+    restart         = "None"
+>>>>>>> origin/jablasco-dev
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = False             ! Take H_ice from restart file
     restart_relax   = 1e3               ! [yrs] Years to relax from restart=>input topography
@@ -47,14 +51,14 @@
     pc_n_redo       = 10                ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 2.0               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1e-2              ! Predictor-corrector tolerance 
-
+    
 /
 
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
-    calv_flt_method     = "kill-pos"        ! "zero", "simple", "flux", "vm-l19", "kill", "kill-pos"
+    calv_flt_method     = "exp1" !"kill-pos"        ! "zero", "simple", "flux", "vm-l19", "kill", "kill-pos"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
-    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    bmb_gl_method       = "nmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -95,23 +99,24 @@
     dmb_sigma_ref       = 300.0             ! [m]   Reference bed roughness
     dmb_m_d             = 3.0               ! [-]   Discharge distance scaling exponent
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
-
+    grounded_melt       = False             ! only needed for opt
 /
 
 &ydyn
-    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
-    visc_method         = 0               ! 0: constant visc=visc_const, 1: dynamic viscosity
+    solver              = "ssa"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    visc_method         = 1 !0               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
-    beta_method         = 0               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
-    beta_q              = 0.2             ! Dragging law exponent 
-    beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    beta_q              = 0.333           ! Dragging law exponent 
+    beta_u0             = 1.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
-    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
-    beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
     ssa_lat_bc          = "floating"      ! "all", "marine", "floating", "none", "slab"
@@ -135,14 +140,13 @@
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction
     z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
-    cf_min          =  0.1              ! [-- or deg] Minimum value of cf
-    cf_ref          =  1.0              ! [-- or deg] Reference/const/max value of cf
+    cf_min          =  1e4              ! [-- or deg] Minimum value of cf
+    cf_ref          =  1e4              ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
     method          = 0                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
-    nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
-    const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
+    const           = 1 !1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
@@ -156,7 +160,7 @@
 &ymat
     flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
-    rf_const                = 1e-16         ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
+    rf_const                = 2.9377e-18    ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
     rf_use_eismint2         = False         ! Only applied for rf_method=1
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent
@@ -181,6 +185,8 @@
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
     use_const_cp    = True              ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = True              ! Use specified constant value of heat conductivity?

@@ -235,24 +235,30 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 16 
+            qtot = 22 
             allocate(names(qtot))
-            names(1)  = "H_ice"
-            names(2)  = "z_srf"
-            names(3)  = "z_bed"
-            names(4)  = "mask_bed"
-            names(5)  = "uxy_b"
-            names(6)  = "uxy_s"
-            names(7)  = "uxy_bar"
-            names(8)  = "beta"
-            names(9)  = "visc_bar"
-            names(10) = "T_prime_b"
-            names(11) = "H_w"
-            names(12) = "mb_net"
-            names(13) = "smb"
-            names(14) = "bmb"
-            names(15) = "cmb"
-            names(16) = "z_sl"
+                names(1)  = "H_ice"
+                names(2)  = "z_srf"
+                names(3)  = "z_bed"
+                names(4)  = "mask_bed"
+                names(5)  = "uxy_b"
+                names(6)  = "uxy_s"
+                names(7)  = "uxy_bar"
+                names(8)  = "ux_bar"
+                names(9)  = "uy_bar"
+                names(10) = "beta"
+                names(11) = "visc_bar"
+                names(12) = "T_prime_b"
+                names(13) = "H_w"
+                names(14) = "mb_net"
+                names(15) = "smb"
+                names(16) = "bmb"
+                names(17) = "cmb_flt"
+                names(18) = "cmb_flt_x"
+                names(19) = "cmb_flt_y"
+                names(20) = "z_sl"
+                names(21) = "lsf"
+                names(22) = "dlsf"
 
         end if 
 
@@ -664,6 +670,10 @@ contains
         call nc_read_interp(filename,"dmb",         tpo%now%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb",         tpo%now%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_flt",     tpo%now%cmb_flt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"lsf",         tpo%now%lsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"dlsf",        tpo%now%dlsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

@@ -150,10 +150,10 @@ contains
 
                 tau_eff_neighb = 0.0_wp 
 
-                if (f_ice(im1,j).gt.0.0) tau_eff_neighb(1) = calc_tau_eff_now(tau_eig_1(im1,j),tau_eig_2(im1,j),w2)
-                if (f_ice(ip1,j).gt.0.0) tau_eff_neighb(2) = calc_tau_eff_now(tau_eig_1(ip1,j),tau_eig_2(ip1,j),w2)
-                if (f_ice(i,jm1).gt.0.0) tau_eff_neighb(3) = calc_tau_eff_now(tau_eig_1(i,jm1),tau_eig_2(i,jm1),w2)
-                if (f_ice(i,jp1).gt.0.0) tau_eff_neighb(4) = calc_tau_eff_now(tau_eig_1(i,jp1),tau_eig_2(i,jp1),w2)
+                if (f_ice(im1,j).gt.0.0) tau_eff_neighb(1) = calc_tau_eff_now_ac(tau_eig_1(im1,j),tau_eig_2(im1,j),w2)
+                if (f_ice(ip1,j).gt.0.0) tau_eff_neighb(2) = calc_tau_eff_now_ac(tau_eig_1(ip1,j),tau_eig_2(ip1,j),w2)
+                if (f_ice(i,jm1).gt.0.0) tau_eff_neighb(3) = calc_tau_eff_now_ac(tau_eig_1(i,jm1),tau_eig_2(i,jm1),w2)
+                if (f_ice(i,jp1).gt.0.0) tau_eff_neighb(4) = calc_tau_eff_now_ac(tau_eig_1(i,jp1),tau_eig_2(i,jp1),w2)
 
                 n = count(tau_eff_neighb.ne.0.0_wp)
 
@@ -167,7 +167,7 @@ contains
                 ! Stresses are available at this margin point. 
                 ! Calculate the effective strain rate directly.
 
-                tau_eff(i,j) = calc_tau_eff_now(tau_eig_1(i,j),tau_eig_2(i,j),w2)
+                tau_eff(i,j) = calc_tau_eff_now_ac(tau_eig_1(i,j),tau_eig_2(i,j),w2)
             
             end if 
 
@@ -221,15 +221,12 @@ contains
         integer  :: i, j
         real(wp) :: H_eff
 
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-            
         ! Initially set calving rate to zero 
         mb_calv = 0.0 
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,H_eff)
-        do j=1,ny
-        do i=1,nx
+        do j=1,size(H_ice,2)
+        do i=1,size(H_ice,1)
                 
             ! Calculate current ice thickness (H_eff = H_ice/f_ice)
             call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
@@ -327,14 +324,15 @@ contains
         mb_calv = 0.0_wp
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
-        do j = 1, size(H_ice,2)
-        do i = 1, size(H_ice,1)  
+        do j = 1, size(tau_eff,2)
+        do i = 1, size(tau_eff,1)  
             
-            ! Calculate lateral calving rate 
-            calv_ref = uxy_bar(i,j)*tau_eff(i,j)/tau_ice 
+            ! Calculate lateral calving rate
+            ! jablasco: to do! 
+            calv_ref = ux_ac(i,j)*tau_eff(i,j)/tau_ice 
 
             ! Apply calving limit
-            calv_now = min(calv_now,calv_lim)
+            calv_now = min(calv_ref,calv_lim)
                     
             ! Get calving mass balance rate
             mb_calv(i,j) = -calv_now

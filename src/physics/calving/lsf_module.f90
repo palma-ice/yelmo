@@ -11,7 +11,7 @@ module lsf_module
     private 
     
     !=== Floating calving rates===
-    public :: calc_calving_rate_vonmises_m16
+    !public :: calc_calving_rate_vonmises_m16
 
     !=== Marine-terminating calving rates ===
     !public :: calc_mici_crawford21

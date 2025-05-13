@@ -136,6 +136,8 @@ module yelmo_defs
         real(wp)           :: dmb_sigma_ref
         real(wp)           :: dmb_m_d 
         real(wp)           :: dmb_m_r
+        logical            :: use_lsf
+        real(wp)           :: dt_lsf
 
         ! Internal parameters 
         real(dp)           :: time 
@@ -927,6 +929,7 @@ module yelmo_defs
         
         ! nml group names
         character(len=32)   :: nml_ytopo
+        character(len=32)   :: nml_ycalv    
         character(len=32)   :: nml_ydyn
         character(len=32)   :: nml_ytill
         character(len=32)   :: nml_yneff

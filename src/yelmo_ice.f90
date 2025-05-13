@@ -768,7 +768,7 @@ end if
         
         ! == topography ==
 
-        call ytopo_par_load(dom%tpo%par,filename,dom%par%nml_ytopo,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ytopo_par_load(dom%tpo%par,filename,dom%par%nml_ytopo,dom%par%nml_ycalv,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ytopo_alloc(dom%tpo%now,dom%tpo%par%nx,dom%tpo%par%ny)
         

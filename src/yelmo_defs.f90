@@ -179,7 +179,10 @@ module yelmo_defs
         real(wp), allocatable :: dmb(:,:)
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
+        real(wp), allocatable :: cmb_flt_x(:,:)
+        real(wp), allocatable :: cmb_flt_y(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
+        real(wp), allocatable :: lsf(:,:),dlsf(:,:)
 
     end type
 
@@ -230,7 +233,11 @@ module yelmo_defs
         real(wp), allocatable   :: dmb_ref(:,:)     ! Subgrid discharge mb rate
 
         real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: cmb_flt_x(:,:)   ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: cmb_flt_y(:,:)   ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
+        real(wp), allocatable   :: lsf(:,:)         ! LSF mask
+        real(wp), allocatable   :: dlsf(:,:)        ! LSF variation (needed?)
         
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
@@ -791,7 +798,7 @@ module yelmo_defs
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(wp), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
         integer,  allocatable :: mask_bed(:,:)
-        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
+        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) , lsf(:,:)
         real(wp), allocatable :: T_srf(:,:), smb(:,:)
         real(wp), allocatable :: depth_iso(:,:,:)  
         
@@ -840,6 +847,7 @@ module yelmo_defs
         real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
+        real(wp)   :: lsf,dlsf
 
         ! ===== Grounded ice variables =====
         real(wp)   :: H_ice_g, z_srf_g, V_ice_g, A_ice_g, uxy_bar_g, uxy_s_g, uxy_b_g

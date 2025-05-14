@@ -101,7 +101,6 @@
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
-    dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
 
@@ -110,11 +109,17 @@
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
     gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
     
+    ! === discharge mass balance ===
+    dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
     dmb_alpha_max       = 60.0              ! [deg] Maximum angle of slope from coast at which to allow discharge
     dmb_tau             = 100.0             ! [yr]  Discharge timescale
     dmb_sigma_ref       = 300.0             ! [m]   Reference bed roughness
     dmb_m_d             = 3.0               ! [-]   Discharge distance scaling exponent
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
+
+    ! === frontal mass melt ===
+    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
 /
 
 &ycalv
@@ -147,10 +152,6 @@
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
     zb_sigma            = 0.0               ! [m] Gaussian filtering of bedrock for calving transition to deep ocean
-
-    ! === frontal mass melt ===
-    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
-    fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
 /
 
 &ydyn
@@ -177,7 +178,6 @@
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
-    
 /
 
 &ytill

@@ -138,6 +138,7 @@ module yelmo_defs
         real(wp)           :: dmb_m_r
         logical            :: use_lsf
         real(wp)           :: dt_lsf
+        real(wp)           :: tau_ice
 
         ! Internal parameters 
         real(dp)           :: time 

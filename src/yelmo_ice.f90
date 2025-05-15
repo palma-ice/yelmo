@@ -1395,6 +1395,7 @@ end if
         call nml_read(filename,group,"experiment",    par%experiment)
 
         call nml_read(filename,group,"nml_ytopo",     par%nml_ytopo)
+        call nml_read(filename,group,"nml_ycalv",     par%nml_ycalv)
         call nml_read(filename,group,"nml_ydyn",      par%nml_ydyn)
         call nml_read(filename,group,"nml_ytill",     par%nml_ytill)
         call nml_read(filename,group,"nml_yneff",     par%nml_yneff)

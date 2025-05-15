@@ -203,6 +203,8 @@ module yelmo_defs
         real(wp), allocatable :: dmb(:,:)         ! Net subgrid discharge
         real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
         real(wp), allocatable :: cmb_flt(:,:)     ! Calving rate, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_flt_x(:,:)     ! Calving rate x, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_flt_y(:,:)     ! Calving rate y, floating (applied) [m/a]
         real(wp), allocatable :: cmb_grnd(:,:)    ! Calving rate, grounded (applied) [m/a]
 
         real(wp) :: dt_tot

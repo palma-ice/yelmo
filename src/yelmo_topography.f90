@@ -317,7 +317,9 @@ end if
                     tpo%now%pred%fmb        = tpo%now%fmb
                     tpo%now%pred%dmb        = tpo%now%dmb
                     tpo%now%pred%cmb        = tpo%now%cmb 
-                    tpo%now%pred%cmb_flt    = tpo%now%cmb_flt 
+                    tpo%now%pred%cmb_flt    = tpo%now%cmb_flt
+                    tpo%now%pred%cmb_flt_x  = tpo%now%cmb_flt_x
+                    tpo%now%pred%cmb_flt_y  = tpo%now%cmb_flt_y 
                     tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd 
                     
                 case("corrector")
@@ -334,7 +336,9 @@ end if
                     tpo%now%corr%fmb        = tpo%now%fmb
                     tpo%now%corr%dmb        = tpo%now%dmb
                     tpo%now%corr%cmb        = tpo%now%cmb 
-                    tpo%now%corr%cmb_flt    = tpo%now%cmb_flt 
+                    tpo%now%corr%cmb_flt    = tpo%now%cmb_flt
+                    tpo%now%corr%cmb_flt_x  = tpo%now%cmb_flt_x
+                    tpo%now%corr%cmb_flt_y  = tpo%now%cmb_flt_y 
                     tpo%now%corr%cmb_grnd   = tpo%now%cmb_grnd
                     
                     ! Restore main ice thickness field to original 
@@ -366,7 +370,9 @@ end if
                         tpo%now%fmb         = tpo%now%pred%fmb 
                         tpo%now%dmb         = tpo%now%pred%dmb 
                         tpo%now%cmb         = tpo%now%pred%cmb 
-                        tpo%now%cmb_flt     = tpo%now%pred%cmb_flt 
+                        tpo%now%cmb_flt     = tpo%now%pred%cmb_flt
+                        tpo%now%cmb_flt_x   = tpo%now%pred%cmb_flt_x
+                        tpo%now%cmb_flt_y   = tpo%now%pred%cmb_flt_y 
                         tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd 
                         
                     else
@@ -381,7 +387,9 @@ end if
                         tpo%now%fmb         = tpo%now%corr%fmb 
                         tpo%now%dmb         = tpo%now%corr%dmb 
                         tpo%now%cmb         = tpo%now%corr%cmb 
-                        tpo%now%cmb_flt     = tpo%now%corr%cmb_flt 
+                        tpo%now%cmb_flt     = tpo%now%corr%cmb_flt
+                        tpo%now%cmb_flt_x   = tpo%now%corr%cmb_flt_x 
+                        tpo%now%cmb_flt_y   = tpo%now%corr%cmb_flt_y
                         tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd 
                         
                     end if
@@ -877,6 +885,8 @@ end if
                 tpo%now%rates%dmb           = 0.0
                 tpo%now%rates%cmb           = 0.0
                 tpo%now%rates%cmb_flt       = 0.0
+                tpo%now%rates%cmb_flt_x     = 0.0
+                tpo%now%rates%cmb_flt_y     = 0.0
                 tpo%now%rates%cmb_grnd      = 0.0
 
                 tpo%now%rates%dt_tot = 0.0 
@@ -897,6 +907,8 @@ end if
                 tpo%now%rates%dmb           = tpo%now%rates%dmb         + tpo%now%dmb*dt
                 tpo%now%rates%cmb           = tpo%now%rates%cmb         + tpo%now%cmb*dt
                 tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt     + tpo%now%cmb_flt*dt
+                tpo%now%rates%cmb_flt_x     = tpo%now%rates%cmb_flt_x   + tpo%now%cmb_flt_x*dt
+                tpo%now%rates%cmb_flt_y     = tpo%now%rates%cmb_flt_y   + tpo%now%cmb_flt_y*dt
                 tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd    + tpo%now%cmb_grnd*dt
 
                 tpo%now%rates%dt_tot = tpo%now%rates%dt_tot + dt  
@@ -919,6 +931,8 @@ end if
                     tpo%now%rates%dmb           = tpo%now%rates%dmb / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb           = tpo%now%rates%cmb / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt / tpo%now%rates%dt_tot
+                    tpo%now%rates%cmb_flt_x       = tpo%now%rates%cmb_flt_x / tpo%now%rates%dt_tot
+                    tpo%now%rates%cmb_flt_y       = tpo%now%rates%cmb_flt_y / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd / tpo%now%rates%dt_tot
 
                     ! Check that dt_tot matches outer dt value
@@ -945,6 +959,8 @@ end if
                         tpo%now%dmb         = tpo%now%rates%dmb
                         tpo%now%cmb         = tpo%now%rates%cmb
                         tpo%now%cmb_flt     = tpo%now%rates%cmb_flt
+                        tpo%now%cmb_flt_x   = tpo%now%rates%cmb_flt_x
+                        tpo%now%cmb_flt_y   = tpo%now%rates%cmb_flt_y
                         tpo%now%cmb_grnd    = tpo%now%rates%cmb_grnd
 
                     end if
@@ -1103,6 +1119,8 @@ end if
         allocate(now%rates%dmb(nx,ny))
         allocate(now%rates%cmb(nx,ny))
         allocate(now%rates%cmb_flt(nx,ny))
+        allocate(now%rates%cmb_flt_x(nx,ny))
+        allocate(now%rates%cmb_flt_y(nx,ny))
         allocate(now%rates%cmb_grnd(nx,ny))
         
         ! Remaining ytopo fields...
@@ -1189,6 +1207,8 @@ end if
         now%rates%dmb           = 0.0
         now%rates%cmb           = 0.0
         now%rates%cmb_flt       = 0.0
+        now%rates%cmb_flt_x     = 0.0
+        now%rates%cmb_flt_y     = 0.0
         now%rates%cmb_grnd      = 0.0
         
         now%H_ice       = 0.0 
@@ -1281,6 +1301,8 @@ end if
         if (allocated(now%rates%dmb))           deallocate(now%rates%dmb)
         if (allocated(now%rates%cmb))           deallocate(now%rates%cmb)
         if (allocated(now%rates%cmb_flt))       deallocate(now%rates%cmb_flt)
+        if (allocated(now%rates%cmb_flt_x))     deallocate(now%rates%cmb_flt_x)
+        if (allocated(now%rates%cmb_flt_y))     deallocate(now%rates%cmb_flt_y)
         if (allocated(now%rates%cmb_grnd))      deallocate(now%rates%cmb_grnd)
         
         if (allocated(now%H_ice))       deallocate(now%H_ice)
@@ -1377,6 +1399,8 @@ end if
         allocate(pc%dmb(nx,ny))
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
+        allocate(pc%cmb_flt_x(nx,ny))
+        allocate(pc%cmb_flt_y(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
         
         ! Initialize to zero
@@ -1391,6 +1415,8 @@ end if
         pc%dmb          = 0.0
         pc%cmb          = 0.0      
         pc%cmb_flt      = 0.0
+        pc%cmb_flt_x    = 0.0
+        pc%cmb_flt_y    = 0.0            
         pc%cmb_grnd     = 0.0
         
         return
@@ -1413,6 +1439,8 @@ end if
         if (allocated(pc%fmb))          deallocate(pc%fmb)
         if (allocated(pc%cmb))          deallocate(pc%cmb)
         if (allocated(pc%cmb_flt))      deallocate(pc%cmb_flt)
+        if (allocated(pc%cmb_flt_x))      deallocate(pc%cmb_flt_x)
+        if (allocated(pc%cmb_flt_y))      deallocate(pc%cmb_flt_y)
         if (allocated(pc%cmb_grnd))     deallocate(pc%cmb_grnd)
         
         return

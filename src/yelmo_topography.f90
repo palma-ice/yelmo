@@ -234,10 +234,10 @@ end if
                         ! Level-set function as calving
                         call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
                         ! jablasco: dont delete, eliminate as bmb for stability (TO DO)
-                        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
+                        !where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
                         ! reset LSF function after dt_lsf
                         if (mod(nint(time*100),nint(tpo%par%dt_lsf*100))==0) then
-                            call LSFinit(tpo%now%lsf,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%dx)
+                            call LSFinit(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,tpo%par%dx)
                         end if
                     else
                         ! Mass balance calving
@@ -593,11 +593,8 @@ end if
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb_grnd,dt,"calv_grnd",adjust_mb=.TRUE.)
 
-
-
         ! Finally, get the total combined calving mass balance
         tpo%now%cmb = tpo%now%cmb_flt + tpo%now%cmb_grnd 
-
 
         ! Update ice fraction mask 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -708,8 +705,10 @@ end if
         !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
     
         call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
-                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,'expl-upwind',tpo%par%boundaries)
+                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
     
+        ! calve ice outside LSF mask
+
         return
     
     end subroutine calc_ytopo_calving_lsf

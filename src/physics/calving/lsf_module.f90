@@ -59,15 +59,15 @@ contains
         
     end subroutine LSFinit
 
-    subroutine LSFupdate(dlsf,lsf,crx_ac,cry_ac,ux_ac,vy_ac,H_grnd,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
+    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,H_grnd,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
 
         implicit none
 
         real(wp),       intent(INOUT) :: dlsf(:,:)               ! advected LSF field
         real(wp),       intent(INOUT) :: lsf(:,:)                ! LSF to be advected (aa-nodes)
-        real(wp),       intent(INOUT) :: crx_ac(:,:),cry_ac(:,:) ! [m/yr] calving rate (vertical)
-        real(wp),       intent(IN)    :: ux_ac(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
-        real(wp),       intent(IN)    :: vy_ac(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
+        real(wp),       intent(INOUT) :: cr_acx(:,:),cr_acy(:,:) ! [m/yr] calving rate (vertical)
+        real(wp),       intent(IN)    :: u_acx(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
+        real(wp),       intent(IN)    :: v_acy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
         real(wp),       intent(IN)    :: H_grnd(:,:)             ! [m] floating contribution?
         real(wp),       intent(IN)    :: var_dot(:,:)            ! [dvar/dt] Source term for variable (needed?)
         integer,        intent(IN)    :: mask_adv(:,:)           ! Advection mask
@@ -81,7 +81,7 @@ contains
         integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
         real(wp), allocatable :: wx(:,:), wy(:,:), mask_lsf(:,:)
         real(wp), allocatable :: ux_domain_ac(:,:), vy_domain_ac(:,:)
-        integer, allocatable  :: mask_new_adv(:,:)
+        integer,  allocatable :: mask_new_adv(:,:)
 
         nx = size(lsf,1)
         ny = size(lsf,2)
@@ -96,56 +96,30 @@ contains
         dlsf     = 0.0_wp
         mask_lsf = 0.0_wp
         mask_new_adv = 1
-        mask_lsf = 1.0_wp ! Allow all LSF mask to be advected
-        !where(lsf .le. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
+        !mask_lsf = 1.0_wp ! Allow all LSF mask to be advected
+        where(lsf .le. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
 
-        ! interpolate calving rates to open ocean?
-        ux_domain_ac = ux_ac
-        vy_domain_ac = vy_ac
-        !call interpolatex_missing_iterative(ux_domain_ac,ux_ac)
-        !call interpolatey_missing_iterative(vy_domain_ac,vy_ac)
+        ! interpolate velocities into the open ocean (test)
+        ux_domain_ac = u_acx
+        vy_domain_ac = v_acy
+        !call interpolatex_missing_iterative(ux_domain_ac,u_acx)
+        !call interpolatey_missing_iterative(vy_domain_ac,v_acy)
 
         ! calving rate has opposite sign as velocity
-        wx = ux_domain_ac + crx_ac
-        wy = vy_domain_ac + cry_ac
+        wx = ux_domain_ac + cr_acx
+        wy = vy_domain_ac + cr_acy
 
         ! Compute the advected LSF field
         call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
                                 mask_new_adv,solver,boundaries,dx,dt) ! changed mask_adv for 1
         call apply_tendency_lsf(lsf,dlsf,dt,adjust_lsf=.FALSE.)
-        !where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
-
-        ! Allow for in between values only in the zero border
-        !do j = 1,ny
-        !do i = 1,nx
-        !
-        !    ! Get neighbor indices
-        !    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-        !
-        !    if ((LSFn(i,j) .gt. 0.0_wp) .and. (LSFn(im1,j) .gt. 0.0_wp) .and. (LSFn(ip1,j) .gt. 0.0_wp) &
-        !        .and. (LSFn(i,jm1) .gt. 0.0_wp) .and. (LSFn(i,jp1) .gt. 0.0_wp)) then
-        !        LSFn(i,j) = 1.0_wp
-        ! 
-        !    !else if ((LSFn(i,j) .le. 0.0_wp) .and. (LSFn(im1,j) .le. 0.0_wp) .and. (LSFn(ip1,j) .le. 0.0_wp) &
-        !    !    .and. (LSFn(i,jm1) .le. 0.0_wp) .and. (LSFn(i,jp1) .le. 0.0_wp)) then
-        !    !    LSFn(i,j) = -1.0_wp
-        !
-        !    end if
-        !
-        !end do
-        !end do
-
-        ! compute distance to ice front
-        !call eikonal_equation(lsf,H_grnd)
-        !lsf = lsf*dx
-        !where(LSFn .le. 0.0) LSFn = -1.0
-
+        
         ! saturate values to -1 to 1 (helps with stability)
-        !where(LSFn .gt. 1.0)  LSFn = 1.0
-        !where(LSFn .lt. -1.0) LSFn = -1.0
+        where(lsf .gt. 1.0)  lsf = 1.0
+        where(lsf .lt. -1.0) lsf = -1.0
 
         ! LSF should not affect points above sea level (maybe in a future it can)
-        !where(H_grnd .gt. 0.0_wp) LSFn = 1.0_wp
+        where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
         return
 
@@ -215,11 +189,11 @@ contains
 
     end subroutine calc_cmb_flt
 
-    subroutine calc_cmb_border(crx_ac,cry_ac,lsf_aa,boundaries)
+    subroutine calc_cmb_border(cr_acx,cr_acy,lsf_aa,boundaries)
 
         implicit none
 
-        real(wp), intent(INOUT) :: crx_ac(:,:),cry_ac(:,:) ! [m/yr] calving-rates on ac-nodes 
+        real(wp), intent(INOUT) :: cr_acx(:,:),cr_acy(:,:) ! [m/yr] calving-rates on ac-nodes 
         real(wp), intent(IN)    :: lsf_aa(:,:)             ! LSF mask on aa-nodes
         character(len=*), intent(IN)  :: boundaries
 
@@ -231,20 +205,20 @@ contains
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             ! x-direction
             if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(ip1,j) .le. 0.0) then
-                crx_ac(i,j)   = crx_ac(i,j)
+                cr_acx(i,j)   = cr_acx(i,j)
             else if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(im1,j) .le. 0.0) then
-                crx_ac(im1,j) = crx_ac(im1,j)
+                cr_acx(im1,j) = cr_acx(im1,j)
             else
-                crx_ac(i,j)   = 0.0
+                cr_acx(i,j)   = 0.0
             end if
 
             ! y-direction
             if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(i,jp1) .le. 0.0) then
-                cry_ac(i,j)   = cry_ac(i,j)
+                cr_acy(i,j)   = cr_acy(i,j)
             else if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(i,jm1) .le. 0.0) then
-                cry_ac(i,jm1) = cry_ac(i,jm1)
+                cr_acy(i,jm1) = cr_acy(i,jm1)
             else
-                cry_ac(i,j)   = 0.0
+                cr_acy(i,j)   = 0.0
             end if
     
         end do
@@ -391,6 +365,9 @@ contains
             ! Exit loop if no more changes
             if (.not. has_changed) exit
         end do
+
+        return
+
     end subroutine interpolatex_missing_iterative
 
     subroutine interpolatey_missing_iterative(array,mask)
@@ -437,6 +414,9 @@ contains
             ! Exit loop if no more changes
             if (.not. has_changed) exit
         end do
+
+        return
+
     end subroutine interpolatey_missing_iterative
 
     subroutine apply_tendency_lsf(lsf,lsf_dot,dt,adjust_lsf)
@@ -473,10 +453,6 @@ contains
                 ! Now update lsf with tendency for this timestep
                 lsf(i,j) = lsf_prev + dt*lsf_dot(i,j)
 
-                ! limit lsf to (-1,1)?
-                !if (lsf(i,j) .lt. -1.0) lsf(i,j) = -1.0
-                !if (lsf(i,j) .gt. 1.0)  lsf(i,j) = 1.0
-
                 ! Ensure tiny numeric LSF values tend to zero are removed
                 ! check effect
                 !if (abs(lsf(i,j)) .lt. TOL) lsf(i,j) = 0.0
@@ -499,7 +475,7 @@ contains
 
     end subroutine apply_tendency_lsf
 
-    ! Advection test (works)
+    ! Simple advection test (works)
     subroutine LSFadvection(LSF,zbed,dx)
         
         implicit none

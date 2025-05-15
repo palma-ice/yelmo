@@ -52,13 +52,13 @@
 
 &ytopo
     ! === ??? ===
-    solver              = "impl-upwind"     ! "expl", "impl-upwind"
+    solver              = "impl-lis"        ! "expl", "impl-lis"
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     grad_lim            = 0.5               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
-    margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
-    use_bmb             = True              ! Use basal mass balance in mass conservation equation
+    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
+    use_bmb             = False             ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
@@ -90,20 +90,20 @@
 &ycalv
     ! === calving method & law ===
     use_lsf             = True              ! use level-set method
-    dt_lsf              = 2000.0              ! [yr] lsf update timescale 
-    calv_flt_method     = "exp1"          ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "zero"      ! "zero", "stress-b12"
+    dt_lsf              = 2000.0            ! [yr] lsf update timescale 
+    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     
     ! === numeric noise === 
-    H_min_grnd          = 0.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
+    H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
     H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     
     ! === 
-    calv_tau            = 10.0              ! [a] Characteristic calving time
-    calv_thin           = 0.0               ! [m/yr] Calving rate to apply to very thin ice
+    calv_tau            = 1.0              ! [a] Characteristic calving time
+    calv_thin           = 30.0               ! [m/yr] Calving rate to apply to very thin ice
     k2                  = 3.2e9             ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
     w2                  = 0.0               ! Weighting coefficient of 2nd principal strain/stress
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
@@ -126,14 +126,14 @@
     beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 0.333           ! Dragging law exponent 
-    beta_u0             = 1.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    beta_u0             = 1.0             ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
-    beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
-    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
     ssa_lat_bc          = "floating"      ! "all", "marine", "floating", "none", "slab"
@@ -163,7 +163,7 @@
 &yneff 
     method          = 0                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
-    const           = 1 !1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
+    const           = 1                 ! == rho_ice*g*(eg 1000 m ice thickness)
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 

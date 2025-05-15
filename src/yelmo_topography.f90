@@ -233,8 +233,12 @@ end if
                     if (tpo%par%use_lsf) then
                         ! Level-set function as calving
                         call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                        ! jablasco: dont delete, eliminate as bmb for stability
+                        ! jablasco: dont delete, eliminate as bmb for stability (TO DO)
                         where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
+                        ! reset LSF function after dt_lsf
+                        if (mod(nint(time*100),nint(tpo%par%dt_lsf*100))==0) then
+                            call LSFinit(tpo%now%lsf,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%dx)
+                        end if
                     else
                         ! Mass balance calving
                         call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)

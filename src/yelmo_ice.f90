@@ -14,6 +14,7 @@ module yelmo_ice
     use yelmo_io 
 
     use yelmo_topography
+    use lsf_module, only : LSFinit
     use yelmo_dynamics
     use yelmo_material
     use yelmo_thermodynamics
@@ -1248,6 +1249,8 @@ end if
         !call yelmo_restart_write(dom,"./yelmo_check_z_bed.nc",time=0.0_wp,init=.TRUE.)
         !stop 
 
+        ! Finally lets initialize the LSF mask
+        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice,dom%bnd%z_bed,dom%tpo%par%dx)
 
         return 
 

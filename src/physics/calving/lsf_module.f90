@@ -114,6 +114,12 @@ contains
                                 mask_new_adv,solver,boundaries,dx,dt) ! changed mask_adv for 1
         call apply_tendency_lsf(lsf,dlsf,dt,adjust_lsf=.FALSE.)
         
+        ! Set border values to ocean values
+        lsf(1,:)  = 1.0
+        lsf(nx,:) = 1.0
+        lsf(:,1)  = 1.0
+        lsf(:,ny) = 1.0
+        
         ! saturate values to -1 to 1 (helps with stability)
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0

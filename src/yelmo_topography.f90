@@ -233,8 +233,6 @@ end if
                     if (tpo%par%use_lsf) then
                         ! Level-set function as calving
                         call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                        ! jablasco: dont delete, eliminate as bmb for stability (TO DO)
-                        !where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
                         ! reset LSF function after dt_lsf
                         if (mod(nint(time*100),nint(tpo%par%dt_lsf*100))==0) then
                             call LSFinit(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,tpo%par%dx)
@@ -632,24 +630,28 @@ end if
     
         ! Local variables
         integer :: i, j, nx, ny
+        real(wp), allocatable :: mbal_now(:,:)
         real(wp), allocatable :: var_dot(:,:)
     
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
        
+        allocate(mbal_now(nx,ny))
         allocate(var_dot(nx,ny))
         var_dot = 0.0 ! check influence
     
         ! === Floating calving laws ===
-      
+        
+        ! Initialize the calving rates
+        tpo%now%cmb_flt_x = 0.0_wp
+        tpo%now%cmb_flt_y = 0.0_wp
+        tpo%now%cmb_flt   = 0.0_wp
+
         select case(trim(tpo%par%calv_flt_method))
     
             case("zero","none")
-    
-                tpo%now%cmb_flt_x = 0.0_wp
-                tpo%now%cmb_flt_y = 0.0_wp
-                tpo%now%cmb_flt   = 0.0_wp
-    
+                ! Do nothing
+
             case("equil")
                 ! For an equilibrated ice sheet calving rate should be opposite to ice velocity
                 tpo%now%cmb_flt_x = -1*dyn%now%ux_bar
@@ -670,16 +672,16 @@ end if
             ! === CalvMIP ===
             case("exp1","exp3")
                 call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
-                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+                !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
     
             case("exp2","exp4")
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
                 !call calc_cmb_border(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%lsf,tpo%par%boundaries)
-                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+                !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
     
             case("advection")
                 call calvmip_advection(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
-                call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+                !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
     
             case DEFAULT
     
@@ -700,14 +702,32 @@ end if
     
     
         ! === LSF advection ===
-        ! advect LSF mask based on the calving law
-        !call LSFupdate(LSFn,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
-        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries) !tpo%par%solver,tpo%par%boundaries)
-    
+        ! advect LSF mask based on the calving law 
         call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
                        var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
     
-        ! calve ice outside LSF mask
+        ! Apply cmb equal to the ice thickness where lsf>1
+        ! Calve ice outside LSF mask
+        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb = -tpo%now%H_ice
+        
+        ! Apply rate and update ice thickness
+        call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calv",adjust_mb=.TRUE.)
+
+        ! Update ice fraction mask 
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+            bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+
+        ! Treat fractional points that are not connected to full ice-covered points
+        call calc_G_remove_fractional_ice(mbal_now,tpo%now%H_ice,tpo%now%f_ice,dt)
+
+        ! Apply rate and update ice thickness
+        call apply_tendency(tpo%now%H_ice,mbal_now,dt,"frac",adjust_mb=.TRUE.)
+
+        ! Add this rate to calving tendency
+        tpo%now%cmb = tpo%now%cmb + mbal_now
+
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+                        bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
         return
     

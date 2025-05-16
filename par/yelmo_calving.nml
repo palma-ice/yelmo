@@ -91,7 +91,7 @@
     ! === calving method & law ===
     use_lsf             = True              ! use level-set method
     dt_lsf              = 2000.0            ! [yr] lsf update timescale 
-    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "exp1"            ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     
     ! === numeric noise === 

@@ -632,12 +632,15 @@ end if
         integer :: i, j, nx, ny
         real(wp), allocatable :: mbal_now(:,:)
         real(wp), allocatable :: var_dot(:,:)
+        real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
     
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
        
         allocate(mbal_now(nx,ny))
         allocate(var_dot(nx,ny))
+        allocate(u_acx_fill(nx,ny))
+        allocate(v_acy_fill(nx,ny))
         var_dot = 0.0 ! check influence
     
         ! === Floating calving laws ===
@@ -647,6 +650,12 @@ end if
         tpo%now%cmb_flt_y = 0.0_wp
         tpo%now%cmb_flt   = 0.0_wp
 
+        ! For the level-set function i need to extrapolate velocities (and ice thickness?) into the ocean
+        !u_acx_fill = dyn%now%ux_bar
+        !v_acy_fill = dyn%now%uy_bar
+        call interpolate_ocn_acx(u_acx_fill,dyn%now%ux_bar)
+        call interpolate_ocn_acy(v_acy_fill,dyn%now%uy_bar)
+
         select case(trim(tpo%par%calv_flt_method))
     
             case("zero","none")
@@ -654,8 +663,8 @@ end if
 
             case("equil")
                 ! For an equilibrated ice sheet calving rate should be opposite to ice velocity
-                tpo%now%cmb_flt_x = -1*dyn%now%ux_bar
-                tpo%now%cmb_flt_y = -1*dyn%now%uy_bar
+                tpo%now%cmb_flt_x = -1*u_acx_fill!-1*dyn%now%ux_bar
+                tpo%now%cmb_flt_y = -1*v_acy_fill!-1*dyn%now%uy_bar
     
             case("vm16")
      
@@ -671,13 +680,12 @@ end if
     
             ! === CalvMIP ===
             case("exp1","exp3")
-                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
-                !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+                !call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
     
             case("exp2","exp4")
-                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
-                !call calc_cmb_border(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%now%lsf,tpo%par%boundaries)
-                !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
+                !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
     
             case("advection")
                 call calvmip_advection(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
@@ -703,9 +711,12 @@ end if
     
         ! === LSF advection ===
         ! advect LSF mask based on the calving law 
-        call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
-                       var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
-    
+        !call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
+        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+        call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_grnd, &
+                        var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+     
+
         ! Apply cmb equal to the ice thickness where lsf>1
         ! Calve ice outside LSF mask
         where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb = -tpo%now%H_ice

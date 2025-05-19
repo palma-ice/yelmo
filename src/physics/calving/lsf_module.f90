@@ -28,6 +28,10 @@ module lsf_module
     public :: calc_cmb_flt
     public :: calc_cmb_border
 
+    ! open ocean extrapo    lation
+    public :: interpolate_ocn_acx
+    public :: interpolate_ocn_acy
+
 contains 
     ! ===================================================================
     !
@@ -100,14 +104,16 @@ contains
         where(lsf .le. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
 
         ! interpolate velocities into the open ocean (test)
-        ux_domain_ac = u_acx
-        vy_domain_ac = v_acy
+        !ux_domain_ac = u_acx
+        !vy_domain_ac = v_acy
         !call interpolatex_missing_iterative(ux_domain_ac,u_acx)
         !call interpolatey_missing_iterative(vy_domain_ac,v_acy)
 
         ! calving rate has opposite sign as velocity
-        wx = ux_domain_ac + cr_acx
-        wy = vy_domain_ac + cr_acy
+        !wx = ux_domain_ac + cr_acx
+        !wy = vy_domain_ac + cr_acy
+        wx = u_acx + cr_acx
+        wy = v_acy + cr_acy
 
         ! Compute the advected LSF field
         call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
@@ -347,7 +353,7 @@ contains
 
             do i = 2, nx - 1
                 do j = 2, ny - 1
-                    if (array(i, j) .eq. 0.0 .and. mask(i,j) == 0.0) then
+                    if (array(i, j) .eq. 0.0 .and. mask(i,j) .eq. 0.0) then
                         sum = 0.0
                         count = 0.0
 
@@ -364,6 +370,7 @@ contains
                             array(i, j) = sum / count
                             has_changed = .true.
                         end if
+
                     end if
                 end do
             end do
@@ -511,5 +518,119 @@ contains
         return
     
     end subroutine LSFadvection
+
+    subroutine interpolate_ocn_acy(mask_fill,mask_orig)
+        ! Routine to extrapolate the nearest value in the y-direction.
+        ! So far we assume that value 0 in mask_orig represents ice-free points
+
+        implicit none
+    
+        real(prec), intent(INOUT) :: mask_fill(:,:)
+        real(prec), intent(IN)    :: mask_orig(:,:)
+    
+        ! Local variables
+        integer  :: i, j
+        integer :: count, repeat
+        real(wp), allocatable :: mask_change(:,:)
+        allocate(mask_change(size(mask_orig,1),size(mask_orig,2)))
+
+        ! Initialize variables
+        mask_change = 1.0_wp
+        where(mask_orig .eq. 0.0_wp) mask_change = 0.0_wp
+        mask_fill = mask_orig
+
+        count  = 0
+        repeat = 1
+        if (SUM(mask_orig) .eq. 0.0_wp) then
+            ! do nothing
+        else
+            do while (repeat .eq. 1)
+                ! Interpolate neighbor value
+                do i = 2, size(mask_orig,1)-1
+                    do j = 2, size(mask_orig,2)-1
+                        if      (mask_change(i,j) .eq. 0.0_wp .and. mask_change(i,j+1) .eq. 1.0) then
+                            mask_fill(i,j)   = mask_fill(i,j+1) 
+                            mask_change(i,j) = 1.0_wp
+                            count = count+1
+                        else if (mask_change(i,j) .eq. 0.0_wp .and. mask_change(i,j-1) .eq. 1.0) then
+                            mask_fill(i,j)   = mask_fill(i,j-1) 
+                            mask_change(i,j) = 1.0_wp
+                            count = count+1
+                        end if
+                    end do
+                end do
+
+                ! Repeat if changes occured
+                if (count .eq. 0) then 
+                    repeat = 0
+                    count  = 0
+                else
+                    repeat = 1
+                    count  = 0
+                end if  
+
+            end do    
+        end if
+
+        return
+    
+    end subroutine interpolate_ocn_acy
+
+    subroutine interpolate_ocn_acx(mask_fill,mask_orig)
+        ! Routine to extrapolate the nearest value in the x-direction.
+        ! So far we assume that value 0 in mask_orig represents ice-free points
+
+        implicit none
+        
+        real(prec), intent(INOUT) :: mask_fill(:,:)
+        real(prec), intent(IN)    :: mask_orig(:,:)
+        
+        ! Local variables
+        integer  :: i, j
+        integer :: count, repeat
+        real(wp), allocatable :: mask_change(:,:)
+        allocate(mask_change(size(mask_orig,1),size(mask_orig,2)))
+    
+        ! Initialize variables
+        mask_change = 1.0_wp
+        where(mask_orig .eq. 0.0_wp) mask_change = 0.0_wp
+        mask_fill = mask_orig
+    
+        count  = 0
+        repeat = 1
+        if (SUM(mask_orig) .eq. 0.0_wp) then
+            ! do nothing
+        else
+            do while (repeat .eq. 1)
+                ! Interpolate neighbor value
+                do i = 2, size(mask_orig,1)-1
+                    do j = 2, size(mask_orig,2)-1
+                        if      (mask_change(i,j) .eq. 0.0_wp .and. mask_change(i+1,j) .eq. 1.0) then
+                            mask_fill(i,j)   = mask_fill(i+1,j) 
+                            mask_change(i,j) = 1.0_wp
+                            count = count+1
+                        else if (mask_change(i,j) .eq. 0.0_wp .and. mask_change(i-1,j) .eq. 1.0) then
+                            mask_fill(i,j)   = mask_fill(i-1,j) 
+                            mask_change(i,j) = 1.0_wp
+                            count = count+1
+                        end if
+                    end do
+                end do
+    
+                ! Repeat if changes occured
+                if (count .eq. 0) then 
+                    repeat = 0
+                    count  = 0
+                else
+                    repeat = 1
+                    count  = 0
+                end if 
+
+            end do    
+        end if
+    
+        return
+        
+    end subroutine interpolate_ocn_acx
 
 end module lsf_module

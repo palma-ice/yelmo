@@ -831,87 +831,82 @@ contains
     !
     ! ===================================================================
 
-    subroutine calvmip_exp1(cr_acx,cr_acy,u_acx,v_acy,lsf_aa,Hgrnd_aa,dx,boundaries)
+    subroutine calvmip_exp1(cr_acx,cr_acy,u_acx,v_acy,lsf_aa,dx,boundaries)
         ! Experiment 1 of CalvMIP
         implicit none
     
         real(wp), intent(OUT) :: cr_acx(:,:),cr_acy(:,:)   ! Calving rates on ac-nodes
         real(wp), intent(IN)  :: u_acx(:,:),v_acy(:,:)     ! Velocities on ac-nodes
         real(wp), intent(IN)  :: lsf_aa(:,:)               ! LSF mask on aa-nodes
-        real(wp), intent(IN)  :: Hgrnd_aa(:,:)             ! Grounded above or below sea-level
         real(wp), intent(IN)  :: dx                        ! Ice resolution
         character(len=*), intent(IN)  :: boundaries        ! Boundary conditions to impose
     
         ! Local variables
         integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
-        real(wp) :: r
+        real(wp) :: r, rip1, rim1, rjp1, rjm1
     
         nx = size(u_acx,1)
         ny = size(u_acx,2)
     
-        ! Initialize calving rates to opposite
-        cr_acx = 0.0_wp !-u_acx
-        cr_acy = 0.0_wp !-v_acy 
+        ! Initialize calving rates to opposite as velocity
+        cr_acx = -u_acx 
+        cr_acy = -v_acy
     
-        r = 0.0_wp
+        r    = 0.0_wp
+        rip1 = 0.0_wp
+        rim1 = 0.0_wp
+        rjp1 = 0.0_wp
+        rjm1 = 0.0_wp
+        
         do j = 1, ny
         do i = 1, nx
     
-            ! 1st. No calving for land-based grounded points (assymetry?)
-            !call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                
-            ! x-direction
-            !if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(ip1,j) .gt. 0.0) then
-            !    cr_acx(i,j) = 0.0_wp
-            !else if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(im1,j) .gt. 0.0) then
-            !    cr_acx(im1,j) = 0.0_wp
-            !end if
-    
-            ! y-direction
-            !if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(i,jp1) .gt. 0.0) then
-            !    cr_acy(i,j) = 0.0_wp
-            !else if(Hgrnd_aa(i,j) .gt. 0.0 .and. Hgrnd_aa(i,jm1) .gt. 0.0) then
-            !    cr_acy(i,jm1) = 0.0_wp
-            !end if
-    
-            ! 2nd. Below radius, no calving at the front
+            ! Below radius, no calving.
             ! aa-nodes indices
             r = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
-    
-            ! border points
-            if (r .ge. 750e3) then
-                ! check direction
+
+            ! Below radius
+            if (r .le. 750e3) then
+                ! Border points
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                
-                ! border points
+                rip1 = sqrt((0.5*(nx+1)-ip1)*(0.5*(nx+1)-ip1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
+                rim1 = sqrt((0.5*(nx+1)-im1)*(0.5*(nx+1)-im1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
+                rjp1 = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-jp1)*(0.5*(ny+1)-jp1))*dx
+                rjm1 = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-jm1)*(0.5*(ny+1)-jm1))*dx
+        
+                ! === Check direction ===
                 ! x-direction
-                if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(ip1,j) .gt. 0.0) then
+                if (rip1 .gt. 750e3) then
+                    ! border point right
                     cr_acx(i,j)   = -u_acx(i,j)
-                else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(im1,j) .gt. 0.0) then
-                    cr_acx(im1,j) = -u_acx(im1,j)   
+                    cr_acx(im1,j) = 0.0_wp
+                else if (rim1 .gt. 750e3) then
+                    ! border point left
+                    cr_acx(im1,j) = -u_acx(im1,j)
+                    cr_acx(i,j)   = 0.0_wp
+                else
+                    ! No border point
+                    cr_acx(i,j) = 0.0_wp
                 end if
-                
+
                 ! y-direction
-                if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jp1) .gt. 0.0) then
+                if (rjp1 .gt. 750e3) then
+                    ! border point top
                     cr_acy(i,j)   = -v_acy(i,j)
-                else if (lsf_aa(i,j) .le. 0.0 .and. lsf_aa(i,jm1) .gt. 0.0) then
+                    cr_acy(i,jm1) = 0.0_wp
+                else if (rjm1 .gt. 750e3) then
+                    ! border point bottom
                     cr_acy(i,jm1) = -v_acy(i,jm1)
+                    cr_acy(i,j)   = 0.0_wp
+                else
+                    ! No border point
+                    cr_acy(i,j) = 0.0_wp
                 end if
                 
             end if
     
         end do
         end do
-    
-        !interpolate calving rates to inland ice
-        !if (SUM(cr_acx) /= 0.0) then
-        !    where(cr_acx .eq. 0.0) cr_acx = -u_acx
-        !end if
-        !if (SUM(cr_acy) /= 0.0) then
-        !   where(cr_acy .eq. 0.0) cr_acy = -v_acy
-        !end if
-        !call interpolatex_missing_iterative(cr_acx,u_acx)
-        !call interpolatey_missing_iterative(cr_acy,v_acy)
     
         return
     
@@ -923,45 +918,50 @@ contains
         implicit none
     
         real(wp), intent(OUT) :: cr_acx(:,:), cr_acy(:,:)
-        real(wp), intent(IN)  :: u_acx(:,:),v_acy(:,:)
+        real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: time
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
     
         ! local variables
-        integer :: i, j, im1, ip1, jm1, jp1, nx, ny
+        integer :: i, j, nx, ny
         real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
         real(wp)              :: wv   
     
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
     
-        wv = 300.0 * sin(2.0 * pi * time / 1000.0) 
+        wv = -300.0 * sin(2.0 * pi * time / 1000.0) 
     
+        !cr_acx = -u_acx+(u_acx/(ABS(u_acx)+1e-8))*wv
+        !cr_acy = -v_acy+(v_acy/(ABS(v_acy)+1e-8))*wv
+
         do j = 1, ny
         do i = 1, nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-    
-            ! define over whole domain
-            ! x-direction
-            if(u_acx(i,j) .gt. 0.0_wp) then
-                cr_acx(i,j) = MIN(-(u_acx(i,j)+wv),0.0_wp)
-            else if (u_acx(i,j) .lt. 0.0_wp) then
-                cr_acx(i,j) = MAX(-(u_acx(i,j)-wv),0.0_wp)
-            else
-                cr_acx(i,j) = 0.0_wp
-            end if
-    
-            ! y-direction
-            if(v_acy(i,j) .gt. 0.0_wp) then
-                cr_acy(i,j) = MIN(-(v_acy(i,j)+wv),0.0_wp)
-            else if (v_acy(i,j) .lt. 0.0_wp) then
-                cr_acy(i,j) = MAX(-(v_acy(i,j)-wv),0.0_wp)
-            else
-                cr_acy(i,j) = 0.0_wp
-            end if
-    
+            cr_acx(i,j) = -u_acx(i,j)+(u_acx(i,j)/(ABS(u_acx(i,j))+1e-8))*wv
+            cr_acy(i,j) = -v_acy(i,j)+(v_acy(i,j)/(ABS(v_acy(i,j))+1e-8))*wv
         end do
         end do
+        !    ! define over whole domain
+        !    ! x-direction
+        !    if(u_acx(i,j) .gt. 0.0_wp) then
+        !        cr_acx(i,j) = -u_acx(i,j)+wv !MIN(-(u_acx(i,j)+wv),0.0_wp)
+        !    else if (u_acx(i,j) .lt. 0.0_wp) then
+        !        cr_acx(i,j) = -u_acx(i,j)-wv !MAX(-(u_acx(i,j)-wv),0.0_wp)
+        !    else
+        !        cr_acx(i,j) = 0.0_wp
+        !    end if
+        !
+        !    ! y-direction
+        !    if(v_acy(i,j) .gt. 0.0_wp) then
+        !        cr_acy(i,j) = -v_acy(i,j)+wv !MIN(-(v_acy(i,j)+wv),0.0_wp)
+        !    else if (v_acy(i,j) .lt. 0.0_wp) then
+        !        cr_acy(i,j) = -v_acy(i,j)-wv !MAX(-(v_acy(i,j)-wv),0.0_wp)
+        !    else
+        !        cr_acy(i,j) = 0.0_wp
+        !    end if
+        !
+        !end do
+        !end do
     
         return
     

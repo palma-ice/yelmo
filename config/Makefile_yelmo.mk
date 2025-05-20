@@ -130,7 +130,7 @@ $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs
 
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
 							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \
- 							  $(objdir)/mass_conservation.o $(objdir)/calving_ac.o $(objdir)/calving_aa.o $(objdir)/lsf_module.o\
+ 							  $(objdir)/mass_conservation.o $(objdir)/calving_ac.o $(objdir)/calving_aa.o $(objdir)/lsf_module.o \
 							  $(objdir)/discharge.o \
  							  $(objdir)/runge_kutta.o \
  							  $(objdir)/topography.o

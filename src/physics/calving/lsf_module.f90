@@ -84,7 +84,6 @@ contains
         ! Local variables
         integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
         real(wp), allocatable :: wx(:,:), wy(:,:), mask_lsf(:,:)
-        real(wp), allocatable :: ux_domain_ac(:,:), vy_domain_ac(:,:)
         integer,  allocatable :: mask_new_adv(:,:)
 
         nx = size(lsf,1)
@@ -93,28 +92,16 @@ contains
         allocate(wy(nx,ny))
         allocate(mask_new_adv(nx,ny))
         allocate(mask_lsf(nx,ny))
-        allocate(ux_domain_ac(nx,ny))
-        allocate(vy_domain_ac(nx,ny))
         
         ! Advection depends on ice velocity minus the calving rate
-        dlsf     = 0.0_wp
-        mask_lsf = 0.0_wp
-        mask_new_adv = 1
-        !mask_lsf = 1.0_wp ! Allow all LSF mask to be advected
-        where(lsf .le. 0.0_wp) mask_lsf = 1.0_wp ! Ice fraction to be advected
+        dlsf     = 0.0_wp  ! LSF change in a time dt
+        mask_new_adv = 1   ! ?
+        mask_lsf = 1.0_wp  ! Allow all LSF mask to be advected
 
-        ! interpolate velocities into the open ocean (test)
-        !ux_domain_ac = u_acx
-        !vy_domain_ac = v_acy
-        !call interpolatex_missing_iterative(ux_domain_ac,u_acx)
-        !call interpolatey_missing_iterative(vy_domain_ac,v_acy)
-
-        ! calving rate has opposite sign as velocity
-        !wx = ux_domain_ac + cr_acx
-        !wy = vy_domain_ac + cr_acy
+        ! net velocity (ice velocity minus calving)
         wx = u_acx + cr_acx
         wy = v_acy + cr_acy
-
+            
         ! Compute the advected LSF field
         call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
                                 mask_new_adv,solver,boundaries,dx,dt) ! changed mask_adv for 1
@@ -130,7 +117,7 @@ contains
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0
 
-        ! LSF should not affect points above sea level (maybe in a future it can)
+        ! LSF should not affect points above sea level
         where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
         return
@@ -460,7 +447,7 @@ contains
             do j = 1, ny
             do i = 1, nx
 
-                ! Store previous ice thickness
+                ! Store previous value
                 lsf_prev = lsf(i,j)
             
                 ! Now update lsf with tendency for this timestep

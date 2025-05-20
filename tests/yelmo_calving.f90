@@ -105,6 +105,7 @@ program yelmo_calving
     ! === Define initial topography ===
     call calvmip_init(yelmo1%bnd%z_bed,yelmo1%grd%x,yelmo1%grd%y,yelmo1%par%domain)
 
+    ! advection test
     if (.not. yelmo1%par%use_restart) then
         ! If no restart, set ice thickness to zero
         yelmo1%tpo%now%H_ice = 0.0
@@ -116,8 +117,6 @@ program yelmo_calving
             call LSFinit(yelmo1%tpo%now%lsf,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf,yelmo1%tpo%par%dx)
         end select
     end if
-
-    
 
     ! === Define additional boundary conditions =====
 

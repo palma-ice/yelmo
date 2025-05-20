@@ -225,7 +225,6 @@ end if
                     call apply_tendency(tpo%now%H_ice,tpo%now%dmb,dt,"dmb",adjust_mb=.TRUE.)
                     
                     ! === mb_net =====
-
                     tpo%now%mb_net = tpo%now%smb + tpo%now%bmb + tpo%now%fmb + tpo%now%dmb 
 
                     ! === calving ===
@@ -235,7 +234,9 @@ end if
                         call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
                         ! reset LSF function after dt_lsf
                         if (mod(nint(time*100),nint(tpo%par%dt_lsf*100))==0) then
-                            call LSFinit(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,tpo%par%dx)
+                            !call LSFinit(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,tpo%par%dx)
+                            where(tpo%now%lsf .ge. 0.0) tpo%now%lsf = 1.0
+                            where(tpo%now%lsf .lt. 0.0) tpo%now%lsf = -1.0
                         end if
                     else
                         ! Mass balance calving
@@ -641,33 +642,32 @@ end if
         allocate(var_dot(nx,ny))
         allocate(u_acx_fill(nx,ny))
         allocate(v_acy_fill(nx,ny))
-        var_dot = 0.0 ! check influence
+        var_dot = 0.0               ! effect?
     
         ! === Floating calving laws ===
         
         ! Initialize the calving rates
+        tpo%now%cmb       = 0.0_wp
         tpo%now%cmb_flt_x = 0.0_wp
         tpo%now%cmb_flt_y = 0.0_wp
         tpo%now%cmb_flt   = 0.0_wp
 
-        ! For the level-set function i need to extrapolate velocities (and ice thickness?) into the ocean
-        !u_acx_fill = dyn%now%ux_bar
-        !v_acy_fill = dyn%now%uy_bar
+        ! Eextrapolate velocities into the ocean.
         call interpolate_ocn_acx(u_acx_fill,dyn%now%ux_bar)
         call interpolate_ocn_acy(v_acy_fill,dyn%now%uy_bar)
 
         select case(trim(tpo%par%calv_flt_method))
     
             case("zero","none")
-                ! Do nothing
+                ! Do nothing. No calving.
 
             case("equil")
-                ! For an equilibrated ice sheet calving rate should be opposite to ice velocity
-                tpo%now%cmb_flt_x = -1*u_acx_fill!-1*dyn%now%ux_bar
-                tpo%now%cmb_flt_y = -1*v_acy_fill!-1*dyn%now%uy_bar
+                ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
+                tpo%now%cmb_flt_x = -1*u_acx_fill
+                tpo%now%cmb_flt_y = -1*v_acy_fill
     
             case("vm16")
-     
+                ! TO DO
                 call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2, &
                                   tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
                 ! convert tau_max in a parameter
@@ -675,20 +675,26 @@ end if
                 !call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice, &
                 !                                    tpo%now%f_grnd,tpo%now%tau_eff,tpo%par%dx,tau_max=0.75e6)
     
-            ! TO DO
-            ! Add new laws
+            ! TO DO: Add new laws
     
             ! === CalvMIP ===
             case("exp1","exp3")
                 !call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
-                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
     
             case("exp2","exp4")
                 !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
-                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
-    
-            case("advection")
-                call calvmip_advection(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
+                if (time_now .le. 1000.0) then
+                    call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
+                else
+                    ! do nothing
+                end if
+            !case("exp5")
+                !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
+
+            !case("advection")
+                ! Advection test without ice
+                !call calvmip_advection(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
                 !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
     
             case DEFAULT
@@ -708,7 +714,7 @@ end if
         ! === Merge all calving law ===
         ! The idea is to merge then all calving-rates
     
-    
+
         ! === LSF advection ===
         ! advect LSF mask based on the calving law 
         !call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
@@ -717,12 +723,12 @@ end if
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
      
 
-        ! Apply cmb equal to the ice thickness where lsf>1
-        ! Calve ice outside LSF mask
+        ! === Calving ===
+        ! Calve ice outside LSF mask (cmb = H_ice)
         where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb = -tpo%now%H_ice
         
         ! Apply rate and update ice thickness
-        call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calv",adjust_mb=.TRUE.)
+        call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)
 
         ! Update ice fraction mask 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &

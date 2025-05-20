@@ -290,15 +290,15 @@ contains
                     
                 end if 
                 
-if (update_others_pc) then
-                ! Now, using old topography still, update additional fields.
+                if (update_others_pc) then
+                    ! Now, using old topography still, update additional fields.
 
-                ! Calculate material (ice properties, viscosity, etc.)
-                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+                    ! Calculate material (ice properties, viscosity, etc.)
+                    call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
 
-                ! Calculate thermodynamics (temperatures and enthalpy)
-                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
-end if 
+                    ! Calculate thermodynamics (temperatures and enthalpy)
+                    call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+                end if 
 
                 ! Step 3: Perform corrector step for topography
                 ! Get corrected ice thickness and store it for later use
@@ -312,38 +312,39 @@ end if
                 ! Step 4: Determine truncation error for ice thickness
 
                 !$ time1 = omp_get_wtime()
-if (.TRUE.) then 
-    ! not rk4...
 
-                select case(trim(dom%par%pc_method))
-                    ! No default case necessary, handled earlier 
+                if (.TRUE.) then 
+                    ! not rk4...
 
-                    case("FE-SBE")
+                    select case(trim(dom%par%pc_method))
+                        ! No default case necessary, handled earlier 
+
+                        case("FE-SBE")
                         
-                        ! FE-SBE truncation error 
-                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
+                            ! FE-SBE truncation error 
+                            call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
-                    case("AB-SAM")
-                        
-                        ! AB-SAM truncation error 
-                        call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now, &
+                        case("AB-SAM")
+
+                            ! AB-SAM truncation error 
+                            call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now, &
                                                                                                 dom%tpo%par%dt_zeta)
 
-                    case("HEUN")
+                        case("HEUN")
 
-                        ! HEUN truncation error (same as FE-SBE)
-                        call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
+                            ! HEUN truncation error (same as FE-SBE)
+                            call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
-                    case("RALSTON")
+                        case("RALSTON")
 
-                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
+                            call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
-                end select 
+                    end select 
 
-else 
-    ! rk4 
-                dom%time%pc_tau = dom%tpo%rk4%tau 
-end if 
+                else 
+                    ! rk4 
+                    dom%time%pc_tau = dom%tpo%rk4%tau 
+                end if 
 
                 ! Calculate eta for this timestep 
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dom%bnd%z_bed, &
@@ -396,16 +397,16 @@ end if
             ! === Predictor-corrector completed successfully ===
 
             !$ time1 = omp_get_wtime()
-if (.not. update_others_pc) then
-            ! Now, using old topography still, update additional fields.
+            if (.not. update_others_pc) then
+                ! Now, using old topography still, update additional fields.
 
-            ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
 
-            ! Calculate thermodynamics (temperatures and enthalpy)
-            call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+                ! Calculate thermodynamics (temperatures and enthalpy)
+                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
 
-end if 
+            end if 
 
             ! Update topography accounting for advective changes
             ! and mass balance changes and calving.

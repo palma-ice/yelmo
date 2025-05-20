@@ -630,10 +630,15 @@ end if
         real(wp), optional, intent(IN)    :: time_now
     
         ! Local variables
-        integer :: i, j, nx, ny
+        integer  :: i, j, nx, ny
+        real(wp) :: dt_kill
         real(wp), allocatable :: mbal_now(:,:)
         real(wp), allocatable :: var_dot(:,:)
         real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
+        
+        ! Make sure dt is not zero
+        dt_kill = dt 
+        if (dt_kill .eq. 0.0) dt_kill = 1.0_wp
     
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
@@ -725,7 +730,7 @@ end if
 
         ! === Calving ===
         ! Calve ice outside LSF mask (cmb = H_ice)
-        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb = -tpo%now%H_ice
+        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb =  -(tpo%now%H_ice / dt_kill * 1.1)
         
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)

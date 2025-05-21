@@ -232,12 +232,6 @@ end if
                     if (tpo%par%use_lsf) then
                         ! Level-set function as calving
                         call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
-                        ! reset LSF function after dt_lsf
-                        if (mod(nint(time*100),nint(tpo%par%dt_lsf*100))==0) then
-                            !call LSFinit(tpo%now%lsf,tpo%now%H_ice,bnd%z_bed,tpo%par%dx)
-                            where(tpo%now%lsf .ge. 0.0) tpo%now%lsf = 1.0
-                            where(tpo%now%lsf .lt. 0.0) tpo%now%lsf = -1.0
-                        end if
                     else
                         ! Mass balance calving
                         call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
@@ -630,7 +624,7 @@ end if
         real(wp), optional, intent(IN)    :: time_now
     
         ! Local variables
-        integer  :: i, j, nx, ny
+        integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
         real(wp) :: dt_kill
         real(wp), allocatable :: mbal_now(:,:)
         real(wp), allocatable :: var_dot(:,:)
@@ -652,7 +646,6 @@ end if
         ! === Floating calving laws ===
         
         ! Initialize the calving rates
-        tpo%now%cmb       = 0.0_wp
         tpo%now%cmb_flt_x = 0.0_wp
         tpo%now%cmb_flt_y = 0.0_wp
         tpo%now%cmb_flt   = 0.0_wp
@@ -722,16 +715,30 @@ end if
 
         ! === LSF advection ===
         ! advect LSF mask based on the calving law 
-        !call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
-        !               var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
         call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_grnd, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
-     
 
         ! === Calving ===
-        ! Calve ice outside LSF mask (cmb = H_ice)
-        where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb =  -(tpo%now%H_ice / dt_kill * 1.1)
-        
+        ! Initialize calving-rate to zero
+        tpo%now%cmb       = 0.0_wp
+        !where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb =  -(tpo%now%H_ice / dt_kill * 1.0)
+        do j=1,ny
+        do i=1,nx
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            if(tpo%now%lsf(i,j) .gt. 0.0_wp) then
+                ! Calve ice outside LSF mask (cmb = H_ice)
+                tpo%now%cmb(i,j) =  -(tpo%now%H_ice(i,j) / dt_kill)
+            else
+                ! jablasco: calve border?
+                !if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .or. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .or. &
+                !    (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .or. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
+                !    ! Calve border points with the lsf fraction?
+                !    tpo%now%cmb(i,j) =  (-1.0-tpo%now%lsf(i,j))*(tpo%now%H_ice(i,j) / dt_kill)
+                !end if
+            end if
+        end do
+        end do
+
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)
 
@@ -750,6 +757,12 @@ end if
 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                         bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+
+        ! reset LSF function after dt_lsf
+        if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
+            where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
+            where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
+        end if
 
         return
     

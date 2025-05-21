@@ -235,7 +235,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 21 
+            qtot = 23 
             allocate(names(qtot))
                 names(1)  = "H_ice"
                 names(2)  = "z_srf"
@@ -251,13 +251,15 @@ contains
                 names(12) = "T_prime_b"
                 names(13) = "H_w"
                 names(14) = "mb_net"
-                names(15) = "smb"
-                names(16) = "bmb"
-                names(17) = "cmb_flt"
-                names(18) = "cmb_flt_x"
-                names(19) = "cmb_flt_y"
-                names(20) = "z_sl"
-                names(21) = "lsf"
+                names(15) = "mb_resid"
+                names(16) = "mb_relax"
+                names(17) = "smb"
+                names(18) = "bmb"
+                names(19) = "cmb"
+                names(20) = "cmb_flt_x"
+                names(21) = "cmb_flt_y"
+                names(22) = "z_sl"
+                names(23) = "lsf"
                 !names(22) = "dlsf"
 
         end if 

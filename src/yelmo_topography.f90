@@ -295,6 +295,7 @@ end if
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+                    
 
             end select 
 
@@ -728,13 +729,19 @@ end if
             if(tpo%now%lsf(i,j) .gt. 0.0_wp) then
                 ! Calve ice outside LSF mask (cmb = H_ice)
                 tpo%now%cmb(i,j) =  -(tpo%now%H_ice(i,j) / dt_kill)
+                ! reset LSF border
+                if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .and. &
+                    (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
+                    tpo%now%lsf(i,j) = 1.0_wp
+                end if
             else
-                ! jablasco: calve border?
-                !if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .or. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .or. &
-                !    (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .or. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
+                ! reset LSF border
+                if ((tpo%now%lsf(im1,j) .le. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .le. 0.0_wp) .and. &
+                    (tpo%now%lsf(i,jm1) .le. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .le. 0.0_wp)) then
+                    tpo%now%lsf(i,j) = -1.0_wp
                 !    ! Calve border points with the lsf fraction?
                 !    tpo%now%cmb(i,j) =  (-1.0-tpo%now%lsf(i,j))*(tpo%now%H_ice(i,j) / dt_kill)
-                !end if
+                end if
             end if
         end do
         end do
@@ -759,10 +766,10 @@ end if
                         bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
         ! reset LSF function after dt_lsf
-        if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
-            where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
-            where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
-        end if
+        !if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
+        !    where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
+        !    where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
+        !end if
 
         return
     

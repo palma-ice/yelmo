@@ -176,7 +176,8 @@ end if
                     ! Calculate grounded fraction on aa-nodes
                     ! (only to be used with basal mass balance, later all
                     !  f_grnd arrays will be calculated according to use choices)
-                    call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
+                    call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd, &
+                                                                        boundaries=tpo%par%boundaries)
                     
                     ! Combine basal mass balance into one field accounting for 
                     ! grounded/floating fraction of grid cells 
@@ -199,7 +200,7 @@ end if
                     ! Calculate frontal mass balance
                     call calc_fmb_total(tpo%now%fmb_ref,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
                                     tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale, &
-                                    bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%dx)
+                                    bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%dx,tpo%par%boundaries)
 
                     if (tpo%par%use_bmb) then
                         call calc_G_mbal(tpo%now%fmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%fmb_ref,dt)
@@ -666,13 +667,13 @@ end if
                 ! Grounded area f_grnd, average to f_grnd_acx/acy 
 
                 call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                                                                            tpo%now%H_grnd,tpo%par%gz_nx)
+                                                                tpo%now%H_grnd,tpo%par%gz_nx,tpo%par%boundaries)
             
             case(3) 
                 ! Grounded area using analytical solutions of Leguy et al. (2021)
 
                 call determine_grounded_fractions(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                                                                            tpo%now%f_grnd_ab,tpo%now%H_grnd)
+                                                                tpo%now%f_grnd_ab,tpo%now%H_grnd,tpo%par%boundaries)
 
         end select
         
@@ -681,13 +682,13 @@ end if
                                                 bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw)
 
         ! Calculate the grounding-line distance
-        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx)
+        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx,tpo%par%boundaries)
 
         ! Define the grounding-zone mask too 
         call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
 
         ! Calculate distance to the ice margin
-        call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx)
+        call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries)
 
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &

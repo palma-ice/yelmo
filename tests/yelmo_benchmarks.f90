@@ -23,8 +23,7 @@ program yelmo_benchmarks
     character(len=256) :: file_restart
     character(len=512) :: path_par 
     character(len=56)  :: experiment
-    logical    :: topo_fixed, dyn_fixed, with_bumps, low_z_sl 
-    character(len=256) :: topo_fixed_file 
+    logical    :: with_bumps, low_z_sl 
     real(wp) :: time_init, time_end, dtt, dt2D_out, dt1D_out
     real(wp) :: period, dt_test, alpha, omega, L, amp 
     real(wp) :: bumps_L, bumps_A 
@@ -59,10 +58,7 @@ program yelmo_benchmarks
     call nml_read(path_par,"ctrl","domain",       domain)        ! EISMINT1, EISMINT2
     call nml_read(path_par,"ctrl","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
     call nml_read(path_par,"ctrl","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"ctrl","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"ctrl","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"ctrl","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
-    
+
     ! Timing parameters 
     call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
     call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
@@ -144,10 +140,6 @@ program yelmo_benchmarks
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=ts%time,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
-
-    ! Update parameter values with EISMINT choices 
-    yelmo1%tpo%par%topo_fixed = topo_fixed 
-
     ! Initialize Bueler test type 
     call bueler_init(buel,yelmo1%grd%nx,yelmo1%grd%ny)
 
@@ -180,9 +172,12 @@ program yelmo_benchmarks
         case DEFAULT 
             ! EISMINT1, EISMINT2, HALFAR, BUELER 
 
-            !yelmo1%bnd%z_bed     = 0.0_wp 
+if (.FALSE.) then
+            yelmo1%bnd%z_bed     = 0.0_wp
+else
             yelmo1%bnd%z_bed  = 220.0 - 778.50*(sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0
-            
+end if
+
             yelmo1%tpo%now%H_ice = 0.0_wp 
             yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
 
@@ -200,16 +195,6 @@ program yelmo_benchmarks
 
     end if 
 
-    ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
-    if (topo_fixed .and. trim(experiment) .eq. "moving") then
-
-        yelmo1%bnd%z_bed  = 0.0 
-        call nc_read(topo_fixed_file,"Hi",yelmo1%tpo%now%H_ice)
-        where(yelmo1%tpo%now%H_ice.lt.1.0) yelmo1%tpo%now%H_ice = 0.0 
-        yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
-        
-    end if 
-    
     ! Load boundary values
 
     yelmo1%bnd%z_sl     = 0.0
@@ -347,6 +332,11 @@ program yelmo_benchmarks
         yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
             
     end if 
+    if (.TRUE.) then
+        ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+        call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_wp,H0=1000.0_wp,H0_shlf=200.0_wp,rmax_shlf=0.6_wp)
+        yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+    end if 
 
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
@@ -381,11 +371,6 @@ program yelmo_benchmarks
     call yelmo_write_init(yelmo1,file_compare,time_init=ts%time,units="years")
     call write_step_2D_bueler(yelmo1,buel,file_compare,ts%time)
     
-    if (dyn_fixed) then 
-        ! Set yelmo parameter to fix dynamics
-        yelmo1%dyn%par%solver = "fixed"
-    end if 
-
     ! Store default bedrock solver method, to be activated after several years 
     thrm_method_default = trim(yelmo1%thrm%par%method)
     rock_method_default = trim(yelmo1%thrm%par%rock_method)

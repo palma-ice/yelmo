@@ -541,12 +541,13 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         integer  :: im2, ip2, jm2, jp2
         integer  :: nx, ny, nz_aa, nz_ac
-        real(wp) :: H_now_acx, H_now_acy 
-        real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
-        real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
-        real(wp) :: c_x, c_y, c_x_acy, c_y_acx
-        real(wp) :: h1, h2 
-        
+        real(dp) :: H_now_acx, H_now_acy 
+        real(dp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
+        real(dp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
+        real(dp) :: c_x, c_y, c_x_acy, c_y_acx
+        real(dp) :: h1, h2 
+        real(dp) :: denom
+
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
         ! getting strange results in thermodynamics, including
@@ -644,6 +645,7 @@ else
             ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
 
             if (H_now_acx .gt. 0.0) then 
+
                 ! Bottom layer - upwind derivative
                 k = 1
                 h1 = H_now_acx*(zeta_aa(k+1)-zeta_aa(k))
@@ -658,15 +660,10 @@ else
                 end do 
 
                 ! Top layer - downwind derivative
-                ! k = nz_aa
-                ! h1 = H_now_acx*(zeta_aa(k-2)-zeta_aa(k-1))
-                ! h2 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
-                ! jvel%dxz(i,j,k) = h2/(h1*(h1+h2))*ux(i,j,k-2) - (h1+h2)/(h1*h2)*ux(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*ux(i,j,k)
-                
-                ! ajr: derivative for top layer seems broken for now - check!
-                ! Use simple downwind derivative instead:
-                k = nz_aa 
-                jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_now_acx*(zeta_aa(k)-zeta_aa(k-1)))
+                k = nz_aa
+                h1 = H_now_acx*(zeta_aa(k-1)-zeta_aa(k-2))
+                h2 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
+                jvel%dxz(i,j,k) = h2/(h1*(h1+h2))*ux(i,j,k-2) - (h1+h2)/(h1*h2)*ux(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*ux(i,j,k)
             end if
 
             if (H_now_acy .gt. 0.0) then 
@@ -684,15 +681,10 @@ else
                 end do 
 
                 ! Top layer - downwind derivative (centered not possible)
-                ! k = nz_aa
-                ! h1 = H_now_acy*(zeta_aa(k-2)-zeta_aa(k-1))
-                ! h2 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
-                ! jvel%dyz(i,j,k) = h2/(h1*(h1+h2))*uy(i,j,k-2) - (h1+h2)/(h1*h2)*uy(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*uy(i,j,k)
-                
-                ! ajr: derivative for top layer seems broken for now - check!
-                ! Use simple downwind derivative instead:
-                k = nz_aa 
-                jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_now_acy*(zeta_aa(k)-zeta_aa(k-1)))
+                k = nz_aa
+                h1 = H_now_acy*(zeta_aa(k-1)-zeta_aa(k-2))
+                h2 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
+                jvel%dyz(i,j,k) = h2/(h1*(h1+h2))*uy(i,j,k-2) - (h1+h2)/(h1*h2)*uy(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*uy(i,j,k)
             end if
             
 end if 
@@ -749,6 +741,7 @@ end if
                     end if
                 end if 
 
+if (.FALSE.) then
                 ! jvel%dxy
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
                     jvel%dxy(i,j,k) = 0.0
@@ -775,6 +768,7 @@ end if
                         jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
                     end if
                 end if 
+end if
 
                 ! jvel%dyy
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
@@ -799,6 +793,7 @@ end if
                     end if
                 end if 
 
+if (.FALSE.) then
                 ! jvel%dyx
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
                     jvel%dyx(i,j,k) = 0.0
@@ -825,6 +820,7 @@ end if
                         jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
                     end if 
                 end if
+end if
 
                 ! === Calculate and apply the sigma-transformation correction terms ===
 

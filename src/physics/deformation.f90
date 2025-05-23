@@ -1618,7 +1618,6 @@ end if
 
         ! === Next perform interpolations to get strain rate tensor components on aa-nodes ===
 
-
         strn2D%dxx      = 0.0 
         strn2D%dyy      = 0.0 
         strn2D%dxy      = 0.0 
@@ -1647,7 +1646,7 @@ end if
                 strn2D%dxx(i,j) = sum(dudxn*gq2D%wt)/gq2D%wt_tot
                 strn2D%dyy(i,j) = sum(dvdyn*gq2D%wt)/gq2D%wt_tot
                 strn2D%dxy(i,j) = sum(0.5_wp*(dudyn+dvdxn)*gq2D%wt)/gq2D%wt_tot
-
+                
                 ! Check tolerance limits
                 if (abs(strn2D%dxx(i,j)) .lt. TOL_UNDERFLOW) strn2D%dxx(i,j) = 0.0 
                 if (abs(strn2D%dyy(i,j)) .lt. TOL_UNDERFLOW) strn2D%dyy(i,j) = 0.0 
@@ -1723,7 +1722,7 @@ end if
             dvdx(i,j) = (uy(ip1,j)-uy(im1,j))/(2.0*dx)
             dvdy(i,j) = (uy(i,jp1)-uy(i,jm1))/(2.0*dy)
 
-if (.TRUE.) then
+if (.FALSE.) then
             ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
             ! Second-order, one-sided derivatives
 
@@ -1821,7 +1820,8 @@ if (.TRUE.) then
                 end if 
             end if 
 
-else
+end if
+if (.FALSE.) then
             ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
             ! First-order, one-sided derivatives 
 

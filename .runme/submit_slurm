@@ -6,6 +6,7 @@
 #SBATCH --account=<ACCOUNT>
 #SBATCH --output=./out.out
 #SBATCH --error=./out.err
+#SBATCH --mem=2000
 <EMAILSECTION>
 
 <OMPSECTION>

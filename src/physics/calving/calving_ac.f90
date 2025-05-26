@@ -36,7 +36,6 @@ module calving_ac
     !=== CalvMIP calving rates ===
     public :: calvmip_exp1
     public :: calvmip_exp2
-    public :: calvmip_advection
 
 contains 
 
@@ -867,7 +866,7 @@ contains
 
             ! Below radius
             if (r .le. 750e3) then
-                ! Border points
+                ! Now treat border points
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
                 rip1 = sqrt((0.5*(nx+1)-ip1)*(0.5*(nx+1)-ip1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
                 rim1 = sqrt((0.5*(nx+1)-im1)*(0.5*(nx+1)-im1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
@@ -879,28 +878,32 @@ contains
                 if (rip1 .gt. 750e3) then
                     ! border point right
                     cr_acx(i,j)   = -u_acx(i,j)
-                    cr_acx(im1,j) = 0.0_wp
-                else if (rim1 .gt. 750e3) then
+                else
+                    cr_acx(i,j)   = 0.0_wp
+                end if
+
+                if (rim1 .gt. 750e3) then
                     ! border point left
                     cr_acx(im1,j) = -u_acx(im1,j)
-                    cr_acx(i,j)   = 0.0_wp
                 else
-                    ! No border point
-                    cr_acx(i,j) = 0.0_wp
+                    cr_acx(im1,j) = 0.0_wp
                 end if
 
                 ! y-direction
                 if (rjp1 .gt. 750e3) then
                     ! border point top
                     cr_acy(i,j)   = -v_acy(i,j)
-                    cr_acy(i,jm1) = 0.0_wp
-                else if (rjm1 .gt. 750e3) then
+                else
+                    !border point top
+                    cr_acy(i,j)   = 0.0_wp
+                end if
+
+                if (rjm1 .gt. 750e3) then
                     ! border point bottom
                     cr_acy(i,jm1) = -v_acy(i,jm1)
-                    cr_acy(i,j)   = 0.0_wp
                 else
-                    ! No border point
-                    cr_acy(i,j) = 0.0_wp
+                    ! border point bottom
+                    cr_acy(i,jm1) = 0.0_wp
                 end if
                 
             end if
@@ -932,72 +935,15 @@ contains
     
         wv = -300.0 * sin(2.0 * pi * time / 1000.0) 
     
-        !cr_acx = -u_acx+(u_acx/(ABS(u_acx)+1e-8))*wv
-        !cr_acy = -v_acy+(v_acy/(ABS(v_acy)+1e-8))*wv
-
         do j = 1, ny
         do i = 1, nx
             cr_acx(i,j) = -u_acx(i,j)+(u_acx(i,j)/(ABS(u_acx(i,j))+1e-8))*wv
             cr_acy(i,j) = -v_acy(i,j)+(v_acy(i,j)/(ABS(v_acy(i,j))+1e-8))*wv
         end do
         end do
-        !    ! define over whole domain
-        !    ! x-direction
-        !    if(u_acx(i,j) .gt. 0.0_wp) then
-        !        cr_acx(i,j) = -u_acx(i,j)+wv !MIN(-(u_acx(i,j)+wv),0.0_wp)
-        !    else if (u_acx(i,j) .lt. 0.0_wp) then
-        !        cr_acx(i,j) = -u_acx(i,j)-wv !MAX(-(u_acx(i,j)-wv),0.0_wp)
-        !    else
-        !        cr_acx(i,j) = 0.0_wp
-        !    end if
-        !
-        !    ! y-direction
-        !    if(v_acy(i,j) .gt. 0.0_wp) then
-        !        cr_acy(i,j) = -v_acy(i,j)+wv !MIN(-(v_acy(i,j)+wv),0.0_wp)
-        !    else if (v_acy(i,j) .lt. 0.0_wp) then
-        !        cr_acy(i,j) = -v_acy(i,j)-wv !MAX(-(v_acy(i,j)-wv),0.0_wp)
-        !    else
-        !        cr_acy(i,j) = 0.0_wp
-        !    end if
-        !
-        !end do
-        !end do
     
         return
     
     end subroutine calvmip_exp2
-    
-    subroutine calvmip_advection(cr_acx,cr_acy,u_acx,v_acy,time)
-    ! Advection test
-    
-        implicit none
-    
-        real(wp), intent(OUT) :: cr_acx(:,:),cr_acy(:,:)   ! Calving rates on ac-nodes
-        real(wp), intent(IN)  :: u_acx(:,:),v_acy(:,:)     ! Velocities on ac-nodes
-        real(wp), intent(IN)  :: time
-    
-        ! Local variables
-        real(wp) :: advection, dx
-        real(wp) :: xc, yc
-        integer  :: i,j,nx,ny
-        real(wp), parameter   :: pi = acos(-1.0)  
-        
-        advection = 0.707107*1000.0
-        dx = 1000.0 
-        nx = size(u_acx,1)
-        ny = size(u_acx,2) 
-        xc = 25
-        yc = 25
-    
-        do j=1,ny
-        do i=1,nx
-            cr_acx(i,j) = advection*((0.001*(i-1)*dx-xc)/nx)*sin(2*pi*time/10)
-            cr_acy(i,j) = advection*((0.001*(j-1)*dx-yc)/ny)*sin(2*pi*time/10)
-        end do
-        end do
-    
-        return
-
-    end subroutine calvmip_advection
 
 end module calving_ac

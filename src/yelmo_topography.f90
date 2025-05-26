@@ -660,6 +660,8 @@ end if
     
             case("zero","none")
                 ! Do nothing. No calving.
+                ! Allow ice everywhere (improve?)
+                tpo%now%lsf = -1.0_wp
 
             case("equil")
                 ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
@@ -684,11 +686,11 @@ end if
     
             case("exp2","exp4")
                 !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
-                if (time_now .le. 1000.0) then
-                    call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
-                else
+                !if (time_now .le. 1000.0) then
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
+                !else
                     ! do nothing
-                end if
+                !end if
             !case("exp5")
                 !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
 
@@ -767,10 +769,10 @@ end if
                         bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
         ! reset LSF function after dt_lsf
-        !if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
-        !    where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
-        !    where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
-        !end if
+        if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
+            where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
+            where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
+        end if
 
         return
     

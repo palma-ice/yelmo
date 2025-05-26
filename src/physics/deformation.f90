@@ -541,12 +541,13 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         integer  :: im2, ip2, jm2, jp2
         integer  :: nx, ny, nz_aa, nz_ac
-        real(wp) :: H_now_acx, H_now_acy 
-        real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
-        real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
-        real(wp) :: c_x, c_y, c_x_acy, c_y_acx
-        real(wp) :: h1, h2 
-        
+        real(dp) :: H_now_acx, H_now_acy 
+        real(dp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
+        real(dp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
+        real(dp) :: c_x, c_y, c_x_acy, c_y_acx
+        real(dp) :: h1, h2 
+        real(dp) :: denom
+
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
         ! getting strange results in thermodynamics, including
@@ -644,6 +645,7 @@ else
             ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
 
             if (H_now_acx .gt. 0.0) then 
+
                 ! Bottom layer - upwind derivative
                 k = 1
                 h1 = H_now_acx*(zeta_aa(k+1)-zeta_aa(k))
@@ -658,15 +660,10 @@ else
                 end do 
 
                 ! Top layer - downwind derivative
-                ! k = nz_aa
-                ! h1 = H_now_acx*(zeta_aa(k-2)-zeta_aa(k-1))
-                ! h2 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
-                ! jvel%dxz(i,j,k) = h2/(h1*(h1+h2))*ux(i,j,k-2) - (h1+h2)/(h1*h2)*ux(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*ux(i,j,k)
-                
-                ! ajr: derivative for top layer seems broken for now - check!
-                ! Use simple downwind derivative instead:
-                k = nz_aa 
-                jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_now_acx*(zeta_aa(k)-zeta_aa(k-1)))
+                k = nz_aa
+                h1 = H_now_acx*(zeta_aa(k-1)-zeta_aa(k-2))
+                h2 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
+                jvel%dxz(i,j,k) = h2/(h1*(h1+h2))*ux(i,j,k-2) - (h1+h2)/(h1*h2)*ux(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*ux(i,j,k)
             end if
 
             if (H_now_acy .gt. 0.0) then 
@@ -684,15 +681,10 @@ else
                 end do 
 
                 ! Top layer - downwind derivative (centered not possible)
-                ! k = nz_aa
-                ! h1 = H_now_acy*(zeta_aa(k-2)-zeta_aa(k-1))
-                ! h2 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
-                ! jvel%dyz(i,j,k) = h2/(h1*(h1+h2))*uy(i,j,k-2) - (h1+h2)/(h1*h2)*uy(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*uy(i,j,k)
-                
-                ! ajr: derivative for top layer seems broken for now - check!
-                ! Use simple downwind derivative instead:
-                k = nz_aa 
-                jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_now_acy*(zeta_aa(k)-zeta_aa(k-1)))
+                k = nz_aa
+                h1 = H_now_acy*(zeta_aa(k-1)-zeta_aa(k-2))
+                h2 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
+                jvel%dyz(i,j,k) = h2/(h1*(h1+h2))*uy(i,j,k-2) - (h1+h2)/(h1*h2)*uy(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*uy(i,j,k)
             end if
             
 end if 
@@ -749,33 +741,6 @@ end if
                     end if
                 end if 
 
-                ! jvel%dxy
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                    jvel%dxy(i,j,k) = 0.0
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
-                    if (jm1 .gt. 1) then 
-                        jm2 = jm1-1
-                        if (f_ice(i,jm2) .eq. 1.0) then 
-                            jvel%dxy(i,j,k) = (1.0*ux(i,jm2,k)-4.0*ux(i,jm1,k)+3.0*ux(i,j,k))/(2.0*dy)
-                        else 
-                            jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
-                        end if
-                    else 
-                        jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
-                    end if
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                    if (jp1 .lt. ny) then 
-                        jp2 = jp1+1
-                        if (f_ice(i,jp2) .eq. 1.0) then 
-                            jvel%dxy(i,j,k) = -(1.0*ux(i,jp2,k)-4.0*ux(i,jp1,k)+3.0*ux(i,j,k))/(2.0*dy)
-                        else
-                            jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
-                        end if
-                    else
-                        jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
-                    end if
-                end if 
-
                 ! jvel%dyy
                 if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
                     if (jm1 .gt. 1) then
@@ -799,32 +764,9 @@ end if
                     end if
                 end if 
 
-                ! jvel%dyx
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                    jvel%dyx(i,j,k) = 0.0
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                    if (im1 .gt. 1) then 
-                        im2 = im1-1
-                        if (f_ice(im2,j) .eq. 1.0) then 
-                            jvel%dyx(i,j,k) = (1.0*uy(im2,j,k)-4.0*uy(im1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
-                        else 
-                            jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
-                        end if
-                    else 
-                        jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
-                    end if
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
-                    if (ip1 .lt. nx) then 
-                        ip2 = ip1+1
-                        if (f_ice(ip2,j) .eq. 1.0) then 
-                            jvel%dyx(i,j,k) = -(1.0*uy(ip2,j,k)-4.0*uy(ip1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
-                        else
-                            jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
-                        end if
-                    else
-                        jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
-                    end if 
-                end if
+                ! Note: do not treat special cases for cross derivatives like dxy or dyx. 
+                ! It is too complicated to check neighbors in this case, and multiple
+                ! tries led to asymmetric discretizations. Better to leave it clean.
 
                 ! === Calculate and apply the sigma-transformation correction terms ===
 
@@ -929,11 +871,11 @@ end if
         integer  :: im1, ip1, jm1, jp1 
         integer  :: im2, ip2, jm2, jp2
         integer  :: nx, ny, nz_aa, nz_ac
-        real(wp) :: H_now
-        real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
-        real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
-        real(wp) :: c_x, c_y, c_x_acy, c_y_acx
-        real(wp) :: h1, h2 
+        real(dp) :: H_now
+        real(dp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
+        real(dp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
+        real(dp) :: c_x, c_y, c_x_acy, c_y_acx
+        real(dp) :: h1, h2 
         
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
@@ -1027,7 +969,6 @@ else
                 ! Use simple downwind derivative instead:
                 k = nz_ac
                 jvel%dzz(i,j,k) = (uz(i,j,k)-uz(i,j,k-1)) / (H_now*(zeta_ac(k)-zeta_ac(k-1)))
-
 end if
 
             end if
@@ -1618,7 +1559,6 @@ end if
 
         ! === Next perform interpolations to get strain rate tensor components on aa-nodes ===
 
-
         strn2D%dxx      = 0.0 
         strn2D%dyy      = 0.0 
         strn2D%dxy      = 0.0 
@@ -1647,7 +1587,7 @@ end if
                 strn2D%dxx(i,j) = sum(dudxn*gq2D%wt)/gq2D%wt_tot
                 strn2D%dyy(i,j) = sum(dvdyn*gq2D%wt)/gq2D%wt_tot
                 strn2D%dxy(i,j) = sum(0.5_wp*(dudyn+dvdxn)*gq2D%wt)/gq2D%wt_tot
-
+                
                 ! Check tolerance limits
                 if (abs(strn2D%dxx(i,j)) .lt. TOL_UNDERFLOW) strn2D%dxx(i,j) = 0.0 
                 if (abs(strn2D%dyy(i,j)) .lt. TOL_UNDERFLOW) strn2D%dyy(i,j) = 0.0 
@@ -1748,33 +1688,6 @@ if (.TRUE.) then
                 end if
             end if 
 
-            ! dudy
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                dudy(i,j) = 0.0
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
-                if (jm1 .gt. 1) then 
-                    jm2 = jm1-1
-                    if (f_ice(i,jm2) .eq. 1.0) then 
-                        dudy(i,j) = (1.0*ux(i,jm2)-4.0*ux(i,jm1)+3.0*ux(i,j))/(2.0*dy)
-                    else 
-                        dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
-                    end if
-                else 
-                    dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
-                end if
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                if (jp1 .lt. ny) then 
-                    jp2 = jp1+1
-                    if (f_ice(i,jp2) .eq. 1.0) then 
-                        dudy(i,j) = -(1.0*ux(i,jp2)-4.0*ux(i,jp1)+3.0*ux(i,j))/(2.0*dy)
-                    else
-                        dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
-                    end if
-                else
-                    dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
-                end if
-            end if 
-
             ! dvdy
             if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
                 if (f_ice(i,jm1) .eq. 1.0 .and. jm1 .gt. 1) then 
@@ -1792,72 +1705,12 @@ if (.TRUE.) then
                         dvdy(i,j) = (uy(i,jp1)-uy(i,j))/dy
                     end if 
                 end if
-            end if 
+            end if
 
-            ! dvdx
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                dvdx(i,j) = 0.0
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                if (im1 .gt. 1) then 
-                    im2 = im1-1
-                    if (f_ice(im2,j) .eq. 1.0) then 
-                        dvdx(i,j) = (1.0*uy(im2,j)-4.0*uy(im1,j)+3.0*uy(i,j))/(2.0*dx)
-                    else 
-                        dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
-                    end if
-                else 
-                    dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
-                end if
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
-                if (ip1 .lt. nx) then 
-                    ip2 = ip1+1
-                    if (f_ice(ip2,j) .eq. 1.0) then 
-                        dvdx(i,j) = -(1.0*uy(ip2,j)-4.0*uy(ip1,j)+3.0*uy(i,j))/(2.0*dx)
-                    else
-                        dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
-                    end if
-                else
-                    dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
-                end if 
-            end if 
-
-else
-            ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
-            ! First-order, one-sided derivatives 
-
-            ! dudx
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
-                dudx(i,j) = (ux(i,j)-ux(im1,j))/dx
-            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
-                dudx(i,j) = (ux(ip1,j)-ux(i,j))/dx
-            end if 
-
-            ! dudy
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                dudy(i,j) = 0.0
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
-                dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
-            end if 
-
-            ! dvdy
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                dvdy(i,j) = (uy(i,j)-uy(i,jm1))/dy
-            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
-                dvdy(i,j) = (uy(i,jp1)-uy(i,j))/dy
-            end if 
-
-            ! dvdx
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                dvdx(i,j) = 0.0
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
-            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
-            end if 
+            ! Note - do not treat cross terms as symmetry breaks down.
+            ! Better to keep it clean.
 end if
-
+        
         end do
         end do
 

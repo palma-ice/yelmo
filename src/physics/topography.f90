@@ -125,7 +125,7 @@ contains
 
     end subroutine gen_mask_bed
 
-    subroutine find_connected_mask(mask,mask_ref,mask_now)
+    subroutine find_connected_mask(mask,mask_ref,mask_now,boundaries)
         ! Brute-force routine to find all points 
         ! that touch or are connected with other points in a mask.
         ! Here use to find any floating ice points that are
@@ -138,7 +138,8 @@ contains
         logical, intent(INOUT) :: mask(:,:)         ! Connected points of interest
         logical, intent(IN)    :: mask_ref(:,:)     ! Points to be connected to
         logical, intent(IN)    :: mask_now(:,:)     ! Points of interest
-
+        character(len=*), intent(IN) :: boundaries
+    
         ! Local variables 
         integer :: i, j, q, nx, ny
         integer :: im1, ip1, jm1, jp1 
@@ -169,24 +170,8 @@ contains
             do j = 1, ny 
             do i = 1, nx 
 
-                ! BC: Periodic boundary conditions
-                im1 = i-1
-                if (im1 == 0) then
-                    im1 = nx
-                end if
-                ip1 = i+1
-                if (ip1 == nx+1) then
-                    ip1 = 1
-                end if
-
-                jm1 = j-1
-                if (jm1 == 0) then
-                    jm1 = ny
-                end if
-                jp1 = j+1
-                if (jp1 == ny+1) then
-                    jp1 = 1
-                end if
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 if (mask_now(i,j)) then 
                     ! This is a point of interest
@@ -228,7 +213,7 @@ contains
 
     end subroutine find_connected_mask
     
-    subroutine calc_ice_fraction_new(f_ice,H_ice,z_bed,z_sl,rho_ice,rho_sw,flt_subgrid)
+    subroutine calc_ice_fraction_new(f_ice,H_ice,z_bed,z_sl,rho_ice,rho_sw,boundaries,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -244,6 +229,7 @@ contains
         real(wp), intent(IN)  :: z_sl(:,:)              ! [m] Sea-level elevation
         real(wp), intent(IN)  :: rho_ice 
         real(wp), intent(IN)  :: rho_sw 
+        character(len=*), intent(IN) :: boundaries
         logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
         
         ! Local variables 
@@ -292,24 +278,8 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! BC: Periodic boundary conditions
-                im1 = i-1
-                if (im1 == 0) then
-                    im1 = nx
-                end if
-                ip1 = i+1
-                if (ip1 == nx+1) then
-                    ip1 = 1
-                end if
-
-                jm1 = j-1
-                if (jm1 == 0) then
-                    jm1 = ny
-                end if
-                jp1 = j+1
-                if (jp1 == ny+1) then
-                    jp1 = 1
-                end if
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
     
                 ! Determine calving front mask 
                 if (H_ice(i,j) .gt. 0.0 .and. H_grnd(i,j) .lt. 0.0) then 
@@ -334,24 +304,8 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! BC: Periodic boundary conditions
-                im1 = i-1
-                if (im1 == 0) then
-                    im1 = nx
-                end if
-                ip1 = i+1
-                if (ip1 == nx+1) then
-                    ip1 = 1
-                end if
-
-                jm1 = j-1
-                if (jm1 == 0) then
-                    jm1 = ny
-                end if
-                jp1 = j+1
-                if (jp1 == ny+1) then
-                    jp1 = 1
-                end if
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 if (mask_cf(i,j)) then 
                     ! This is a calving front point 
@@ -469,7 +423,7 @@ contains
 
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
+                
                 ! Count how many neighbors are ice covered  
                 H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
                 mask       = H_neighb .gt. 0.0_wp 
@@ -598,24 +552,8 @@ contains
         do j = 1, ny
         do i = 1, nx 
 
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             f_neighb = [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
             n = count(f_neighb .lt. 1.0)
@@ -727,7 +665,7 @@ contains
 
     end subroutine calc_z_srf_max
 
-    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gz_nx,rho_ice,rho_sw)
+    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gz_nx,rho_ice,rho_sw,boundaries)
         ! Interpolate variables at grounding line to subgrid level to 
         ! calculate the average z_srf value for the aa-node cell
 
@@ -739,10 +677,11 @@ contains
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: z_bed(:,:)
         real(wp), intent(IN)  :: z_sl(:,:)
-        integer,    intent(IN)  :: gz_nx        ! Number of interpolation points per side (nx*nx)
+        integer,  intent(IN)  :: gz_nx            ! Number of interpolation points per side (nx*nx)
         real(wp), intent(IN)  :: rho_ice 
         real(wp), intent(IN)  :: rho_sw
-        
+        character(len=*), intent(IN) :: boundaries
+    
         ! Local variables
         integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1
@@ -779,24 +718,8 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             f_grnd_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
 
@@ -959,7 +882,7 @@ contains
 
     end subroutine calc_H_af
 
-    subroutine calc_f_grnd_subgrid_area_aa(f_grnd,H_grnd,gz_nx)
+    subroutine calc_f_grnd_subgrid_area_aa(f_grnd,H_grnd,gz_nx,boundaries)
         ! Use H_grnd to determined grounded area fraction of grid point.
 
         implicit none
@@ -967,6 +890,7 @@ contains
         real(wp), intent(OUT) :: f_grnd(:,:)        ! aa-nodes 
         real(wp), intent(IN)  :: H_grnd(:,:)        ! aa-nodes
         integer,  intent(IN)  :: gz_nx              ! Number of interpolation points per side (nx*nx)
+        character(len=*), intent(IN) :: boundaries
 
         ! Local variables
         integer  :: i, j, nx, ny
@@ -986,24 +910,8 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             if (maxval(H_grnd(im1:ip1,jm1:jp1)) .ge. 0.0 .and. minval(H_grnd(im1:ip1,jm1:jp1)) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
@@ -1022,7 +930,7 @@ contains
         
     end subroutine calc_f_grnd_subgrid_area_aa
     
-    subroutine calc_f_grnd_subgrid_area(f_grnd,f_grnd_acx,f_grnd_acy,H_grnd,gz_nx)
+    subroutine calc_f_grnd_subgrid_area(f_grnd,f_grnd_acx,f_grnd_acy,H_grnd,gz_nx,boundaries)
         ! Use H_grnd to determined grounded area fraction of grid point.
 
         implicit none
@@ -1032,7 +940,8 @@ contains
         real(wp), intent(OUT) :: f_grnd_acy(:,:)    ! ac-nodes
         real(wp), intent(IN)  :: H_grnd(:,:)        ! aa-nodes
         integer,  intent(IN)  :: gz_nx          ! Number of interpolation points per side (nx*nx)
-
+        character(len=*), intent(IN) :: boundaries
+        
         ! Local variables
         integer  :: i, j, nx, ny
         real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4
@@ -1055,24 +964,8 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! === f_grnd at aa-nodes ===
 
@@ -1436,7 +1329,7 @@ end if
 
     end subroutine remove_englacial_lakes
 
-    subroutine calc_distance_to_ice_margin(dist_mrgn,f_ice,dx)
+    subroutine calc_distance_to_ice_margin(dist_mrgn,f_ice,dx,boundaries)
         ! Calculate distance to the ice margin
         
         ! Note: this subroutine is a wrapper that calls the
@@ -1448,14 +1341,15 @@ end if
         real(wp), intent(OUT) :: dist_mrgn(:,:) ! [km] Distance to grounding line
         real(wp), intent(IN)  :: f_ice(:,:)     ! [1]  Fraction of grid-cell ice coverage 
         real(wp), intent(IN)  :: dx             ! [m]  Grid resolution (assume dy=dx)
-
-        call calc_distance_to_grounding_line(dist_mrgn,f_ice,dx)
+        character(len=*), intent(IN) :: boundaries
+    
+        call calc_distance_to_grounding_line(dist_mrgn,f_ice,dx,boundaries)
 
         return 
 
     end subroutine calc_distance_to_ice_margin
     
-    subroutine calc_distance_to_grounding_line(dist_gl,f_grnd,dx)
+    subroutine calc_distance_to_grounding_line(dist_gl,f_grnd,dx,boundaries)
         ! Calculate distance to the grounding line 
         
         implicit none 
@@ -1463,6 +1357,7 @@ end if
         real(wp), intent(OUT) :: dist_gl(:,:)   ! [km] Distance to grounding line
         real(wp), intent(IN)  :: f_grnd(:,:)    ! [1]  Grounded grid-cell fraction 
         real(wp), intent(IN)  :: dx             ! [m]  Grid resolution (assume dy=dx)
+        character(len=*), intent(IN) :: boundaries
 
         ! Local variables 
         integer  :: i, j, nx, ny, q
@@ -1496,24 +1391,8 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! Grounded point or partially floating point with floating neighbors
             if (f_grnd(i,j) .gt. 0.0 .and. &
@@ -1542,24 +1421,8 @@ end if
                 if (dist_gl(i,j) .eq. dist_max) then 
                     ! Distance needs to be determined for this point 
 
-                    ! BC: Periodic boundary conditions
-                    im1 = i-1
-                    if (im1 == 0) then
-                        im1 = nx
-                    end if
-                    ip1 = i+1
-                    if (ip1 == nx+1) then
-                        ip1 = 1
-                    end if
-
-                    jm1 = j-1
-                    if (jm1 == 0) then
-                        jm1 = ny
-                    end if
-                    jp1 = j+1
-                    if (jp1 == ny+1) then
-                        jp1 = 1
-                    end if
+                    ! Get neighbor indices
+                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                     ! Get distances to direct and corner neighbors
                     dists = [dist_gl_ref(im1,j),dist_gl_ref(ip1,j), &       ! Direct neighbors
@@ -1752,7 +1615,8 @@ end if
 
     end subroutine calc_bmb_total
 
-    subroutine calc_fmb_total(fmb,fmb_shlf,bmb_shlf,H_ice,H_grnd,f_ice,fmb_method,fmb_scale,rho_ice,rho_sw,dx)
+    subroutine calc_fmb_total(fmb,fmb_shlf,bmb_shlf,H_ice,H_grnd,f_ice, &
+                                fmb_method,fmb_scale,rho_ice,rho_sw,dx,boundaries)
 
         implicit none 
 
@@ -1767,7 +1631,8 @@ end if
         real(wp), intent(IN)  :: rho_ice
         real(wp), intent(IN)  :: rho_sw
         real(wp), intent(IN)  :: dx
-
+        character(len=*), intent(IN) :: boundaries
+    
         ! Local variables
         integer    :: i, j, nx, ny, n_margin
         integer    :: im1, ip1, jm1, jp1
@@ -1805,24 +1670,8 @@ end if
                 do j = 1, ny 
                 do i = 1, nx 
 
-                    ! BC: Periodic boundary conditions
-                    im1 = i-1
-                    if (im1 == 0) then
-                        im1 = nx
-                    end if
-                    ip1 = i+1
-                    if (ip1 == nx+1) then
-                        ip1 = 1
-                    end if
-
-                    jm1 = j-1
-                    if (jm1 == 0) then
-                        jm1 = ny
-                    end if
-                    jp1 = j+1
-                    if (jp1 == ny+1) then
-                        jp1 = 1
-                    end if
+                    ! Get neighbor indices
+                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                     ! Get mask of neighbors that are ice free 
                     mask = ( [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0 )
@@ -1990,7 +1839,7 @@ end if
 
 ! == Routines for determining the grounded fraction on all four grids
   
-  subroutine determine_grounded_fractions(f_grnd,f_grnd_acx,f_grnd_acy,f_grnd_ab,H_grnd)
+  subroutine determine_grounded_fractions(f_grnd,f_grnd_acx,f_grnd_acy,f_grnd_ab,H_grnd,boundaries)
     ! Determine the grounded fraction of centered and staggered grid points
     ! Uses the bilinear interpolation scheme (with analytical solutions) 
     ! from CISM (Leguy et al., 2021), as adapted from IMAU-ICE v2.0 code (rev. 4776833b)
@@ -2002,6 +1851,7 @@ end if
     real(wp), intent(OUT), optional :: f_grnd_acy(:,:) 
     real(wp), intent(OUT), optional :: f_grnd_ab(:,:) 
     real(wp), intent(IN)  :: H_grnd(:,:) 
+    character(len=*), intent(IN) :: boundaries
     
     ! Local variables
     integer :: i, j, nx, ny 
@@ -2031,31 +1881,15 @@ end if
     f_flt = -H_grnd
     
     ! Calculate grounded fractions of all four quadrants of each a-grid cell
-    call determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt)
+    call determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt,boundaries)
     
     ! Get grounded fractions on all four grids by averaging over the quadrants
     !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
     do j = 1, ny
     do i = 1, nx 
         
-        ! BC: Periodic boundary conditions
-        im1 = i-1
-        if (im1 == 0) then
-            im1 = nx
-        end if
-        ip1 = i+1
-        if (ip1 == nx+1) then
-            ip1 = 1
-        end if
-
-        jm1 = j-1
-        if (jm1 == 0) then
-            jm1 = ny
-        end if
-        jp1 = j+1
-        if (jp1 == ny+1) then
-            jp1 = 1
-        end if
+        ! Get neighbor indices
+        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
       ! aa-nodes
       f_grnd(i,j)     = 0.25_wp * (f_grnd_NW(i,j) + f_grnd_NE(i,j) + f_grnd_SW(i,j) + f_grnd_SE(i,j))
@@ -2083,7 +1917,7 @@ end if
 
   end subroutine determine_grounded_fractions
 
-  subroutine determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt)
+  subroutine determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt,boundaries)
     ! Calculate grounded fractions of all four quadrants of each a-grid cell
     ! (using the approach from CISM, where grounded fractions are calculated
     !  based on analytical solutions to the bilinear interpolation)
@@ -2095,6 +1929,7 @@ end if
     real(wp), intent(OUT) :: f_grnd_SW(:,:)
     real(wp), intent(OUT) :: f_grnd_SE(:,:)
     real(wp), intent(IN)  :: f_flt(:,:) 
+    character(len=*), intent(IN) :: boundaries
 
     ! Local variables:
     integer  :: i, j, ii, jj, nx, ny
@@ -2110,24 +1945,8 @@ end if
     do j = 1, ny
     do i = 1, nx
         
-        ! BC: Periodic boundary conditions
-        im1 = i-1
-        if (im1 == 0) then
-            im1 = nx
-        end if
-        ip1 = i+1
-        if (ip1 == nx+1) then
-            ip1 = 1
-        end if
-
-        jm1 = j-1
-        if (jm1 == 0) then
-            jm1 = ny
-        end if
-        jp1 = j+1
-        if (jp1 == ny+1) then
-            jp1 = 1
-        end if
+        ! Get neighbor indices
+        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
       f_NW = 0.25_wp * (f_flt(im1,jp1) + f_flt(i,jp1)   + f_flt(im1,j)   + f_flt(i,j))
       f_N  = 0.50_wp * (f_flt(i,jp1)   + f_flt(i,j))

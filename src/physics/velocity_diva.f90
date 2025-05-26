@@ -394,12 +394,14 @@ end if
             ux_i(:,:,k) = ux(:,:,k) - ux_b 
             uy_i(:,:,k) = uy(:,:,k) - uy_b 
         end do
-        
+    
+if (.FALSE.) then
         if (par%visc_method .eq. 0) then 
             ! Diagnose viscosity for visc_method=0 (not used prognostically)
             call calc_visc_eff_3D_nodes(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
         end if 
+end if
 
         return 
 
@@ -596,7 +598,7 @@ end if
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .TRUE.
+        logical, parameter :: use_gq3D = .FALSE.
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)

@@ -90,13 +90,13 @@ contains
         ny = size(lsf,2)
         allocate(wx(nx,ny))
         allocate(wy(nx,ny))
-        allocate(mask_new_adv(nx,ny))
         allocate(mask_lsf(nx,ny))
         
-        ! Advection depends on ice velocity minus the calving rate
-        dlsf     = 0.0_wp  ! LSF change in a time dt
-        mask_new_adv = 1   ! ?
-        mask_lsf = 1.0_wp  ! Allow all LSF mask to be advected
+        ! Initialize variables
+        dlsf         = 0.0_wp  ! LSF change in a time dt
+        wx           = 0.0_wp  ! retreat-rate x direction (ac-node)
+        wy           = 0.0_wp  ! retreat-rate y direction (ac-node)
+        mask_lsf     = 1.0_wp  ! Allow all LSF mask to be advected
 
         ! net velocity (ice velocity minus calving)
         wx = u_acx + cr_acx
@@ -104,7 +104,7 @@ contains
             
         ! Compute the advected LSF field
         call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
-                                mask_new_adv,solver,boundaries,dx,dt) ! changed mask_adv for 1
+                                 mask_adv,solver,boundaries,dx,dt)
         call apply_tendency_lsf(lsf,dlsf,dt,adjust_lsf=.FALSE.)
         
         ! Set border values to ocean values
@@ -117,7 +117,7 @@ contains
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0
 
-        ! LSF should not affect points above sea level
+        ! LSF should not affect points above sea level (check)
         where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
         return
@@ -453,14 +453,10 @@ contains
                 ! Now update lsf with tendency for this timestep
                 lsf(i,j) = lsf_prev + dt*lsf_dot(i,j)
 
-                ! Ensure tiny numeric LSF values tend to zero are removed
-                ! check effect
-                !if (abs(lsf(i,j)) .lt. TOL) lsf(i,j) = 0.0
-
                 ! Calculate actual current rate of change
                 dlsfdt = (lsf(i,j) - lsf_prev) / dt
 
-                ! Update mb rate to match ice rate of change perfectly
+                ! Update lsf rate to match ice rate of change perfectly
                 if (allow_adjust_lsf) then
                     lsf_dot(i,j) = dlsfdt
                 end if

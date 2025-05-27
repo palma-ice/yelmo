@@ -652,7 +652,9 @@ end if
         tpo%now%cmb_flt_y = 0.0_wp
         tpo%now%cmb_flt   = 0.0_wp
 
-        ! Eextrapolate velocities into the ocean.
+        ! Extrapolate velocities into the ocean.
+        u_acx_fill = 0.0_wp
+        v_acy_fill = 0.0_wp
         call interpolate_ocn_acx(u_acx_fill,dyn%now%ux_bar)
         call interpolate_ocn_acy(v_acy_fill,dyn%now%uy_bar)
 
@@ -681,24 +683,14 @@ end if
     
             ! === CalvMIP ===
             case("exp1","exp3")
-                !call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%now%H_grnd,tpo%par%dx,tpo%par%boundaries) 
                 call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
     
             case("exp2","exp4")
-                !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
-                !if (time_now .le. 1000.0) then
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
-                !else
-                    ! do nothing
-                !end if
+            
             !case("exp5")
-                !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
+                ! call calvmip_exp5
 
-            !case("advection")
-                ! Advection test without ice
-                !call calvmip_advection(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now)
-                !call calc_cmb_flt(tpo%now%cmb_flt,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,tpo%par%boundaries)
-    
             case DEFAULT
     
                 write(*,*) "calc_ytopo:: Error: floating calving method not recognized."
@@ -723,9 +715,7 @@ end if
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
 
         ! === Calving ===
-        ! Initialize calving-rate to zero
-        tpo%now%cmb       = 0.0_wp
-        !where(tpo%now%lsf .gt. 0.0_wp) tpo%now%cmb =  -(tpo%now%H_ice / dt_kill * 1.0)
+        tpo%now%cmb = 0.0_wp
         do j=1,ny
         do i=1,nx
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
@@ -742,8 +732,11 @@ end if
                 if ((tpo%now%lsf(im1,j) .le. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .le. 0.0_wp) .and. &
                     (tpo%now%lsf(i,jm1) .le. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .le. 0.0_wp)) then
                     tpo%now%lsf(i,j) = -1.0_wp
-                !    ! Calve border points with the lsf fraction?
-                !    tpo%now%cmb(i,j) =  (-1.0-tpo%now%lsf(i,j))*(tpo%now%H_ice(i,j) / dt_kill)
+                end if
+                ! neccessary for exp2. Needed?
+                if ((tpo%now%H_ice(i,j) .lt. tpo%par%H_min_flt) .and. &
+                    (bnd%z_bed(i,j) .lt. 0.0_wp)) then
+                        tpo%now%H_ice(i,j) = tpo%par%H_min_flt + 0.1  
                 end if
             end if
         end do
@@ -760,6 +753,7 @@ end if
         call calc_G_remove_fractional_ice(mbal_now,tpo%now%H_ice,tpo%now%f_ice,dt)
 
         ! Apply rate and update ice thickness
+        mbal_now = 0.0_wp
         call apply_tendency(tpo%now%H_ice,mbal_now,dt,"frac",adjust_mb=.TRUE.)
 
         ! Add this rate to calving tendency
@@ -768,10 +762,12 @@ end if
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                         bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
-        ! reset LSF function after dt_lsf
-        if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
-            where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
-            where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
+        ! reset LSF function after dt_lsf (if dt_lsf is positive)
+        if (tpo%par%dt_lsf .gt. 0.0) then
+            if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
+                where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
+                where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
+            end if
         end if
 
         return

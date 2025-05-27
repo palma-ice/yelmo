@@ -71,8 +71,8 @@ program yelmo_calving
     select case(trim(ctl%exp))
         case("exp1","exp2")
             ctl%domain = "circular"
-            ctl%x0 = -900.0
-            ctl%x1 =  900.0
+            ctl%x0 = -800.0
+            ctl%x1 =  800.0
         case("exp3","exp4","exp5")
             ctl%domain = "thule"
             ctl%x0 = -1000.0

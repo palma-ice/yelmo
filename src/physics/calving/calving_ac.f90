@@ -933,7 +933,8 @@ contains
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
     
-        wv = -300.0 * sin(2.0 * pi * time / 1000.0) 
+        !wv = -300.0 * sin(2.0 * pi * time / 1000.0)
+        wv = -150.0 * sin(2.0 * pi * time / 1000.0) 
     
         do j = 1, ny
         do i = 1, nx

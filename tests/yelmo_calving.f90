@@ -75,8 +75,8 @@ program yelmo_calving
             ctl%x1 =  800.0
         case("exp3","exp4","exp5")
             ctl%domain = "thule"
-            ctl%x0 = -1000.0
-            ctl%x1 =  1000.0
+            ctl%x0 = -800.0
+            ctl%x1 =  800.0
         case("advection")
             ctl%domain = "advection"
             ctl%x0     = 0.0

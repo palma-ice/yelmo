@@ -10,25 +10,16 @@ module lsf_module
 
     private 
     
-    !=== Floating calving rates===
-    !public :: calc_calving_rate_vonmises_m16
-
-    !=== Marine-terminating calving rates ===
-    !public :: calc_mici_crawford21
-
-    !=== Land-terminates calving rates ===
-
-    !=== LSF routines ===
+    ! === LSF routines ===
     public :: LSFinit
     public :: LSFadvection
     public :: LSFupdate
-    public :: LSFborder
 
-    !=== Total CMB_flt (aesthetics) ===
-    public :: calc_cmb_flt
-    public :: calc_cmb_border
+    ! === Total CMB_flt (aesthetics) ===
+    !public :: calc_cmb_flt
+    !public :: calc_cmb_border
 
-    ! open ocean extrapo    lation
+    ! === Ocean extrapolation routines ===
     public :: interpolate_ocn_acx
     public :: interpolate_ocn_acy
 
@@ -97,6 +88,8 @@ contains
         wx           = 0.0_wp  ! retreat-rate x direction (ac-node)
         wy           = 0.0_wp  ! retreat-rate y direction (ac-node)
         mask_lsf     = 1.0_wp  ! Allow all LSF mask to be advected
+        !mask_lsf     = 0.0_wp
+        !where(lsf .lt. 1.0_wp) mask_lsf = 1.0_wp
 
         ! net velocity (ice velocity minus calving)
         wx = u_acx + cr_acx
@@ -120,38 +113,15 @@ contains
         ! LSF should not affect points above sea level (check)
         where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
+        if (.TRUE.) then
+            ! plot retreat rate instead of calving rate
+            cr_acx = wx
+            cr_acy = wy
+        end if
+
         return
 
     end subroutine LSFupdate
-
-    subroutine LSFborder(LSF,f_ice,boundaries)
-        ! We will set the ice border as value zero
-        ! Test to see if it helps with stability and advance + retreat
-        
-        implicit none
-
-        real(wp),       intent(OUT)   :: LSF(:,:)               ! new LSF field (aa-nodes)
-        real(wp),       intent(IN)    :: f_ice(:,:)              ! Ice fraction to be advected
-        character(len=*), intent(IN)  :: boundaries              ! Boundary conditions to impose
-
-        ! Local variables
-        integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
-
-        nx = size(LSF,1)
-        ny = size(LSF,2)
-    
-        do j=1,ny
-        do i=1,nx
-            if ((f_ice(i,j) .gt. 0.0_wp) .and. ((f_ice(im1,j) .eq. 0.0_wp) .or. (f_ice(ip1,j) .eq. 0.0_wp) &
-                    .or. (f_ice(i,jm1) .eq. 0.0_wp) .or. (f_ice(i,jp1) .eq. 0.0_wp))) then
-                    LSF(i,j) = 0.0_wp
-            end if
-        end do
-        end do
-
-        return
-
-    end subroutine LSFborder
 
     ! ===================================================================
     !
@@ -233,192 +203,6 @@ contains
     !
     ! ===================================================================
     
-    subroutine eikonal_equation(lsf,H_grnd)
-        ! internal function to determine distance to the ice front 
-        ! used for LSF mask
-        ! based on PICO module
-
-        implicit none
-
-        real(prec), intent(INOUT) :: lsf(:,:)
-        real(prec), intent(IN)    :: H_grnd(:,:)
-
-        ! Local variables
-        integer :: i, j, nx, ny
-        real(prec) :: loop, current_label_ice !, current_label_ocn
-        real(prec), allocatable :: dist_ice_front(:,:)
-        real(prec), allocatable :: mask_lsf(:,:)
-
-        nx = size(lsf,1)
-        ny = size(lsf,2)
-        allocate(dist_ice_front(nx,ny))
-        allocate(mask_lsf(nx,ny))
-        
-        current_label_ice = 1.0
-        !current_label_ocn = -1.0
-        
-        ! Define border (do not take the border which is set to zero)
-        !mask_lsf = 0.0 ! Init mask to zero
-        !do i = 3, nx-2
-        !do j = 3, ny-2
-        !    if (lsf(i,j) .gt. 0.0 .and. ((lsf(i-1,j) .le. 0.0) .or.  (lsf(i+1,j) .le. 0.0) .or. &
-        !                                 (lsf(i,j-1) .le. 0.0) .or.  (lsf(i,j+1) .le. 0.0))) then
-        !        mask_lsf(i,j) = 1.0
-        !    !else if (lsf(i,j) .lt. 0.0 .and. ((lsf(i-1,j) .ge. 0.0) .or.  (lsf(i+1,j) .ge. 0.0) .or. &
-        !    !                             (lsf(i,j-1) .ge. 0.0) .or.  (lsf(i,j+1) .ge. 0.0))) then
-        !    !    mask_lsf(i,j) = -1.0
-        !    end if
-        !end do
-        !end do 
-
-        ! Assign to dists mask
-        dist_ice_front = 0.0
-        where(lsf .le. 0.0) dist_ice_front = 1.0
-        ! LSF should not affect points above sea level
-        where(H_grnd .ge. 0.0) dist_ice_front = 0.0
-
-        ! compute distance to mask
-        loop = 1.0
-        do while(loop .ne. 0.0)
-            loop = 0.0
-
-            do i = 2, nx-1
-            do j = 2, ny-1
-
-                ! lsf positive points (ice)
-                if (lsf(i,j) .gt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
-                    if(((dist_ice_front(i-1,j) .eq. current_label_ice)) .or. (dist_ice_front(i+1,j) .eq. current_label_ice) .or. &
-                        (dist_ice_front(i,j-1) .eq. current_label_ice) .or. (dist_ice_front(i,j+1) .eq. current_label_ice)) then
-                        dist_ice_front(i,j) = current_label_ice + 1.0
-                        loop = 1.0
-                    end if
-                !else if (lsf(i,j) .lt. 0.0 .and. dist_ice_front(i,j) .eq. 0.0) then
-                !    if(((dist_ice_front(i-1,j) .eq. current_label_ocn)) .or. (dist_ice_front(i+1,j) .eq. current_label_ocn) .or. &
-                !        (dist_ice_front(i,j-1) .eq. current_label_ocn) .or. (dist_ice_front(i,j+1) .eq. current_label_ocn)) then
-                !        dist_ice_front(i,j) = current_label_ocn - 1.0
-                !        loop = 1.0
-                !    end if
-                end if
-            end do
-            end do
-
-            current_label_ice = current_label_ice+1.0
-            !current_label_ocn = current_label_ocn-1.0
-
-        end do
-
-        ! jablasco: correct distance! (distance for ice front grid is 0 not 1)
-        where(dist_ice_front .gt. 0.0) dist_ice_front = dist_ice_front-1.0
-        !where(lsf .lt. 0.0) dist_ice_front = -1.0
-        where(0.0 .lt. lsf .and. lsf .lt. 1.0) dist_ice_front = lsf ! at the ice front the number is fractional
-        !where(lsf .ge. 0.0) lsf = dist_ice_front
-
-        ! new lsf mask is dist_ice_front
-        lsf = dist_ice_front
-
-        return
-
-    end subroutine eikonal_equation
-
-    subroutine interpolatex_missing_iterative(array,mask)
-    
-        implicit none
-
-        real(prec), intent(INOUT) :: array(:,:)
-        real(prec), intent(IN)    :: mask(:,:)
-
-        ! Local variables
-        integer  :: i, j, nx, ny, ni
-        real(wp) :: sum, count
-        logical  :: has_changed
-
-        nx = size(array,1)
-        ny = size(array,2)
-
-        do
-            has_changed = .false.
-
-            do i = 2, nx - 1
-                do j = 2, ny - 1
-                    if (array(i, j) .eq. 0.0 .and. mask(i,j) .eq. 0.0) then
-                        sum = 0.0
-                        count = 0.0
-
-                        ! Check x-neighbors
-                        do ni = -1, 1
-                            if (array(i + ni, j) /= 0.0) then
-                                sum = sum + array(i + ni, j)
-                                count = count + 1.0
-                            end if
-                        end do
-
-                        ! Interpolate if neighbors are available
-                        if (count > 0.0) then
-                            array(i, j) = sum / count
-                            has_changed = .true.
-                        end if
-
-                    end if
-                end do
-            end do
-
-            ! Exit loop if no more changes
-            if (.not. has_changed) exit
-        end do
-
-        return
-
-    end subroutine interpolatex_missing_iterative
-
-    subroutine interpolatey_missing_iterative(array,mask)
-    
-        implicit none
-
-        real(prec), intent(INOUT) :: array(:,:)
-        real(prec), intent(IN)    :: mask(:,:)
-
-        ! Local variables
-        integer  :: i, j, nx, ny, nj
-        real(wp) :: sum, count
-        logical  :: has_changed
-
-        nx = size(array,1)
-        ny = size(array,2)
-
-        do
-            has_changed = .false.
-
-            do i = 2, nx - 1
-                do j = 2, ny - 1
-                    if (array(i, j) .eq. 0.0 .and. mask(i,j) == 0.0) then
-                        sum = 0.0
-                        count = 0.0
-
-                        ! Check y-neighbors
-                        do nj = -1, 1
-                            if (array(i, j + nj) /= 0.0) then
-                                sum = sum + array(i, j + nj)
-                                count = count + 1.0
-                            end if
-                        end do
-
-                        ! Interpolate if neighbors are available
-                        if (count > 0.0) then
-                            array(i, j) = sum / count
-                            has_changed = .true.
-                        end if
-                    end if
-                end do
-            end do
-
-            ! Exit loop if no more changes
-            if (.not. has_changed) exit
-        end do
-
-        return
-
-    end subroutine interpolatey_missing_iterative
-
     subroutine apply_tendency_lsf(lsf,lsf_dot,dt,adjust_lsf)
             
         implicit none

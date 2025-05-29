@@ -686,8 +686,9 @@ end if
                 call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
     
             case("exp2","exp4")
-                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
-            
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,time_now,tpo%par%boundaries)
+                !call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,time_now,tpo%par%boundaries)
+
             !case("exp5")
                 ! call calvmip_exp5
 
@@ -713,6 +714,9 @@ end if
         ! advect LSF mask based on the calving law 
         call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_grnd, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+        !call LSFupdate(tpo%now%dlsf,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_grnd, &
+        !    var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+
 
         ! === Calving ===
         tpo%now%cmb = 0.0_wp
@@ -768,6 +772,17 @@ end if
                 where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
                 where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
             end if
+        end if
+
+        if (.TRUE.) then
+            ! plot total cr (diagnosis)
+            do j = 1, ny
+            do i = 1, nx
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+                tpo%now%cmb(i,j) = ((0.5_wp*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
+                                    (0.5_wp*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
+            end do
+            end do
         end if
 
         return

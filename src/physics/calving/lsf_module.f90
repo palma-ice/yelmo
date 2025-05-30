@@ -20,8 +20,9 @@ module lsf_module
     !public :: calc_cmb_border
 
     ! === Ocean extrapolation routines ===
-    public :: interpolate_ocn_acx
-    public :: interpolate_ocn_acy
+    !public :: interpolate_ocn_acx
+    !public :: interpolate_ocn_acy
+    public :: extrapolate_ocn_laplace
 
 contains 
     ! ===================================================================
@@ -113,7 +114,7 @@ contains
         ! LSF should not affect points above sea level (check)
         where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
-        if (.TRUE.) then
+        if (.FALSE.) then
             ! plot retreat rate instead of calving rate
             cr_acx = wx
             cr_acy = wy
@@ -298,16 +299,50 @@ contains
         ! Local variables
         integer  :: i, j
         integer :: count, repeat
-        real(wp), allocatable :: mask_change(:,:)
+        real(wp), allocatable :: mask_change(:,:),mask_change_n(:,:)
         allocate(mask_change(size(mask_orig,1),size(mask_orig,2)))
+        allocate(mask_change_n(size(mask_orig,1),size(mask_orig,2)))
 
         ! Initialize variables
-        mask_change = 1.0_wp
+        mask_change   = 1.0_wp
+        mask_change_n = 1.0_wp
+
         where(mask_orig .eq. 0.0_wp) mask_change = 0.0_wp
+        where(mask_orig .eq. 0.0_wp) mask_change_n = 0.0_wp
         mask_fill = mask_orig
 
         count  = 0
         repeat = 1
+
+        ! Initialize the solution array
+        !u_x = 0.0
+        !u_x_new = 0.0
+  
+        ! Define boundary conditions
+        !u_x(1, :) = 1.0   ! Example boundary condition: top boundary
+        !u_x(nx, :) = 0.0  ! Example boundary condition: bottom boundary
+        !u_x(:, 1) = 1.0   ! Example boundary condition: left boundary
+        !u_x(:, ny) = 0.0  ! Example boundary condition: right boundary
+  
+        ! Jacobi iteration
+        !iter = 0
+        !error = tol + 1.0
+
+        !do while (error > tol)
+        !    error = 0.0
+        !    iter = iter + 1
+        !
+        !    do i = 2, nx-1
+        !      do j = 2, ny-1
+        !        u_x_new(i, j) = 0.25 * (u_x(i+1, j) + u_x(i-1, j) + u_x(i, j+1) + u_x(i, j-1))
+        !        error = error + abs(u_x_new(i, j) - u_x(i, j))
+        !      end do
+        !    end do
+        !
+        !    u_x = u_x_new
+        !    write(*,*) 'Iteration:', iter, 'Error:', error
+        ! end do
+
         if (SUM(mask_orig) .eq. 0.0_wp) then
             ! do nothing
         else
@@ -343,7 +378,7 @@ contains
     
     end subroutine interpolate_ocn_acy
 
-    subroutine interpolate_ocn_acx(mask_fill,mask_orig)
+    subroutine extrapolate_ocn_acx(mask_fill,mask_orig)
         ! Routine to extrapolate the nearest value in the x-direction.
         ! So far we assume that value 0 in mask_orig represents ice-free points
 
@@ -398,6 +433,51 @@ contains
     
         return
         
-    end subroutine interpolate_ocn_acx
+    end subroutine extrapolate_ocn_acx
+
+    subroutine extrapolate_ocn_laplace(mask_fill, mask_orig)
+        ! Routine to extrapolate values using the Laplace equation.
+        ! Assumes that value 0 in mask_orig represents ice-free points
+        
+        implicit none
+        
+        real(wp), intent(INOUT) :: mask_fill(:,:)
+        real(wp), intent(IN) :: mask_orig(:,:)
+        
+        ! Local variables
+        integer :: i, j, iter
+        real(wp) :: error, tol
+        real(wp), allocatable :: mask_new(:,:)
+        
+        ! Allocate memory for the temporary array
+        allocate(mask_new(size(mask_orig,1), size(mask_orig,2)))
+        
+        ! Initialize variables
+        mask_fill = mask_orig
+        mask_new = mask_orig
+        tol = 1e-2_wp  ! Tolerance for convergence
+        error = tol + 1.0_wp
+        iter = 0
+        
+        ! Jacobi iteration
+        do while (error > tol)
+            error = 0.0_wp
+            iter = iter + 1
+        
+            do i = 2, size(mask_orig,1)-1
+                do j = 2, size(mask_orig,2)-1
+                    if (mask_orig(i,j) == 0.0_wp) then
+                        mask_new(i,j) = 0.25_wp * (mask_fill(i+1,j) + mask_fill(i-1,j) + mask_fill(i,j+1) + mask_fill(i,j-1))
+                        error = error + abs(mask_new(i,j) - mask_fill(i,j))
+                    end if
+                end do
+            end do
+        
+            mask_fill = mask_new
+        end do
+        
+        deallocate(mask_new)
+        
+    end subroutine extrapolate_ocn_laplace
 
 end module lsf_module

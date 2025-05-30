@@ -655,8 +655,10 @@ end if
         ! Extrapolate velocities into the ocean.
         u_acx_fill = 0.0_wp
         v_acy_fill = 0.0_wp
-        call interpolate_ocn_acx(u_acx_fill,dyn%now%ux_bar)
-        call interpolate_ocn_acy(v_acy_fill,dyn%now%uy_bar)
+        !call interpolate_ocn_acx(u_acx_fill,dyn%now%ux_bar)
+        !call interpolate_ocn_acy(v_acy_fill,dyn%now%uy_bar)
+        call extrapolate_ocn_laplace(u_acx_fill,dyn%now%ux_bar)
+        call extrapolate_ocn_laplace(v_acy_fill,dyn%now%uy_bar)
 
         select case(trim(tpo%par%calv_flt_method))
     
@@ -774,7 +776,7 @@ end if
             end if
         end if
 
-        if (.TRUE.) then
+        if (.FALSE.) then
             ! plot total cr (diagnosis)
             do j = 1, ny
             do i = 1, nx

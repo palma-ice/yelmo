@@ -939,7 +939,7 @@ contains
         allocate(v_acx(nx,ny))
 
         ! Initialize    
-        wv      = 0.5 * 300.0 * sin(2.0 * pi * time / 1000.0) 
+        wv      = 300.0 * sin(2.0 * pi * time / 1000.0) 
         uxy_acx = 0.0_wp
         uxy_acy = 0.0_wp
         u_acy   = 0.0_wp

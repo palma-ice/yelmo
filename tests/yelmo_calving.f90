@@ -79,8 +79,8 @@ program yelmo_calving
             ctl%x1 =  800.0
         case("advection")
             ctl%domain = "advection"
-            ctl%x0     = 0.0
-            ctl%x1     = 50.0
+            ctl%x0     = -800.0
+            ctl%x1     = 800.0
         case DEFAULT
             write(*,*) "ctl.exp = ",trim(ctl%domain), " not recognized."
             stop
@@ -112,7 +112,7 @@ program yelmo_calving
         yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed 
         select case(trim(ctl%exp))
             case("advection")
-            call LSFadvection(yelmo1%tpo%now%lsf,yelmo1%bnd%z_bed,yelmo1%tpo%par%dx)
+            call CircularDomain(yelmo1%tpo%now%lsf,yelmo1%bnd%z_bed,yelmo1%tpo%par%dx)
         case DEFAULT 
             call LSFinit(yelmo1%tpo%now%lsf,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf,yelmo1%tpo%par%dx)
         end select

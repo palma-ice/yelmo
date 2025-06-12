@@ -289,7 +289,7 @@ contains
                     dom%dyn%now%uy_bar = 0.5_wp*dom%dyn%now%uy_bar + 0.5_wp*dom%dyn%now%uy_bar_prev
                     
                 end if 
-                
+
                 if (update_others_pc) then
                     ! Now, using old topography still, update additional fields.
 

@@ -185,7 +185,7 @@ module yelmo_defs
         real(wp), allocatable :: cmb_flt_x(:,:)
         real(wp), allocatable :: cmb_flt_y(:,:)
         real(wp), allocatable :: cmb_grnd(:,:)
-        real(wp), allocatable :: lsf(:,:),dlsf(:,:)
+        real(wp), allocatable :: lsf(:,:)
 
     end type
 
@@ -203,9 +203,10 @@ module yelmo_defs
         real(wp), allocatable :: dmb(:,:)         ! Net subgrid discharge
         real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
         real(wp), allocatable :: cmb_flt(:,:)     ! Calving rate, floating (applied) [m/a]
-        real(wp), allocatable :: cmb_flt_x(:,:)     ! Calving rate x, floating (applied) [m/a]
-        real(wp), allocatable :: cmb_flt_y(:,:)     ! Calving rate y, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_flt_x(:,:)   ! Calving rate x, floating (applied) [m/a]
+        real(wp), allocatable :: cmb_flt_y(:,:)   ! Calving rate y, floating (applied) [m/a]
         real(wp), allocatable :: cmb_grnd(:,:)    ! Calving rate, grounded (applied) [m/a]
+        real(wp), allocatable :: dlsfdt(:,:)      ! LSF rate of change [m/a] 
 
         real(wp) :: dt_tot
     end type
@@ -242,7 +243,7 @@ module yelmo_defs
         real(wp), allocatable   :: cmb_flt_y(:,:)   ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
         real(wp), allocatable   :: lsf(:,:)         ! LSF mask
-        real(wp), allocatable   :: dlsf(:,:)        ! LSF variation (needed?)
+        real(wp), allocatable   :: dlsfdt(:,:)      ! LSF rate of change 
         
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
@@ -287,7 +288,8 @@ module yelmo_defs
         real(wp), allocatable   :: dHidt_dyn_n(:,:) ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
-        
+        real(wp), allocatable   :: lsf_n(:,:)       ! [-] LSF mask from previous timestep 
+
         real(wp), allocatable   :: H_ice_dyn(:,:) 
         real(wp), allocatable   :: f_ice_dyn(:,:) 
         
@@ -852,7 +854,7 @@ module yelmo_defs
         real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt,  cmb_flt_x, cmb_flt_y, cmb_grnd
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
-        real(wp)   :: lsf,dlsf
+        real(wp)   :: lsf
 
         ! ===== Grounded ice variables =====
         real(wp)   :: H_ice_g, z_srf_g, V_ice_g, A_ice_g, uxy_bar_g, uxy_s_g, uxy_b_g

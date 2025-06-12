@@ -260,8 +260,7 @@ contains
                 names(21) = "cmb_flt_y"
                 names(22) = "z_sl"
                 names(23) = "lsf"
-                !names(22) = "dlsf"
-
+                !names(24) = "dlsfdt"
         end if 
 
         write_pd_metrics = .FALSE. 
@@ -1065,9 +1064,9 @@ contains
             case("lsf")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%lsf(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("dlsf")
-                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dlsf(i1:i2,j1:j2), &
-                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)                                
+            case("dlsfdt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dlsfdt(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("z_srf")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_srf(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)

@@ -12,17 +12,18 @@ module lsf_module
     
     ! === LSF routines ===
     public :: LSFinit
-    public :: LSFadvection
+    !public :: LSFadvection
     public :: LSFupdate
 
     ! === Total CMB_flt (aesthetics) ===
-    !public :: calc_cmb_flt
     !public :: calc_cmb_border
 
     ! === Ocean extrapolation routines ===
-    !public :: interpolate_ocn_acx
-    !public :: interpolate_ocn_acy
-    public :: extrapolate_ocn_laplace
+    public :: extrapolate_ocn_acx
+    public :: extrapolate_ocn_acy
+    public :: extrapolate_ocn_laplace_simple
+
+    public :: CircularDomain
 
 contains 
     ! ===================================================================
@@ -55,7 +56,7 @@ contains
         
     end subroutine LSFinit
 
-    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,H_grnd,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
+    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,H_grnd,var_dot,mask_adv,dx,dy,dt,solver)
 
         implicit none
 
@@ -71,7 +72,6 @@ contains
         real(wp),       intent(IN)    :: dy                      ! [m] Horizontal resolution, y-direction
         real(wp),       intent(IN)    :: dt                      ! [a]   Timestep
         character(len=*), intent(IN)  :: solver                  ! Solver to use for the ice thickness advection equation
-        character(len=*), intent(IN)  :: boundaries              ! Boundary conditions to impose
 
         ! Local variables
         integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
@@ -89,30 +89,27 @@ contains
         wx           = 0.0_wp  ! retreat-rate x direction (ac-node)
         wy           = 0.0_wp  ! retreat-rate y direction (ac-node)
         mask_lsf     = 1.0_wp  ! Allow all LSF mask to be advected
-        !mask_lsf     = 0.0_wp
-        !where(lsf .lt. 1.0_wp) mask_lsf = 1.0_wp
 
-        ! net velocity (ice velocity minus calving)
+        ! lsf velocity
         wx = u_acx + cr_acx
-        wy = v_acy + cr_acy
-            
+        wy = v_acy + cr_acy   
+
         ! Compute the advected LSF field
-        call calc_G_advec_simple(dlsf,lsf,mask_lsf,wx,wy, &
-                                 mask_adv,solver,boundaries,dx,dt)
-        call apply_tendency_lsf(lsf,dlsf,dt,adjust_lsf=.FALSE.)
-        
-        ! Set border values to ocean values
-        lsf(1,:)  = 1.0
-        lsf(nx,:) = 1.0
-        lsf(:,1)  = 1.0
-        lsf(:,ny) = 1.0
+        if (.TRUE.) then
+            call calc_advec2D(dlsf,lsf,mask_lsf,wx,wy,var_dot, &
+                                mask_adv,dx,dy,dt,"impl-lis","periodic")
+            call apply_tendency_lsf(lsf,dlsf,dt,adjust_lsf=.FALSE.)
+        else
+            ! Simple advecter without diagonilizing. Test.
+            call LSFadvec_simple(dlsf,lsf, wx, wy, dt, dx, "periodic")
+        end if
         
         ! saturate values to -1 to 1 (helps with stability)
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0
 
         ! LSF should not affect points above sea level (check)
-        where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
+        !where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
 
         if (.FALSE.) then
             ! plot retreat rate instead of calving rate
@@ -129,35 +126,6 @@ contains
     ! Total CMB_flt (aesthetics)
     !
     ! ===================================================================
-
-    subroutine calc_cmb_flt(cmb_flt,cmb_flt_x,cmb_flt_y,boundaries)
-
-        implicit none
-
-        real(wp), intent(OUT) :: cmb_flt(:,:)                  ! calving on aa-nodes
-        real(wp), intent(IN)  :: cmb_flt_x(:,:),cmb_flt_y(:,:) ! calving on ac_nodes
-        character(len=*), intent(IN)  :: boundaries
-
-        ! Local variables
-        integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
-        real(wp) :: cmb_flt_x_aa,cmb_flt_y_aa
-
-        nx = size(cmb_flt_x,1)
-        ny = size(cmb_flt_x,2) 
-
-        ! compute to aa nodes
-        do j = 1, ny
-        do i = 1, nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            cmb_flt_x_aa = 0.5_wp*(cmb_flt_x(i,j) + cmb_flt_x(im1,j))
-            cmb_flt_y_aa = 0.5_wp*(cmb_flt_y(i,j) + cmb_flt_y(i,jm1))
-            cmb_flt(i,j) = (cmb_flt_x_aa*cmb_flt_x_aa + cmb_flt_y_aa*cmb_flt_y_aa)**0.5
-        end do
-        end do
-
-        return
-
-    end subroutine calc_cmb_flt
 
     subroutine calc_cmb_border(cr_acx,cr_acy,lsf_aa,boundaries)
 
@@ -241,7 +209,7 @@ contains
                 ! Calculate actual current rate of change
                 dlsfdt = (lsf(i,j) - lsf_prev) / dt
 
-                ! Update lsf rate to match ice rate of change perfectly
+                ! Update lsf rate to match rate of change perfectly
                 if (allow_adjust_lsf) then
                     lsf_dot(i,j) = dlsfdt
                 end if
@@ -255,94 +223,103 @@ contains
         return
 
     end subroutine apply_tendency_lsf
+        
+    subroutine LSFadvec_simple(dlsf,LSF, u, v, dt, dx, boundaries)
+        ! Simple LSF advection routine. Not diagonilized.
 
-    ! Simple advection test (works)
-    subroutine LSFadvection(LSF,zbed,dx)
-        
         implicit none
+            
+        ! Define input and output variables
+        real(wp), intent(INOUT) :: dlsf(:,:)    ! aa-node
+        real(wp), intent(INOUT) :: LSF(:,:)     ! aa-node
+        real(wp), intent(IN) :: u(:,:), v(:,:)  ! ac-node
+        real(wp), intent(IN) :: dt, dx
+        character(len=*), intent(IN)  :: boundaries
+            
+        ! Local variables
+        real(wp) :: dtdx
+        real(wp), dimension(size(LSF,1), size(LSF,2)) :: dLSF_acx, dLSF_acy ! ac-nodes
+        real(wp), dimension(size(LSF,1), size(LSF,2)) :: qx_ac, qy_ac, qx_aa, qy_aa
+        integer :: i, j, im1, ip1, jm1, jp1, nx, ny
+            
+        dlsf     = 0.0_wp
+        dtdx     = dt / dx
+        dLSF_acx = 0.0_wp
+        dLSF_acy = 0.0_wp
+        nx       = size(LSF,1)
+        ny       = size(LSF,2)
     
-        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask
-        real(wp), intent(IN)  :: zbed(:,:)    
-        real(wp), intent(IN)  :: dx            ! Model resolution
-        
-        ! Internal variables
-        real(wp) :: rc, xc, yc
-        integer  :: i,j,nx,ny
-    
-        nx = size(zbed,1)
-        ny = size(zbed,2)
-        rc = 12.5
-        xc = 25
-        yc = 25 
-    
-        do j=1,ny
-        do i=1,nx
-    
-        LSF(i,j) = ((0.001*(i-1)*dx-xc)**2+(0.001*(j-1)*dx-yc)**2)**0.5 -rc 
-    
+        do i = 1, nx
+            do j = 1, ny
+                ! ac-nodes
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                dLSF_acx(i,j) = (LSF(ip1,j)-LSF(i,j))
+                dLSF_acy(i,j) = (LSF(i,jp1)-LSF(i,j))
+                qx_ac(i,j) = u(i,j) * dLSF_acx(i,j)
+                qy_ac(i,j) = v(i,j) * dLSF_acy(i,j)
+            end do
         end do
-        end do
     
+        do i = 1, nx
+            do j = 1, ny
+                ! Compute to aa-nodes
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)    
+                qx_aa(i,j) = 0.5*(qx_ac(i,j) + qx_ac(im1,j)) 
+                qy_aa(i,j) = 0.5*(qy_ac(i,j) + qy_ac(i,jm1))
+            end do
+        end do
+            
+        ! Update LSF
+        dlsf = - dtdx * (qx_aa + qy_aa)
+        LSF  = LSF + dlsf 
+            
+        if (.FALSE.) then
+            ! Apply bounds
+            where (LSF .lt. -1.0)
+                LSF = -1.0
+            end where
+            
+            where (LSF .gt. 1.0)
+                LSF = 1.0
+            end where
+        end if
+
         return
     
-    end subroutine LSFadvection
+    end subroutine LSFadvec_simple
 
-    subroutine interpolate_ocn_acy(mask_fill,mask_orig)
+    ! ===================================================================
+    !
+    ! Oceanic extrapolation routines.
+    !
+    ! ===================================================================
+    subroutine extrapolate_ocn_acy(mask_fill,mask_orig,mask_ac)
         ! Routine to extrapolate the nearest value in the y-direction.
         ! So far we assume that value 0 in mask_orig represents ice-free points
-
+    
         implicit none
-    
-        real(prec), intent(INOUT) :: mask_fill(:,:)
-        real(prec), intent(IN)    :: mask_orig(:,:)
-    
+        
+        real(wp), intent(INOUT) :: mask_fill(:,:)
+        real(wp), intent(IN)    :: mask_orig(:,:)
+        real(wp), intent(IN)    :: mask_ac(:,:)
+        
         ! Local variables
         integer  :: i, j
         integer :: count, repeat
         real(wp), allocatable :: mask_change(:,:),mask_change_n(:,:)
         allocate(mask_change(size(mask_orig,1),size(mask_orig,2)))
         allocate(mask_change_n(size(mask_orig,1),size(mask_orig,2)))
-
+    
         ! Initialize variables
         mask_change   = 1.0_wp
         mask_change_n = 1.0_wp
-
-        where(mask_orig .eq. 0.0_wp) mask_change = 0.0_wp
-        where(mask_orig .eq. 0.0_wp) mask_change_n = 0.0_wp
+    
+        where(mask_ac .eq. 0.0_wp) mask_change = 0.0_wp
         mask_fill = mask_orig
-
+    
         count  = 0
         repeat = 1
-
-        ! Initialize the solution array
-        !u_x = 0.0
-        !u_x_new = 0.0
-  
-        ! Define boundary conditions
-        !u_x(1, :) = 1.0   ! Example boundary condition: top boundary
-        !u_x(nx, :) = 0.0  ! Example boundary condition: bottom boundary
-        !u_x(:, 1) = 1.0   ! Example boundary condition: left boundary
-        !u_x(:, ny) = 0.0  ! Example boundary condition: right boundary
-  
-        ! Jacobi iteration
-        !iter = 0
-        !error = tol + 1.0
-
-        !do while (error > tol)
-        !    error = 0.0
-        !    iter = iter + 1
-        !
-        !    do i = 2, nx-1
-        !      do j = 2, ny-1
-        !        u_x_new(i, j) = 0.25 * (u_x(i+1, j) + u_x(i-1, j) + u_x(i, j+1) + u_x(i, j-1))
-        !        error = error + abs(u_x_new(i, j) - u_x(i, j))
-        !      end do
-        !    end do
-        !
-        !    u_x = u_x_new
-        !    write(*,*) 'Iteration:', iter, 'Error:', error
-        ! end do
-
+    
         if (SUM(mask_orig) .eq. 0.0_wp) then
             ! do nothing
         else
@@ -361,7 +338,7 @@ contains
                         end if
                     end do
                 end do
-
+    
                 ! Repeat if changes occured
                 if (count .eq. 0) then 
                     repeat = 0
@@ -370,34 +347,35 @@ contains
                     repeat = 1
                     count  = 0
                 end if  
-
+    
             end do    
         end if
-
+    
         return
     
-    end subroutine interpolate_ocn_acy
-
-    subroutine extrapolate_ocn_acx(mask_fill,mask_orig)
+    end subroutine extrapolate_ocn_acy
+    
+    subroutine extrapolate_ocn_acx(mask_fill,mask_orig,mask_ac)
         ! Routine to extrapolate the nearest value in the x-direction.
         ! So far we assume that value 0 in mask_orig represents ice-free points
-
+    
         implicit none
-        
-        real(prec), intent(INOUT) :: mask_fill(:,:)
-        real(prec), intent(IN)    :: mask_orig(:,:)
-        
+            
+        real(wp), intent(INOUT) :: mask_fill(:,:)
+        real(wp), intent(IN)    :: mask_orig(:,:)
+        real(wp), intent(IN)    :: mask_ac(:,:)
+    
         ! Local variables
         integer  :: i, j
         integer :: count, repeat
         real(wp), allocatable :: mask_change(:,:)
         allocate(mask_change(size(mask_orig,1),size(mask_orig,2)))
-    
+        
         ! Initialize variables
         mask_change = 1.0_wp
-        where(mask_orig .eq. 0.0_wp) mask_change = 0.0_wp
+        where(mask_ac .eq. 0.0_wp) mask_change = 0.0_wp
         mask_fill = mask_orig
-    
+        
         count  = 0
         repeat = 1
         if (SUM(mask_orig) .eq. 0.0_wp) then
@@ -418,7 +396,7 @@ contains
                         end if
                     end do
                 end do
-    
+        
                 ! Repeat if changes occured
                 if (count .eq. 0) then 
                     repeat = 0
@@ -427,57 +405,89 @@ contains
                     repeat = 1
                     count  = 0
                 end if 
-
+    
             end do    
         end if
-    
+        
         return
-        
+            
     end subroutine extrapolate_ocn_acx
-
-    subroutine extrapolate_ocn_laplace(mask_fill, mask_orig)
+    
+    subroutine extrapolate_ocn_laplace_simple(mask_fill, mask_orig,mask_ac)
         ! Routine to extrapolate values using the Laplace equation.
-        ! Assumes that value 0 in mask_orig represents ice-free points
-        
+        ! Assumes that value 0 in mask_ac represents ice-free points
+            
         implicit none
         
         real(wp), intent(INOUT) :: mask_fill(:,:)
         real(wp), intent(IN) :: mask_orig(:,:)
-        
+        real(wp), intent(IN) :: mask_ac(:,:)
+            
         ! Local variables
         integer :: i, j, iter
         real(wp) :: error, tol
         real(wp), allocatable :: mask_new(:,:)
-        
+            
         ! Allocate memory for the temporary array
         allocate(mask_new(size(mask_orig,1), size(mask_orig,2)))
-        
+            
         ! Initialize variables
         mask_fill = mask_orig
-        mask_new = mask_orig
-        tol = 1e-2_wp  ! Tolerance for convergence
-        error = tol + 1.0_wp
-        iter = 0
-        
+        mask_new  = mask_orig
+        tol       = 1e-2_wp      ! Tolerance for convergence
+        error     = tol + 1.0_wp
+        iter      = 0
+            
         ! Jacobi iteration
         do while (error > tol)
             error = 0.0_wp
             iter = iter + 1
-        
+            
             do i = 2, size(mask_orig,1)-1
                 do j = 2, size(mask_orig,2)-1
-                    if (mask_orig(i,j) == 0.0_wp) then
+                    if (mask_ac(i,j) .eq. 0.0_wp) then
                         mask_new(i,j) = 0.25_wp * (mask_fill(i+1,j) + mask_fill(i-1,j) + mask_fill(i,j+1) + mask_fill(i,j-1))
                         error = error + abs(mask_new(i,j) - mask_fill(i,j))
                     end if
                 end do
             end do
-        
             mask_fill = mask_new
         end do
-        
+            
         deallocate(mask_new)
-        
-    end subroutine extrapolate_ocn_laplace
+    
+        return
+            
+    end subroutine extrapolate_ocn_laplace_simple    
 
+    ! LSF circular domain. Test.
+
+    subroutine CircularDomain(LSF,zbed,dx)
+        
+        implicit none
+    
+        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask
+        real(wp), intent(IN)  :: zbed(:,:)    
+        real(wp), intent(IN)  :: dx            ! Model resolution [m]
+        
+        ! Internal variables
+        real(wp) :: rc
+        integer  :: i,j,nx,ny
+    
+        nx = size(zbed,1)
+        ny = size(zbed,2)
+        rc = 10.0_wp ! grid points below zero
+    
+        do j=1,ny
+        do i=1,nx
+    
+        LSF(i,j) = (sqrt((0.5*(nx+1)-i)**2 + (0.5*(ny+1)-j)**2) - rc)*dx*1e-3 
+    
+        end do
+        end do
+    
+        return
+    
+    end subroutine CircularDomain
+    
 end module lsf_module

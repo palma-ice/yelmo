@@ -36,6 +36,7 @@ module calving_ac
     !=== CalvMIP calving rates ===
     public :: calvmip_exp1
     public :: calvmip_exp2
+    public :: calvmip_exp5
 
 contains 
 
@@ -831,7 +832,7 @@ contains
     ! ===================================================================
 
     subroutine calvmip_exp1(cr_acx,cr_acy,u_acx,v_acy,lsf_aa,dx,boundaries)
-        ! Experiment 1 of CalvMIP
+        ! Experiment 1 & 3 of CalvMIP
         implicit none
     
         real(wp), intent(OUT) :: cr_acx(:,:),cr_acy(:,:)   ! Calving rates on ac-nodes
@@ -915,31 +916,26 @@ contains
     
     end subroutine calvmip_exp1
     
-    subroutine calvmip_exp2(cr_acx,cr_acy,u_acx,v_acy,lsf,time,boundaries)
-        ! Experiment 2 of CalvMIP
+    subroutine calvmip_exp2(cr_acx,cr_acy,u_acx,v_acy,time,boundaries)
+        ! Experiment 2 & 4 of CalvMIP
     
         implicit none
     
         real(wp), intent(OUT) :: cr_acx(:,:), cr_acy(:,:)
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
-        real(wp), intent(IN)  :: lsf(:,:)
         real(wp), intent(IN)  :: time
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
     
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv,uxy_acx,uxy_acy   
+        real(wp) :: wv,wvr,uxy_acx,uxy_acy,u_acy,v_acx   
         real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
-        real(wp), allocatable :: u_acy(:,:),v_acx(:,:)
 
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
-    
-        allocate(u_acy(nx,ny))
-        allocate(v_acx(nx,ny))
 
         ! Initialize    
-        wv      = 300.0 * sin(2.0 * pi * time / 1000.0) 
+        wv      = -300.0 * sin(2.0 * pi * time / 1000.0) 
         uxy_acx = 0.0_wp
         uxy_acy = 0.0_wp
         u_acy   = 0.0_wp
@@ -947,28 +943,72 @@ contains
         cr_acx  = 0.0_wp
         cr_acy  = 0.0_wp
     
-        ! Stagger velocities x/y ac-velocities into y/x ac-nodes
         do j = 1, ny
         do i = 1, nx
+            ! Stagger velocities x/y ac-velocities into y/x ac-nodes
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            u_acy(i,j) = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
-            v_acx(i,j) = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
-        end do
-        end do
-
-        do j = 1, ny
-        do i = 1, nx
-            uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx(i,j)**2)**0.5)
-            !cr_acx(i,j) = -(uxy_acx+wv)*(u_acx(i,j)/uxy_acx)
-            cr_acx(i,j) = -u_acx(i,j)-(u_acx(i,j)/uxy_acx)*wv
-            uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy(i,j)**2)**0.5)
-            !cr_acy(i,j) = -(uxy_acy+wv)*(v_acy(i,j)/uxy_acy)
-            cr_acy(i,j) = -v_acy(i,j)-(v_acy(i,j)/uxy_acy)*wv
+            u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
+            v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
+            ! x-direction
+            uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
+            cr_acx(i,j) = -u_acx(i,j)+(u_acx(i,j)/uxy_acx)*wv
+            ! y-direction
+            uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
+            cr_acy(i,j) = -v_acy(i,j)+(v_acy(i,j)/uxy_acy)*wv
         end do
         end do
 
         return
     
     end subroutine calvmip_exp2
+
+    subroutine calvmip_exp5(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+        ! Experiment 5 of CalvMIP
+        
+        implicit none
+        
+        real(wp), intent(OUT) :: cr_acx(:,:), cr_acy(:,:)
+        real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: H_ice_c
+        character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
+            
+        ! local variables
+        integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
+        real(wp) :: wv,wvr,uxy_acx,uxy_acy,u_acy,v_acx   
+        real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
+        
+        nx = size(u_acx,1)
+        ny = size(u_acx,2) 
+        
+        ! Initialize    
+        wv      = 0.0_wp
+        uxy_acx = 0.0_wp
+        uxy_acy = 0.0_wp
+        u_acy   = 0.0_wp
+        v_acx   = 0.0_wp
+        cr_acx  = 0.0_wp
+        cr_acy  = 0.0_wp
+            
+        do j = 1, ny
+            do i = 1, nx
+                ! Stagger velocities x/y ac-velocities into y/x ac-nodes
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
+                v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
+                ! Compute calving rate
+                wv = MAX(0.0_wp,1.0_wp+(H_ice_c-H_ice(i,j))/H_ice_c)
+                ! x-direction
+                uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
+                cr_acx(i,j) = -u_acx(i,j)*wv
+                ! y-direction
+                uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
+                cr_acy(i,j) = -v_acy(i,j)*wv
+            end do
+        end do
+
+        return
+    
+    end subroutine calvmip_exp5
 
 end module calving_ac

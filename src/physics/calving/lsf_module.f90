@@ -12,18 +12,12 @@ module lsf_module
     
     ! === LSF routines ===
     public :: LSFinit
-    !public :: LSFadvection
     public :: LSFupdate
-
-    ! === Total CMB_flt (aesthetics) ===
-    !public :: calc_cmb_border
 
     ! === Ocean extrapolation routines ===
     public :: extrapolate_ocn_acx
     public :: extrapolate_ocn_acy
     public :: extrapolate_ocn_laplace_simple
-
-    public :: CircularDomain
 
 contains 
     ! ===================================================================
@@ -97,7 +91,7 @@ contains
         ! Compute the advected LSF field
         if (.TRUE.) then
             call calc_advec2D(dlsf,lsf,mask_lsf,wx,wy,var_dot, &
-                                mask_adv,dx,dy,dt,"impl-lis","periodic")
+                                mask_adv,dx,dy,dt,solver,"periodic")
             call apply_tendency_lsf(lsf,dlsf,dt,adjust_lsf=.FALSE.)
         else
             ! Simple advecter without diagonilizing. Test.
@@ -459,35 +453,5 @@ contains
         return
             
     end subroutine extrapolate_ocn_laplace_simple    
-
-    ! LSF circular domain. Test.
-
-    subroutine CircularDomain(LSF,zbed,dx)
-        
-        implicit none
-    
-        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask
-        real(wp), intent(IN)  :: zbed(:,:)    
-        real(wp), intent(IN)  :: dx            ! Model resolution [m]
-        
-        ! Internal variables
-        real(wp) :: rc
-        integer  :: i,j,nx,ny
-    
-        nx = size(zbed,1)
-        ny = size(zbed,2)
-        rc = 10.0_wp ! grid points below zero
-    
-        do j=1,ny
-        do i=1,nx
-    
-        LSF(i,j) = (sqrt((0.5*(nx+1)-i)**2 + (0.5*(ny+1)-j)**2) - rc)*dx*1e-3 
-    
-        end do
-        end do
-    
-        return
-    
-    end subroutine CircularDomain
     
 end module lsf_module

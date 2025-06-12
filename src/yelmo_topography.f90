@@ -664,10 +664,11 @@ end if
         tpo%now%cmb_flt   = 0.0_wp
 
         ! Extrapolate velocities into the ocean.
-        u_acx_fill = dyn%now%ux_bar
-        v_acy_fill = dyn%now%uy_bar
+        !u_acx_fill = dyn%now%ux_bar
+        !v_acy_fill = dyn%now%uy_bar
 
-        if (.TRUE.) then
+        !
+        if (.FALSE.) then
             ! simple extrapolation (only x or y direction, nearest neighbour)
             call extrapolate_ocn_acx(u_acx_fill,dyn%now%ux_bar,dyn%now%ux_bar)
             call extrapolate_ocn_acy(v_acy_fill,dyn%now%uy_bar,dyn%now%uy_bar)
@@ -703,7 +704,7 @@ end if
     
             case("exp2","exp4")
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
-
+            
             case("exp5")
                 call calvmip_exp5(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref,tpo%par%boundaries)
             
@@ -730,20 +731,6 @@ end if
         tpo%now%lsf_n = tpo%now%lsf
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_grnd, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
-
-        if (.FALSE.) then
-            ! check units are correct
-            write(*,*) "dx= ", tpo%par%dx
-            write(*,*) "dy= ", tpo%par%dx
-            write(*,*) "u_max= ", MAXVAL(u_acx_fill)
-            write(*,*) "v_max= ", MAXVAL(v_acy_fill) 
-            write(*,*) "u_min= ", MINVAL(u_acx_fill)
-            write(*,*) "v_min= ", MINVAL(v_acy_fill)  
-            write(*,*) "crx_max= ", MAXVAL(tpo%now%cmb_flt_x)
-            write(*,*) "cry_max= ", MAXVAL(tpo%now%cmb_flt_y) 
-            write(*,*) "crx_min= ", MINVAL(tpo%now%cmb_flt_x)
-            write(*,*) "cry_min= ", MINVAL(tpo%now%cmb_flt_y)  
-        end if
 
         ! === Calving ===
         tpo%now%cmb = 0.0_wp

@@ -928,7 +928,7 @@ contains
     
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv,wvr,uxy_acx,uxy_acy,u_acy,v_acx   
+        real(wp) :: wv,uxy_acx,uxy_acy,u_acy,v_acx   
         real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
 
         nx = size(u_acx,1)
@@ -975,40 +975,91 @@ contains
             
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv,wvr,uxy_acx,uxy_acy,u_acy,v_acx   
-        real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
+        real(wp) :: wv_acx,wv_acy,wvr,uxy_acx,uxy_acy,u_acy,v_acx 
+        real(wp), allocatable :: H_ice_fill(:,:)  
         
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
-        
+        allocate(H_ice_fill(nx,ny))
+
         ! Initialize    
-        wv      = 0.0_wp
+        wv_acx  = 0.0_wp
+        wv_acy  = 0.0_wp
         uxy_acx = 0.0_wp
         uxy_acy = 0.0_wp
         u_acy   = 0.0_wp
         v_acx   = 0.0_wp
         cr_acx  = 0.0_wp
         cr_acy  = 0.0_wp
+        H_ice_fill = H_ice
             
+        ! since we compute on ac-nodes and ice thickness are on aa-nodes
+        ! we need to extrapolate ice thickness to the ocean
+        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,H_ice)
+
         do j = 1, ny
             do i = 1, nx
-                ! Stagger velocities x/y ac-velocities into y/x ac-nodes
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
-                v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
-                ! Compute calving rate
-                wv = MAX(0.0_wp,1.0_wp+(H_ice_c-H_ice(i,j))/H_ice_c)
                 ! x-direction
-                uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
-                cr_acx(i,j) = -u_acx(i,j)*wv
+                wv_acx = MAX(0.0_wp,1.0_wp+(H_ice_c-(0.5*(H_ice_fill(i,j)+H_ice_fill(ip1,j))))/H_ice_c)
+                cr_acx(i,j) = -u_acx(i,j)*wv_acx
                 ! y-direction
-                uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
-                cr_acy(i,j) = -v_acy(i,j)*wv
+                wv_acy = MAX(0.0_wp,1.0_wp+(H_ice_c-(0.5*(H_ice_fill(i,j)+H_ice_fill(i,jp1))))/H_ice_c)
+                cr_acy(i,j) = -v_acy(i,j)*wv_acy
             end do
         end do
+
+        deallocate(H_ice_fill)
 
         return
     
     end subroutine calvmip_exp5
+
+    subroutine extrapolate_ocn_laplace_simple(mask_fill, mask_orig,mask)
+        ! Routine to extrapolate values using the Laplace equation.
+        ! Assumes that value 0 in mask represents ice-free points
+                
+        implicit none
+            
+        real(wp), intent(INOUT) :: mask_fill(:,:)
+        real(wp), intent(IN) :: mask_orig(:,:)
+        real(wp), intent(IN) :: mask(:,:)
+                
+        ! Local variables
+        integer :: i, j, iter
+        real(wp) :: error, tol
+        real(wp), allocatable :: mask_new(:,:)
+                
+        ! Allocate memory for the temporary array
+        allocate(mask_new(size(mask_orig,1), size(mask_orig,2)))
+                
+        ! Initialize variables
+        mask_fill = mask_orig
+        mask_new  = mask_orig
+        tol       = 1e-2_wp      ! Tolerance for convergence
+        error     = tol + 1.0_wp
+        iter      = 0
+                
+        ! Jacobi iteration
+        do while (error > tol)
+            error = 0.0_wp
+            iter = iter + 1
+                
+            do i = 2, size(mask_orig,1)-1
+                do j = 2, size(mask_orig,2)-1
+                    if (mask(i,j) .eq. 0.0_wp) then
+                        mask_new(i,j) = 0.25_wp * (mask_fill(i+1,j) + mask_fill(i-1,j) + mask_fill(i,j+1) + mask_fill(i,j-1))
+                        error = error + abs(mask_new(i,j) - mask_fill(i,j))
+                    end if
+                end do
+            end do
+            mask_fill = mask_new
+        end do
+                
+        deallocate(mask_new)
+        
+        return
+            
+    end subroutine extrapolate_ocn_laplace_simple
 
 end module calving_ac

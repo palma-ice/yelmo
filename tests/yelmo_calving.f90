@@ -199,6 +199,32 @@ program yelmo_calving
     
 contains
 
-
+    subroutine CircularDomain(LSF,zbed,dx)
+        
+        implicit none
+    
+        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask
+        real(wp), intent(IN)  :: zbed(:,:)    
+        real(wp), intent(IN)  :: dx            ! Model resolution [m]
+        
+        ! Internal variables
+        real(wp) :: rc
+        integer  :: i,j,nx,ny
+    
+        nx = size(zbed,1)
+        ny = size(zbed,2)
+        rc = 10.0_wp ! grid points below zero
+    
+        do j=1,ny
+        do i=1,nx
+    
+        LSF(i,j) = (sqrt((0.5*(nx+1)-i)**2 + (0.5*(ny+1)-j)**2) - rc)*dx*1e-3 
+    
+        end do
+        end do
+    
+        return
+    
+    end subroutine CircularDomain
 
 end program yelmo_calving

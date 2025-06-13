@@ -50,7 +50,7 @@ contains
         
     end subroutine LSFinit
 
-    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,H_grnd,var_dot,mask_adv,dx,dy,dt,solver)
+    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,var_dot,mask_adv,dx,dy,dt,solver)
 
         implicit none
 
@@ -59,7 +59,6 @@ contains
         real(wp),       intent(INOUT) :: cr_acx(:,:),cr_acy(:,:) ! [m/yr] calving rate (vertical)
         real(wp),       intent(IN)    :: u_acx(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
         real(wp),       intent(IN)    :: v_acy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
-        real(wp),       intent(IN)    :: H_grnd(:,:)             ! [m] floating contribution?
         real(wp),       intent(IN)    :: var_dot(:,:)            ! [dvar/dt] Source term for variable (needed?)
         integer,        intent(IN)    :: mask_adv(:,:)           ! Advection mask
         real(wp),       intent(IN)    :: dx                      ! [m] Horizontal resolution, x-direction
@@ -102,9 +101,6 @@ contains
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0
 
-        ! LSF should not affect points above sea level (check)
-        !where(H_grnd .gt. 0.0_wp) lsf = -1.0_wp
-
         if (.FALSE.) then
             ! plot retreat rate instead of calving rate
             cr_acx = wx
@@ -114,51 +110,6 @@ contains
         return
 
     end subroutine LSFupdate
-
-    ! ===================================================================
-    !
-    ! Total CMB_flt (aesthetics)
-    !
-    ! ===================================================================
-
-    subroutine calc_cmb_border(cr_acx,cr_acy,lsf_aa,boundaries)
-
-        implicit none
-
-        real(wp), intent(INOUT) :: cr_acx(:,:),cr_acy(:,:) ! [m/yr] calving-rates on ac-nodes 
-        real(wp), intent(IN)    :: lsf_aa(:,:)             ! LSF mask on aa-nodes
-        character(len=*), intent(IN)  :: boundaries
-
-        ! Local variables
-        integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
-    
-        do j=1,ny
-        do i=1,nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            ! x-direction
-            if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(ip1,j) .le. 0.0) then
-                cr_acx(i,j)   = cr_acx(i,j)
-            else if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(im1,j) .le. 0.0) then
-                cr_acx(im1,j) = cr_acx(im1,j)
-            else
-                cr_acx(i,j)   = 0.0
-            end if
-
-            ! y-direction
-            if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(i,jp1) .le. 0.0) then
-                cr_acy(i,j)   = cr_acy(i,j)
-            else if (lsf_aa(i,j) .gt. 0.0 .and. lsf_aa(i,jm1) .le. 0.0) then
-                cr_acy(i,jm1) = cr_acy(i,jm1)
-            else
-                cr_acy(i,j)   = 0.0
-            end if
-    
-        end do
-        end do
-
-        return
-
-    end subroutine calc_cmb_border
 
     ! ===================================================================
     !
@@ -220,6 +171,7 @@ contains
         
     subroutine LSFadvec_simple(dlsf,LSF, u, v, dt, dx, boundaries)
         ! Simple LSF advection routine. Not diagonilized.
+        ! Test
 
         implicit none
             
@@ -287,6 +239,7 @@ contains
     ! Oceanic extrapolation routines.
     !
     ! ===================================================================
+    
     subroutine extrapolate_ocn_acy(mask_fill,mask_orig,mask_ac)
         ! Routine to extrapolate the nearest value in the y-direction.
         ! So far we assume that value 0 in mask_orig represents ice-free points

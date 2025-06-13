@@ -929,7 +929,7 @@ contains
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
         real(wp) :: wv,uxy_acx,uxy_acy,u_acy,v_acx   
-        real(wp), parameter   :: pi = acos(-1.0)  ! Calculate pi intrinsically
+        real(wp), parameter :: pi = acos(-1.0)  ! Calculate pi intrinsically
 
         nx = size(u_acx,1)
         ny = size(u_acx,2) 

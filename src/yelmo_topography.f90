@@ -664,16 +664,16 @@ end if
         tpo%now%cmb_flt   = 0.0_wp
 
         ! Extrapolate velocities into the ocean.
-        !u_acx_fill = dyn%now%ux_bar
-        !v_acy_fill = dyn%now%uy_bar
+        u_acx_fill = dyn%now%ux_bar
+        v_acy_fill = dyn%now%uy_bar
 
-        !
-        if (.FALSE.) then
+        if (.TRUE.) then
             ! simple extrapolation (only x or y direction, nearest neighbour)
             call extrapolate_ocn_acx(u_acx_fill,dyn%now%ux_bar,dyn%now%ux_bar)
             call extrapolate_ocn_acy(v_acy_fill,dyn%now%uy_bar,dyn%now%uy_bar)
         else
             ! laplace extrapolation (weighting on the x and y direction)
+            ! computationally more expensive
             call extrapolate_ocn_laplace_simple(u_acx_fill,dyn%now%ux_bar,dyn%now%ux_bar)
             call extrapolate_ocn_laplace_simple(v_acy_fill,dyn%now%uy_bar,dyn%now%uy_bar)
         end if
@@ -698,7 +698,7 @@ end if
     
             ! TO DO: Add new laws
     
-            ! === CalvMIP ===
+            ! CalvMIP laws
             case("exp1","exp3")
                 call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
     
@@ -717,8 +717,23 @@ end if
         end select
     
         ! === Marine terminating calving laws ===
-        ! MICI should be a marine terminating calving law (only for grounding-line points?)
+        select case(trim(tpo%par%calv_grnd_method))
+
+            case("zero","none")
+                ! Do nothing. No calving.
+
+            ! TO DO
+            ! Add new laws
+            ! MICI should be a marine terminating calving law (only for grounding-line points?)
+
+            case DEFAULT
     
+                write(*,*) "calc_ytopo:: Error: grounded calving method not recognized."
+                write(*,*) "calv_grnd_method = ", trim(tpo%par%calv_grnd_method)
+                stop
+    
+        end select
+        
         ! === Land terminating calving laws ===
         ! For the moment we will assume no calving laws for land-terminating ice points.
     
@@ -727,12 +742,13 @@ end if
     
 
         ! === LSF advection ===
-        ! advect LSF mask based on the calving law 
+        ! store lsf mask. Necessary to not cimpute it two times.
         tpo%now%lsf_n = tpo%now%lsf
-        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_grnd, &
+        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
         ! === Calving ===
+        ! Applu calving as a melt rate equal to ice thickness where lsf is positive
         tpo%now%cmb = 0.0_wp
         do j=1,ny
         do i=1,nx
@@ -751,16 +767,19 @@ end if
                     (tpo%now%lsf(i,jm1) .le. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .le. 0.0_wp)) then
                     tpo%now%lsf(i,j) = -1.0_wp
                 end if
-                ! neccessary for exp2. Needed?
-                if (tpo%now%H_ice(i,j) .eq. 0.0_wp) then
-                    tpo%now%lsf(i,j) = 1.0_wp
-                else if ((tpo%now%H_ice(i,j) .lt. tpo%par%H_min_flt) .and. &
+
+                ! If lsf advances faster than the ice, set ice to H_min_flt.
+                ! This should not be the case (except CalvMIP exp2)
+                if ((tpo%now%H_ice(i,j) .lt. tpo%par%H_min_flt) .and. &
                             (bnd%z_bed(i,j) .lt. 0.0_wp)) then
                     tpo%now%H_ice(i,j) = tpo%par%H_min_flt + 0.1_wp
                 end if
             end if
         end do
         end do
+
+        ! LSF should not affect points above sea level
+        where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = -1.0_wp
 
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)
@@ -790,12 +809,12 @@ end if
             end if
         end if
 
-        if (.TRUE.) then
-            ! plot total cr (diagnosis)
+        if (.FALSE.) then
+            ! plot total total cr (as diagnosis)
             do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
-                tpo%now%cmb(i,j) = ((0.5_wp*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
+                tpo%now%cmb_flt(i,j) = ((0.5_wp*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
                                     (0.5_wp*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
             end do
             end do

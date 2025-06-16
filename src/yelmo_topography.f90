@@ -809,13 +809,22 @@ end if
             end if
         end if
 
-        if (.FALSE.) then
-            ! plot total total cr (as diagnosis)
+        if (.TRUE.) then
+            ! plot the calving front velocity.
             do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
-                tpo%now%cmb_flt(i,j) = ((0.5_wp*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
-                                    (0.5_wp*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
+                if (tpo%now%lsf(i,j) .gt. 0.0_wp) then
+                    tpo%now%cmb_flt(i,j) = 0.0_wp
+                else
+                    if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .or. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .or. &
+                        (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .or. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
+                        tpo%now%cmb_flt(i,j) = ((0.5_wp*(dyn%now%ux_bar(im1,j)+dyn%now%ux_bar(i,j)))**2 + &
+                                                (0.5_wp*(dyn%now%uy_bar(i,jm1)+dyn%now%uy_bar(i,j)))**2)**0.5
+                    else
+                        tpo%now%cmb_flt(i,j) = 0.0_wp
+                    end if
+                end if
             end do
             end do
         end if

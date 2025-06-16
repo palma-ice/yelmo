@@ -155,7 +155,7 @@ program yelmo_calving
     
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,ctl%file1D,time_init=ctl%time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    if (.TRUE.) then
+    if (.FALSE.) then
         call yelmo_write_reg_step(yelmo1,ctl%file1D,time=ctl%time_init) 
     else
         ! CalvingMIP variables
@@ -196,7 +196,7 @@ program yelmo_calving
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
-            if (.TRUE.) then
+            if (.FALSE.) then
                 call yelmo_write_reg_step(yelmo1,ctl%file1D,time=time) 
             else
                 ! CalvingMIP variables
@@ -308,9 +308,9 @@ contains
     
         rho_ice             = 917.0             ! ice density kg/m3
         m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
-        density_corr        = rho_ice/1000.0    ! ice density correction with pure water
+        density_corr        = rho_ice/1028.0    ! ice density correction with pure water
         ismip6_correction   = m3yr_to_kgs*density_corr
-        yr_to_sec           = 31556952.0
+        yr_to_sec           = 31556926.0
             
         m3_km3              = 1e-9 
         m2_km2              = 1e-6 
@@ -364,7 +364,7 @@ contains
         if (npts_frnt .gt. 0) then
     
             A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
-            calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
+            calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
             flux_frnt  = calv_flt+sum(dom%tpo%now%fmb*dom%tpo%now%H_ice,mask=mask_frnt)*dx      ! m^3/yr: flux [m-1 yr-1]
     
             ! ajr, why only *dx above? 
@@ -389,37 +389,20 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
     
-        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
-                        dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
-                        dim1="time",start=[n],ncid=ncid)
-    
-        ! ===== Mass ===== 
-        call nc_write(filename,"lim",reg%V_ice*rho_ice*1e9,units="kg",long_name="Total ice mass", &
-                    standard_name="land_ice_mass",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
-                    standard_name="land_ice_mass_not_displacing_sea_water",dim1="time",start=[n],ncid=ncid)
-    
-        ! ===== Area ====
-        call nc_write(filename,"iareagr",reg%A_ice_g*1e6,units="m^2",long_name="Grounded ice area", &
-                    standard_name="grounded_ice_sheet_area",dim1="time",start=[n],ncid=ncid)
+        ! CalvMIP outputs
         call nc_write(filename,"iareafl",reg%A_ice_f*1e6,units="m^2",long_name="Floating ice area", &
-                    standard_name="floating_ice_shelf_area",dim1="time",start=[n],ncid=ncid)
-    
-        ! ==== Fluxes ====
-        call nc_write(filename,"tendacabf",smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlibmassbf ",bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlibmassbffl",bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
-                    standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
+                standard_name="floating_ice_shelf_area",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"iareagr",reg%A_ice_g*1e6,units="m^2",long_name="Grounded ice area", &
+                standard_name="grounded_ice_sheet_area",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"lim",reg%V_ice*rho_ice*1e9,units="kg",long_name="Total ice mass", &
+                standard_name="land_ice_mass",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
+                standard_name="land_ice_mass_not_displacing_sea_water",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendlicalvf",calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlifmassbf",flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="time",start=[n],ncid=ncid)
+                standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendligroundf",flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
-                    standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
-    
+                standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
+        
         ! Close the netcdf file
         call nc_close(ncid)
     
@@ -496,7 +479,10 @@ contains
                     standard_name=" ",dims=dims,ncid=ncid)
         call nc_write(filename,"topg",ylmo%bnd%z_bed(1:ylmo%grd%nx,1:ylmo%grd%ny),start=[1,1,n],units="m",long_name="Bedrock height", &
                     standard_name="bedrock_altimetry",dims=dims,ncid=ncid)
-
+        ! Test
+        call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt(1:ylmo%grd%nx,1:ylmo%grd%ny),start=[1,1,n],units="m",long_name="Bedrock height", &
+                            standard_name="ice front velocity",dims=dims,ncid=ncid)
+                    
         ! Close the netcdf file
         call nc_close(ncid)
     

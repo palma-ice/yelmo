@@ -1,7 +1,7 @@
 &ctl
 
     exp         = "exp1"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx           = 10.0                 ! [km] Grid resolution
+    dx           = 25.0                 ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
@@ -27,7 +27,7 @@
     nml_masks       = "yelmo_masks"
     nml_init_topo   = "yelmo_init_topo"
     nml_data        = "yelmo_data"
-    restart         = "/Users/jablas001/Models/yelmo-ucm/yelmo_main_lsf/output/calvmip_dx10/exp1/yelmo_restart.nc"
+    restart         = "/Users/jablas001/Models/yelmo-ucm/yelmo_main_lsf/output/calvmip_dx25/exp1/yelmo_restart.nc"
     restart_z_bed   = True             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True             ! Take H_ice from restart file
     restart_relax   = 0.0              ! [yrs] Years to relax from restart=>input topography
@@ -35,7 +35,7 @@
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 5                ! Vertical resolution in ice
+    nz_aa           = 6                ! Vertical resolution in ice
     dt_method       = 0                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.01              ! [a] Minimum timestep 
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable

@@ -4,6 +4,7 @@ program yelmo_calving
     use ncio  
     use yelmo 
     use lsf_module
+    use yelmo_tools, only : get_region_indices
 
     use calving_benchmarks
     
@@ -145,11 +146,21 @@ program yelmo_calving
  
     ! 2D file 
     call yelmo_write_init(yelmo1,ctl%file2D,time_init=ctl%time_init,units="years")
-    call yelmo_write_step(yelmo1,ctl%file2D,time=ctl%time_init)  
+    if (.FALSE.) then
+        call yelmo_write_step(yelmo1,ctl%file2D,time=ctl%time_init)
+    else
+        ! CalvingMIP variables
+        call write_2D_calvingmip(yelmo1,ctl%file2D,time=ctl%time_init)   
+    end if 
     
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,ctl%file1D,time_init=ctl%time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call yelmo_write_reg_step(yelmo1,ctl%file1D,time=ctl%time_init) 
+    if (.TRUE.) then
+        call yelmo_write_reg_step(yelmo1,ctl%file1D,time=ctl%time_init) 
+    else
+        ! CalvingMIP variables
+        call write_1D_calvingmip(yelmo1,ctl%file1D,time=ctl%time_init)
+    end if
 
     ! Store default parameters
     yelmo_ref = yelmo1
@@ -425,7 +436,8 @@ contains
         real(wp),          intent(IN) :: time
     
         ! Local variables
-        integer  :: ncid, n, i, j
+        integer :: ncid, n, i, j
+        character(len=32), allocatable :: dims(:)
             
         ! CalvingMIP variables
         integer,  allocatable :: mask_clvmip(:,:)
@@ -436,7 +448,14 @@ contains
         allocate(mask_clvmip(ylmo%grd%nx,ylmo%grd%ny))
         allocate(ux_bar_aa(ylmo%grd%nx,ylmo%grd%ny))
         allocate(uy_bar_aa(ylmo%grd%nx,ylmo%grd%ny)) 
-    
+
+        ! Allocate local representation of dims to be able to add "time" as last dimension
+        allocate(dims(3))
+        dims(1) = "xc"
+        dims(2) = "yc"
+        dims(3) = "time"
+
+        ! Initialize variables
         mask_clvmip = 0
         ux_bar_aa   = 0.0_wp
         uy_bar_aa   = 0.0_wp
@@ -445,17 +464,17 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
     
         ! Determine current writing time step 
-        n = nc_time_index(filename,"Time",time,ncid)
+        n = nc_time_index(filename,"time",time,ncid)
     
         ! Update the time step
-        call nc_write(filename,"Time",time,dim1="Time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
         ! Compute mask
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) mask_clvmip = 3
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp) mask_clvmip = 2
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp) mask_clvmip = 1
-
-        ! convert velocities into aa-nodes
+            
+        ! convert velocities into aa-nodes    
         do i=2, ylmo%grd%nx-1
         do j=2, ylmo%grd%ny-1
             ux_bar_aa(i,j) = 0.5*(ylmo%dyn%now%ux_bar(i,j)+ylmo%dyn%now%ux_bar(i-1,j))
@@ -467,19 +486,17 @@ contains
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = 0.0_wp
 
         ! Write CalvingMIP variables variables
-
-
         call nc_write(filename,"xvelmean",ux_bar_aa,start=[1,1,n],units="m a-1",long_name="X velocity", &
-                        standard_name="land_ice_vertical_mean_x_velocity", dim1="X",dim2="Y",dim3="Time",ncid=ncid)
+                        standard_name="land_ice_vertical_mean_x_velocity", dims=dims,ncid=ncid)
         call nc_write(filename,"yvelmean",uy_bar_aa,start=[1,1,n],units="m a-1",long_name="Y velocity", &
-                standard_name="land_ice_vertical_mean_y_velocity", dim1="X",dim2="Y",dim3="Time",ncid=ncid)
+                standard_name="land_ice_vertical_mean_y_velocity", dims=dims,ncid=ncid)
         call nc_write(filename,"lithk",ylmo%tpo%now%H_ice,start=[1,1,n],units="m",long_name="Ice thickness", &
-                    standard_name="land_ice_thickness", dim1="X",dim2="Y",dim3="Time",ncid=ncid)
+                    standard_name="land_ice_thickness", dims=dims,ncid=ncid)
         call nc_write(filename,"mask",mask_clvmip,start=[1,1,n],units="",long_name="Ice mask", &
-                        dim1="X",dim2="Y",dim3="=Time",ncid=ncid)
-        call nc_write(filename,"topg",ylmo%bnd%z_bed,start=[1,1,n],units="m",long_name="Bedrock height", &
-                    standard_name="bedrock_altimetry", dim1="X",dim2="Y",dim3="Time",ncid=ncid)
-    
+                    standard_name=" ",dims=dims,ncid=ncid)
+        call nc_write(filename,"topg",ylmo%bnd%z_bed(1:ylmo%grd%nx,1:ylmo%grd%ny),start=[1,1,n],units="m",long_name="Bedrock height", &
+                    standard_name="bedrock_altimetry",dims=dims,ncid=ncid)
+
         ! Close the netcdf file
         call nc_close(ncid)
     

@@ -1,7 +1,7 @@
 &ctl
 
     exp         = "exp4"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx           = 25.0                 ! [km] Grid resolution
+    dx           = 10.0                 ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
@@ -27,7 +27,7 @@
     nml_masks       = "yelmo_masks"
     nml_init_topo   = "yelmo_init_topo"
     nml_data        = "yelmo_data"
-    restart         = "/Users/jablas001/Models/yelmo-ucm/yelmo_main_lsf/output/calvmip_dx25/exp3/yelmo_restart.nc"
+    restart         = "/Users/jablas001/Models/yelmo-ucm/yelmo_main_lsf/output/calvmip_dx10/exp3/yelmo_restart.nc"
     restart_z_bed   = True             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True             ! Take H_ice from restart file
     restart_relax   = 0.0              ! [yrs] Years to relax from restart=>input topography

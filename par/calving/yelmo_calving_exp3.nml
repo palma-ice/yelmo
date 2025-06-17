@@ -1,7 +1,7 @@
 &ctl
 
     exp         = "exp3"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx           = 10.0                 ! [km] Grid resolution
+    dx           = 5.0                 ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 

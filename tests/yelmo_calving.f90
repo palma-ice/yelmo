@@ -259,7 +259,7 @@ contains
         ! Local variables
         type(yregions_class) :: reg
             
-        integer  :: ncid, n
+        integer  :: ncid, n, i, j
         real(wp) :: rho_ice
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
@@ -286,23 +286,35 @@ contains
         real(wp) :: A_ice_frnt 
         real(wp) :: calv_flt 
         real(wp) :: flux_frnt 
+
+        real(wp) :: iareatotalNW
+        real(wp) :: iareatotalNE
+        real(wp) :: iareatotalSW
+        real(wp) :: iareatotalSE
         
         logical, allocatable :: mask_tot(:,:) 
         logical, allocatable :: mask_grnd(:,:)
         logical, allocatable :: mask_flt(:,:) 
         logical, allocatable :: mask_grl(:,:) 
-        logical, allocatable :: mask_frnt(:,:) 
+        logical, allocatable :: mask_frnt(:,:)
+        logical, allocatable :: mask_NW(:,:)
+        logical, allocatable :: mask_NE(:,:)
+        logical, allocatable :: mask_SW(:,:)
+        logical, allocatable :: mask_SE(:,:) 
             
         dx = dom%grd%dx 
         dy = dom%grd%dy 
     
         ! Allocate variables
-    
         allocate(mask_tot(dom%grd%nx,dom%grd%ny))
         allocate(mask_grnd(dom%grd%nx,dom%grd%ny))
         allocate(mask_flt(dom%grd%nx,dom%grd%ny))
         allocate(mask_grl(dom%grd%nx,dom%grd%ny))
         allocate(mask_frnt(dom%grd%nx,dom%grd%ny))
+        allocate(mask_NW(dom%grd%nx,dom%grd%ny))
+        allocate(mask_NE(dom%grd%nx,dom%grd%ny))
+        allocate(mask_SW(dom%grd%nx,dom%grd%ny))
+        allocate(mask_SE(dom%grd%nx,dom%grd%ny))
     
         ! === Data conversion factors ========================================
     
@@ -325,9 +337,33 @@ contains
         mask_tot  = (dom%tpo%now%H_ice .gt. 0.0) 
         mask_grnd = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0)
         mask_flt  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0)
-        !mask_grl  = (dom%tpo%now%f_grnd_bmb .gt. 0.0 .and. dom%tpo%now%f_grnd_bmb .lt. 1.0)         
         mask_grl  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0 .and. dom%tpo%now%mask_grz .eq. 1.0)         
         mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0 .and. dom%tpo%now%mask_frnt .eq. 1.0) 
+        mask_NW   = .FALSE.
+        mask_NE   = .FALSE.
+        mask_SW   = .FALSE.
+        mask_SE   = .FALSE.
+
+        do i=1,dom%grd%nx
+        do j=1,dom%grd%ny
+            ! NW mask
+            if ((i .le. 1+0.5*(dom%grd%nx-1)) .and. (j .ge. 1+0.5*(dom%grd%ny-1))) then
+                mask_NW(i,j) = .TRUE.
+            end if
+            ! NE mask
+            if ((i .ge. 1+0.5*(dom%grd%nx-1)) .and. (j .ge. 1+0.5*(dom%grd%ny-1))) then
+                mask_NE(i,j) = .TRUE.
+            end if
+            ! SW mask
+            if ((i .ge. 1+0.5*(dom%grd%nx-1)) .and. (j .le. 1+0.5*(dom%grd%ny-1))) then
+                mask_SW(i,j) = .TRUE.
+            end if
+            ! SE mask
+            if ((i .le. 1+0.5*(dom%grd%nx-1)) .and. (j .le. 1+0.5*(dom%grd%ny-1))) then
+                mask_SE(i,j) = .TRUE.
+            end if
+        end do
+        end do
 
         ! Determine number of points at grl and frnt
         npts_tot  = count(mask_tot)
@@ -390,6 +426,21 @@ contains
         call nc_write(filename,"tendligroundf",flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
                 standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
         
+        ! Total area by sectors
+        iareatotalNW = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_NW)*dx*dy
+        iareatotalNE = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_NE)*dx*dy
+        iareatotalSW = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_SW)*dx*dy
+        iareatotalSE = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_SE)*dx*dy
+
+        call nc_write(filename,"iareatotalNW",iareatotalNW,units="m^2",long_name="Total ice area NorthWest", &
+                standard_name="total_ice_area_NorthWest",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"iareatotalNE",iareatotalNE,units="m^2",long_name="Total ice area NorthEast", &
+                standard_name="total_ice_area_NorthEast",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"iareatotalSW",iareatotalSW,units="m^2",long_name="Total ice area SouthWest", &
+                standard_name="total_ice_area_SouthWest",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"iareatotalSE",iareatotalSE,units="m^2",long_name="Total ice area SouthEast", &
+                standard_name="total_ice_area_SouthEast",dim1="time",start=[n],ncid=ncid)
+                        
         ! Close the netcdf file
         call nc_close(ncid)
     
@@ -413,9 +464,11 @@ contains
         integer,  allocatable :: mask_clvmip(:,:)
         real(wp), allocatable :: ux_bar_aa(:,:)
         real(wp), allocatable :: uy_bar_aa(:,:)
+        real(wp), allocatable :: H_clvmip(:,:)
 
         ! Allocate and initialize local arrays
         allocate(mask_clvmip(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(H_clvmip(ylmo%grd%nx,ylmo%grd%ny))
         allocate(ux_bar_aa(ylmo%grd%nx,ylmo%grd%ny))
         allocate(uy_bar_aa(ylmo%grd%nx,ylmo%grd%ny)) 
 
@@ -429,6 +482,7 @@ contains
         mask_clvmip = 0
         ux_bar_aa   = 0.0_wp
         uy_bar_aa   = 0.0_wp
+        H_clvmip    = ylmo%tpo%now%H_ice
     
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -452,24 +506,22 @@ contains
         end do
         end do
 
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) ux_bar_aa = 0.0_wp
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = 0.0_wp
+        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) ux_bar_aa = mv
+        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = mv
+        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_clvmip  = mv
 
         ! Write CalvingMIP variables variables
         call nc_write(filename,"xvelmean",ux_bar_aa,start=[1,1,n],units="m a-1",long_name="X velocity", &
-                        standard_name="land_ice_vertical_mean_x_velocity", dims=dims,ncid=ncid)
+                    standard_name="land_ice_vertical_mean_x_velocity", dims=dims,ncid=ncid)
         call nc_write(filename,"yvelmean",uy_bar_aa,start=[1,1,n],units="m a-1",long_name="Y velocity", &
-                standard_name="land_ice_vertical_mean_y_velocity", dims=dims,ncid=ncid)
-        call nc_write(filename,"lithk",ylmo%tpo%now%H_ice,start=[1,1,n],units="m",long_name="Ice thickness", &
+                    standard_name="land_ice_vertical_mean_y_velocity", dims=dims,ncid=ncid)
+        call nc_write(filename,"lithk",H_clvmip,start=[1,1,n],units="m",long_name="Ice thickness", &
                     standard_name="land_ice_thickness", dims=dims,ncid=ncid)
         call nc_write(filename,"mask",mask_clvmip,start=[1,1,n],units="",long_name="Ice mask", &
                     standard_name=" ",dims=dims,ncid=ncid)
         call nc_write(filename,"topg",ylmo%bnd%z_bed(1:ylmo%grd%nx,1:ylmo%grd%ny),start=[1,1,n],units="m",long_name="Bedrock height", &
                     standard_name="bedrock_altimetry",dims=dims,ncid=ncid)
-        ! Test
-        call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt(1:ylmo%grd%nx,1:ylmo%grd%ny),start=[1,1,n],units="m",long_name="Bedrock height", &
-                            standard_name="ice front velocity",dims=dims,ncid=ncid)
-                    
+
         ! Close the netcdf file
         call nc_close(ncid)
     

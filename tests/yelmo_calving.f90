@@ -322,13 +322,13 @@ contains
         reg = dom%reg
     
         ! Assign masks of interest
-    
         mask_tot  = (dom%tpo%now%H_ice .gt. 0.0) 
         mask_grnd = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0)
         mask_flt  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0)
-        mask_grl  = (dom%tpo%now%f_grnd_bmb .gt. 0.0 .and. dom%tpo%now%f_grnd_bmb .lt. 1.0)         
-        mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%mask_bed .eq. 4)
-    
+        !mask_grl  = (dom%tpo%now%f_grnd_bmb .gt. 0.0 .and. dom%tpo%now%f_grnd_bmb .lt. 1.0)         
+        mask_grl  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0 .and. dom%tpo%now%mask_grz .eq. 1.0)         
+        mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0 .and. dom%tpo%now%mask_frnt .eq. 1.0) 
+
         ! Determine number of points at grl and frnt
         npts_tot  = count(mask_tot)
         npts_grnd = count(mask_grnd)
@@ -336,22 +336,13 @@ contains
         npts_grl  = count(mask_grl)      
         npts_frnt = count(mask_frnt) 
     
-        ! Calculate additional variables of interest for ISMIP6
-    
-        ! To do: these variables should be defined locally!
-        ! ISMIP6 boundary: jablasco
-        smb_tot     = sum(dom%bnd%smb,    mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
-        bmb_tot     = sum(dom%tpo%now%bmb,mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
-        bmb_shlf_t  = sum(dom%tpo%now%bmb,mask=mask_flt)*(dx*dy)    ! m^3/yr: flux
-    
+        ! Calculate additional variables of interest for CalvingMIP
         if (npts_grl .gt. 0) then
     
             A_ice_grl = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_grl)*dx*dy*m2_km2 ! [km^2]
             !flux_grl  = sum(dom%tpo%now%H_ice,mask=mask_grl)*(dx*dy)                 ! m^3/yr: flux
-            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice,mask=mask_grl)*dx   ! m^3/yr: flux
-    
-            ! ajr, why only *dx above? 
-    
+            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx   ! m^3/yr: flux
+        
         else
     
             A_ice_grl = 0.0_wp
@@ -364,16 +355,12 @@ contains
         if (npts_frnt .gt. 0) then
     
             A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
-            calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
-            flux_frnt  = calv_flt+sum(dom%tpo%now%fmb*dom%tpo%now%H_ice,mask=mask_frnt)*dx      ! m^3/yr: flux [m-1 yr-1]
-    
-            ! ajr, why only *dx above? 
-    
+            !calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice*rho_ice)*dx          ! m^3/yr: flux [m-1 yr-1]
+            calv_flt   = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_flt)*dx
         else
     
             A_ice_frnt = 0.0_wp
             calv_flt   = 0.0_wp 
-            flux_frnt  = 0.0_wp
     
         end if
     

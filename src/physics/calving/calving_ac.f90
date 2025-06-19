@@ -867,7 +867,7 @@ contains
             r = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
 
             ! Below radius
-            if (r .le. 750e3) then
+            if (r .lt. 750e3) then
                 ! Now treat border points
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
                 rip1 = sqrt((0.5*(nx+1)-ip1)*(0.5*(nx+1)-ip1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
@@ -877,14 +877,14 @@ contains
         
                 ! === Check direction ===
                 ! x-direction
-                if (rip1 .gt. 750e3) then
+                if (rip1 .ge. 750e3) then
                     ! border point right
                     cr_acx(i,j)   = -u_acx(i,j)
                 else
                     cr_acx(i,j)   = 0.0_wp
                 end if
 
-                if (rim1 .gt. 750e3) then
+                if (rim1 .ge. 750e3) then
                     ! border point left
                     cr_acx(im1,j) = -u_acx(im1,j)
                 else
@@ -892,7 +892,7 @@ contains
                 end if
 
                 ! y-direction
-                if (rjp1 .gt. 750e3) then
+                if (rjp1 .ge. 750e3) then
                     ! border point top
                     cr_acy(i,j)   = -v_acy(i,j)
                 else
@@ -900,7 +900,7 @@ contains
                     cr_acy(i,j)   = 0.0_wp
                 end if
 
-                if (rjm1 .gt. 750e3) then
+                if (rjm1 .ge. 750e3) then
                     ! border point bottom
                     cr_acy(i,jm1) = -v_acy(i,jm1)
                 else

@@ -706,8 +706,9 @@ end if
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
             
             case("exp5")
-                call calvmip_exp5(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref,tpo%par%boundaries)
-            
+                !call calvmip_exp5(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref,tpo%par%boundaries)
+                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref,tpo%par%boundaries)
+
             case DEFAULT
     
                 write(*,*) "calc_ytopo:: Error: floating calving method not recognized."

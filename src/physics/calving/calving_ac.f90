@@ -37,6 +37,7 @@ module calving_ac
     public :: calvmip_exp1
     public :: calvmip_exp2
     public :: calvmip_exp5
+    public :: calvmip_exp5_aa
 
 contains 
 
@@ -1014,6 +1015,68 @@ contains
         return
     
     end subroutine calvmip_exp5
+
+    subroutine calvmip_exp5_aa(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+        ! Experiment 5 of CalvMIP
+            
+        implicit none
+            
+        real(wp), intent(OUT) :: cr_acx(:,:), cr_acy(:,:)
+        real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: H_ice_c
+        character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
+                
+        ! local variables
+        integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
+        real(wp) :: uxy_aa,uxy_acx,uxy_acy,u_acy,v_acx
+        real(wp), allocatable :: H_ice_fill(:,:), wv_aa(:,:) 
+            
+        nx = size(u_acx,1)
+        ny = size(u_acx,2) 
+        allocate(H_ice_fill(nx,ny))
+        allocate(wv_aa(nx,ny))
+    
+        ! Initialize    
+        uxy_aa     = 0.0_wp
+        H_ice_fill = H_ice
+        wv_aa      = 0.0_wp
+                
+        ! since we compute on ac-nodes and ice thickness are on aa-nodes
+        ! we need to extrapolate ice thickness to the ocean
+        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,H_ice)
+    
+        do j = 1, ny
+            do i = 1, nx
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                ! velocity on aa-node
+                uxy_aa     = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
+                wv_aa(i,j) = MAX(0.0_wp,1.0_wp+(H_ice_c-H_ice_fill(i,j))/H_ice_c)*uxy_aa                
+            end do
+        end do
+
+        do j = 1, ny
+            do i = 1, nx
+                ! Stagger velocities x/y ac-velocities into y/x ac-nodes
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
+                v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
+                ! x-direction
+                uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
+                cr_acx(i,j) = -(u_acx(i,j)/uxy_acx)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
+                ! y-direction
+                uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
+                cr_acy(i,j) = -(v_acy(i,j)/uxy_acy)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
+            end do
+        end do
+
+        deallocate(H_ice_fill)
+        deallocate(wv_aa)
+    
+        return
+        
+    end subroutine calvmip_exp5_aa
+    
 
     subroutine extrapolate_ocn_laplace_simple(mask_fill, mask_orig,mask)
         ! Routine to extrapolate values using the Laplace equation.

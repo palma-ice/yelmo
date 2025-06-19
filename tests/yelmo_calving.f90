@@ -466,11 +466,21 @@ contains
         real(wp), allocatable :: uy_bar_aa(:,:)
         real(wp), allocatable :: H_clvmip(:,:)
 
+        ! Profile A variables
+        real(wp), allocatable :: lithkA(:,:),sA(:,:),xvelmeanA(:,:),yvelmeanA(:,:),maskA(:,:)
+
         ! Allocate and initialize local arrays
         allocate(mask_clvmip(ylmo%grd%nx,ylmo%grd%ny))
         allocate(H_clvmip(ylmo%grd%nx,ylmo%grd%ny))
         allocate(ux_bar_aa(ylmo%grd%nx,ylmo%grd%ny))
         allocate(uy_bar_aa(ylmo%grd%nx,ylmo%grd%ny)) 
+
+        ! Profile A
+        allocate(lithkA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        allocate(sA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        allocate(xvelmeanA(1,1+INT(0.5*(ylmo%grd%ny+1))))    
+        allocate(yvelmeanA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        allocate(maskA(1,1+INT(0.5*(ylmo%grd%ny+1))))
 
         ! Allocate local representation of dims to be able to add "time" as last dimension
         allocate(dims(3))

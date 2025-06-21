@@ -1,7 +1,7 @@
 &ctl
 
     exp         = "exp1"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx          = 5.0                  ! [km] Grid resolution
+    dx          = 25.0                  ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
@@ -72,7 +72,7 @@
     ! bmb_gl_method = pmpt
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
-    gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
+    gz_Hg1              = 0.0               ! Grounding zone, limit of penetration of bmb_shlf 
     
     ! === discharge mass balance ===
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on

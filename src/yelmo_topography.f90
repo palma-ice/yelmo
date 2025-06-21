@@ -748,12 +748,19 @@ end if
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
+
+
         ! === Calving ===
         ! Applu calving as a melt rate equal to ice thickness where lsf is positive
         tpo%now%cmb = 0.0_wp
         do j=1,ny
         do i=1,nx
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            ! Compute the mean calving rate in every aa node
+            tpo%now%cmb_flt(i,j) = ((0.5*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
+                                    (0.5*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
+
+            ! Redefine LSF    
             if(tpo%now%lsf(i,j) .gt. 0.0_wp) then
                 ! Calve ice outside LSF mask (cmb = H_ice)
                 tpo%now%cmb(i,j) =  -(tpo%now%H_ice(i,j) / dt_kill)
@@ -810,7 +817,7 @@ end if
             end if
         end if
 
-        if (.TRUE.) then
+        if (.FALSE.) then
             ! plot the calving front velocity.
             do j = 1, ny
             do i = 1, nx

@@ -377,7 +377,7 @@ contains
     
             A_ice_grl = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_grl)*dx*dy*m2_km2 ! [km^2]
             !flux_grl  = sum(dom%tpo%now%H_ice,mask=mask_grl)*(dx*dy)                 ! m^3/yr: flux
-            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx   ! m^3/yr: flux
+            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx   ! kg/yr: flux
         
         else
     
@@ -392,7 +392,7 @@ contains
     
             A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
             !calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice*rho_ice)*dx          ! m^3/yr: flux [m-1 yr-1]
-            calv_flt   = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_flt)*dx
+            calv_flt   = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_flt)*dx !kg/yr
         else
     
             A_ice_frnt = 0.0_wp
@@ -421,11 +421,11 @@ contains
                 standard_name="land_ice_mass",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
                 standard_name="land_ice_mass_not_displacing_sea_water",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlicalvf",calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
+        call nc_write(filename,"tendlicalvf",calv_flt,units="kg a-1",long_name="Total calving flux", &
                 standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendligroundf",flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
+        call nc_write(filename,"tendligroundf",flux_grl,units="kg a-1",long_name="Total grounding line flux", &
                 standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
-        
+                
         ! Total area by sectors
         iareatotalNW = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_NW)*dx*dy
         iareatotalNE = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_NE)*dx*dy
@@ -529,8 +529,10 @@ contains
                     standard_name="land_ice_thickness", dims=dims,ncid=ncid)
         call nc_write(filename,"mask",mask_clvmip,start=[1,1,n],units="",long_name="Ice mask", &
                     standard_name=" ",dims=dims,ncid=ncid)
-        call nc_write(filename,"topg",ylmo%bnd%z_bed(1:ylmo%grd%nx,1:ylmo%grd%ny),start=[1,1,n],units="m",long_name="Bedrock height", &
+        call nc_write(filename,"topg",ylmo%bnd%z_bed,start=[1,1,n],units="m",long_name="Bedrock height", &
                     standard_name="bedrock_altimetry",dims=dims,ncid=ncid)
+        call nc_write(filename,"calverate",ylmo%tpo%now%cmb_flt,start=[1,1,n],units="m a-1",long_name="Calving rate", &
+                    standard_name="calving_rate", dims=dims,ncid=ncid)            
 
         ! Close the netcdf file
         call nc_close(ncid)

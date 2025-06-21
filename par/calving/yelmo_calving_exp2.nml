@@ -1,7 +1,7 @@
 &ctl
 
     exp         = "exp1"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx           = 5.0                 ! [km] Grid resolution
+    dx           = 25.0                 ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
@@ -27,7 +27,8 @@
     nml_masks       = "yelmo_masks"
     nml_init_topo   = "yelmo_init_topo"
     nml_data        = "yelmo_data"
-    restart         = "/home/a/a271124/Model/yelmo-lsf/output/calvmip_dx5/exp1/yelmo_restart.nc"
+    !restart         = "/home/a/a271124/Model/yelmo-lsf/output/calvmip_dx5/exp1/yelmo_restart.nc"
+    restart         = "/Users/jablas001/Models/yelmo-ucm/yelmo_main_lsf/output/test_output/exp1_test/yelmo_restart.nc"
     restart_z_bed   = True             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True             ! Take H_ice from restart file
     restart_relax   = 0.0              ! [yrs] Years to relax from restart=>input topography
@@ -71,7 +72,7 @@
     ! bmb_gl_method = pmpt
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
-    gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
+    gz_Hg1              = 0.0             ! Grounding zone, limit of penetration of bmb_shlf 
     
     ! === discharge mass balance ===
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on

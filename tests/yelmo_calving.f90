@@ -337,7 +337,7 @@ contains
         mask_tot  = (dom%tpo%now%H_ice .gt. 0.0) 
         mask_grnd = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0)
         mask_flt  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0)
-        mask_grl  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0 .and. dom%tpo%now%mask_grz .eq. 1.0)         
+        mask_grl  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0 .and. dom%tpo%now%mask_grz .eq. 0.0)         
         mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0 .and. dom%tpo%now%mask_frnt .eq. 1.0) 
         mask_NW   = .FALSE.
         mask_NE   = .FALSE.
@@ -377,7 +377,7 @@ contains
     
             A_ice_grl = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_grl)*dx*dy*m2_km2 ! [km^2]
             !flux_grl  = sum(dom%tpo%now%H_ice,mask=mask_grl)*(dx*dy)                 ! m^3/yr: flux
-            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx   ! kg/yr: flux
+            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_grl)*dx   ! kg/yr: flux
         
         else
     
@@ -392,7 +392,7 @@ contains
     
             A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
             !calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice*rho_ice)*dx          ! m^3/yr: flux [m-1 yr-1]
-            calv_flt   = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_flt)*dx !kg/yr
+            calv_flt   = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice*rho_ice,mask=mask_frnt)*dx !kg/yr
         else
     
             A_ice_frnt = 0.0_wp
@@ -465,22 +465,24 @@ contains
         real(wp), allocatable :: ux_bar_aa(:,:)
         real(wp), allocatable :: uy_bar_aa(:,:)
         real(wp), allocatable :: H_clvmip(:,:)
+        real(wp), allocatable :: calverate(:,:)
 
         ! Profile A variables
-        real(wp), allocatable :: lithkA(:,:),sA(:,:),xvelmeanA(:,:),yvelmeanA(:,:),maskA(:,:)
+        !real(wp), allocatable :: lithkA(:,:),sA(:,:),xvelmeanA(:,:),yvelmeanA(:,:),maskA(:,:)
 
         ! Allocate and initialize local arrays
         allocate(mask_clvmip(ylmo%grd%nx,ylmo%grd%ny))
         allocate(H_clvmip(ylmo%grd%nx,ylmo%grd%ny))
         allocate(ux_bar_aa(ylmo%grd%nx,ylmo%grd%ny))
         allocate(uy_bar_aa(ylmo%grd%nx,ylmo%grd%ny)) 
+        allocate(calverate(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Profile A
-        allocate(lithkA(1,1+INT(0.5*(ylmo%grd%ny+1))))
-        allocate(sA(1,1+INT(0.5*(ylmo%grd%ny+1))))
-        allocate(xvelmeanA(1,1+INT(0.5*(ylmo%grd%ny+1))))    
-        allocate(yvelmeanA(1,1+INT(0.5*(ylmo%grd%ny+1))))
-        allocate(maskA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        !allocate(lithkA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        !allocate(sA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        !allocate(xvelmeanA(1,1+INT(0.5*(ylmo%grd%ny+1))))    
+        !allocate(yvelmeanA(1,1+INT(0.5*(ylmo%grd%ny+1))))
+        !allocate(maskA(1,1+INT(0.5*(ylmo%grd%ny+1))))
 
         ! Allocate local representation of dims to be able to add "time" as last dimension
         allocate(dims(3))
@@ -493,6 +495,7 @@ contains
         ux_bar_aa   = 0.0_wp
         uy_bar_aa   = 0.0_wp
         H_clvmip    = ylmo%tpo%now%H_ice
+        calverate   = ylmo%tpo%now%cmb_flt
     
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -519,6 +522,7 @@ contains
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) ux_bar_aa = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_clvmip  = mv
+        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) calverate = mv
 
         ! Write CalvingMIP variables variables
         call nc_write(filename,"xvelmean",ux_bar_aa,start=[1,1,n],units="m a-1",long_name="X velocity", &
@@ -531,9 +535,9 @@ contains
                     standard_name=" ",dims=dims,ncid=ncid)
         call nc_write(filename,"topg",ylmo%bnd%z_bed,start=[1,1,n],units="m",long_name="Bedrock height", &
                     standard_name="bedrock_altimetry",dims=dims,ncid=ncid)
-        call nc_write(filename,"calverate",ylmo%tpo%now%cmb_flt,start=[1,1,n],units="m a-1",long_name="Calving rate", &
+        call nc_write(filename,"calverate",calverate,start=[1,1,n],units="m a-1",long_name="Calving rate", &
                     standard_name="calving_rate", dims=dims,ncid=ncid)            
-
+                    
         ! Close the netcdf file
         call nc_close(ncid)
     

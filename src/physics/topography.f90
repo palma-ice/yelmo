@@ -21,6 +21,7 @@ module topography
     public :: gen_mask_bed
 
     public :: calc_ice_fraction
+    public :: calc_ice_fraction_new
     public :: calc_ice_front
 
     public :: calc_z_srf

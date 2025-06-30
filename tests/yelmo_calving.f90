@@ -5,6 +5,7 @@ program yelmo_calving
     use yelmo 
     use lsf_module
     use yelmo_tools, only : get_region_indices
+    use topography, only: calc_ice_fraction_new
 
     use calving_benchmarks
     
@@ -301,7 +302,9 @@ contains
         logical, allocatable :: mask_NE(:,:)
         logical, allocatable :: mask_SW(:,:)
         logical, allocatable :: mask_SE(:,:) 
-            
+
+        ! profile variables (1D)
+
         dx = dom%grd%dx 
         dy = dom%grd%dy 
     
@@ -315,7 +318,7 @@ contains
         allocate(mask_NE(dom%grd%nx,dom%grd%ny))
         allocate(mask_SW(dom%grd%nx,dom%grd%ny))
         allocate(mask_SE(dom%grd%nx,dom%grd%ny))
-    
+
         ! === Data conversion factors ========================================
     
         rho_ice             = 917.0             ! ice density kg/m3
@@ -343,7 +346,7 @@ contains
         mask_NE   = .FALSE.
         mask_SW   = .FALSE.
         mask_SE   = .FALSE.
-
+            
         do i=1,dom%grd%nx
         do j=1,dom%grd%ny
             ! NW mask
@@ -399,7 +402,6 @@ contains
             calv_flt   = 0.0_wp 
     
         end if
-    
     
         ! 2. Begin writing step 
     
@@ -465,7 +467,9 @@ contains
         real(wp), allocatable :: ux_bar_aa(:,:)
         real(wp), allocatable :: uy_bar_aa(:,:)
         real(wp), allocatable :: H_clvmip(:,:)
+        real(wp), allocatable :: H_frnt(:,:)
         real(wp), allocatable :: calverate(:,:)
+        real(wp), allocatable :: fice_subgrid(:,:)
 
         ! Profile A variables
         !real(wp), allocatable :: lithkA(:,:),sA(:,:),xvelmeanA(:,:),yvelmeanA(:,:),maskA(:,:)
@@ -476,6 +480,7 @@ contains
         allocate(ux_bar_aa(ylmo%grd%nx,ylmo%grd%ny))
         allocate(uy_bar_aa(ylmo%grd%nx,ylmo%grd%ny)) 
         allocate(calverate(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(fice_subgrid(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Profile A
         !allocate(lithkA(1,1+INT(0.5*(ylmo%grd%ny+1))))
@@ -495,6 +500,7 @@ contains
         ux_bar_aa   = 0.0_wp
         uy_bar_aa   = 0.0_wp
         H_clvmip    = ylmo%tpo%now%H_ice
+        H_frnt    = ylmo%tpo%now%H_ice
         calverate   = ylmo%tpo%now%cmb_flt
     
         ! Open the file for writing
@@ -511,17 +517,23 @@ contains
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp) mask_clvmip = 2
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp) mask_clvmip = 1
             
+        ! compute subgrid floating margin
+        call calc_ice_fraction_new(fice_subgrid,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%bnd%z_sl,ylmo%bnd%c%rho_ice, &
+            ylmo%bnd%c%rho_sw,ylmo%tpo%par%boundaries,.TRUE.)
+
         ! convert velocities into aa-nodes    
         do i=2, ylmo%grd%nx-1
         do j=2, ylmo%grd%ny-1
             ux_bar_aa(i,j) = 0.5*(ylmo%dyn%now%ux_bar(i,j)+ylmo%dyn%now%ux_bar(i-1,j))
             uy_bar_aa(i,j) = 0.5*(ylmo%dyn%now%uy_bar(i,j)+ylmo%dyn%now%uy_bar(i,j-1))
+            H_frnt(i,j)    = ylmo%tpo%now%H_ice(i,j)/(MAX(fice_subgrid(i,j),1e-8))
         end do
         end do
 
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) ux_bar_aa = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_clvmip  = mv
+        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_frnt    = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) calverate = mv
 
         ! Write CalvingMIP variables variables
@@ -537,7 +549,19 @@ contains
                     standard_name="bedrock_altimetry",dims=dims,ncid=ncid)
         call nc_write(filename,"calverate",calverate,start=[1,1,n],units="m a-1",long_name="Calving rate", &
                     standard_name="calving_rate", dims=dims,ncid=ncid)            
-                    
+        if (.TRUE.) then
+            call nc_write(filename,"lsf",ylmo%tpo%now%lsf,start=[1,1,n],units=" ",long_name="LSF mask", &
+                    standard_name="level_set_function", dims=dims,ncid=ncid)
+            call nc_write(filename,"H_frnt",H_frnt,start=[1,1,n],units=" ",long_name="Ice front thickness", &
+                    standard_name="Ice_front_thickness", dims=dims,ncid=ncid)
+            call nc_write(filename,"f_ice",fice_subgrid,start=[1,1,n],units=" ",long_name="Ice fraction", &
+                    standard_name="Ice_fraction", dims=dims,ncid=ncid)
+            call nc_write(filename,"xvelmean_ac",ylmo%dyn%now%ux_bar,start=[1,1,n],units="m a-1",long_name="X velocity", &
+                    standard_name="land_ice_vertical_mean_x_velocity_ac", dims=dims,ncid=ncid)
+            call nc_write(filename,"yvelmean_ac",ylmo%dyn%now%uy_bar,start=[1,1,n],units="m a-1",long_name="Y velocity", &
+                    standard_name="land_ice_vertical_mean_y_velocity_ac", dims=dims,ncid=ncid)
+        end if
+
         ! Close the netcdf file
         call nc_close(ncid)
     

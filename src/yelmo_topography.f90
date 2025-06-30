@@ -234,7 +234,7 @@ end if
                     ! Calculate and apply calving
                     if (tpo%par%use_lsf) then
                         ! Level-set function as calving
-                        call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time)
+                        call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,H_prev,time)
                     else
                         ! Mass balance calving
                         call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
@@ -624,7 +624,7 @@ end if
     end subroutine calc_ytopo_calving
 
     ! jablasco: lsf routine
-    subroutine calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,time_now)
+    subroutine calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,H_prev,time_now)
 
         implicit none
     
@@ -634,6 +634,7 @@ end if
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd
         real(wp),           intent(IN)    :: dt
+        real(wp),           intent(IN)    :: H_prev(:,:)
         real(wp), optional, intent(IN)    :: time_now
     
         ! Local variables
@@ -743,15 +744,13 @@ end if
     
 
         ! === LSF advection ===
-        ! store lsf mask. Necessary to not cimpute it two times.
+        ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
-
-
         ! === Calving ===
-        ! Applu calving as a melt rate equal to ice thickness where lsf is positive
+        ! Apply calving as a melt rate equal to ice thickness where lsf is positive
         tpo%now%cmb = 0.0_wp
         do j=1,ny
         do i=1,nx
@@ -764,6 +763,7 @@ end if
             if(tpo%now%lsf(i,j) .gt. 0.0_wp) then
                 ! Calve ice outside LSF mask (cmb = H_ice)
                 tpo%now%cmb(i,j) =  -(tpo%now%H_ice(i,j) / dt_kill)
+
                 ! reset LSF border
                 if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .and. &
                     (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
@@ -774,13 +774,6 @@ end if
                 if ((tpo%now%lsf(im1,j) .le. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .le. 0.0_wp) .and. &
                     (tpo%now%lsf(i,jm1) .le. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .le. 0.0_wp)) then
                     tpo%now%lsf(i,j) = -1.0_wp
-                end if
-
-                ! If lsf advances faster than the ice, set ice to H_min_flt.
-                ! This should not be the case (except CalvMIP exp2)
-                if ((tpo%now%H_ice(i,j) .lt. tpo%par%H_min_flt) .and. &
-                            (bnd%z_bed(i,j) .lt. 0.0_wp)) then
-                    tpo%now%H_ice(i,j) = tpo%par%H_min_flt + 0.1_wp
                 end if
             end if
         end do
@@ -815,26 +808,6 @@ end if
                 where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
                 where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
             end if
-        end if
-
-        if (.FALSE.) then
-            ! plot the calving front velocity.
-            do j = 1, ny
-            do i = 1, nx
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
-                if (tpo%now%lsf(i,j) .gt. 0.0_wp) then
-                    tpo%now%cmb_flt(i,j) = 0.0_wp
-                else
-                    if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .or. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .or. &
-                        (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .or. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
-                        tpo%now%cmb_flt(i,j) = ((0.5_wp*(dyn%now%ux_bar(im1,j)+dyn%now%ux_bar(i,j)))**2 + &
-                                                (0.5_wp*(dyn%now%uy_bar(i,jm1)+dyn%now%uy_bar(i,j)))**2)**0.5
-                    else
-                        tpo%now%cmb_flt(i,j) = 0.0_wp
-                    end if
-                end if
-            end do
-            end do
         end if
 
         return

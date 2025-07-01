@@ -1126,6 +1126,7 @@ end if
         call nml_read(filename,group_ytopo,"topo_rel",          par%topo_rel,         init=init_pars)
         call nml_read(filename,group_ytopo,"topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
         call nml_read(filename,group_ytopo,"topo_rel_field",    par%topo_rel_field,   init=init_pars)
+        call nml_read(filename,group_ytopo,"grounded_melt",     par%grounded_melt,    init=init_pars)
         ! Grounding line
         call nml_read(filename,group_ytopo,"bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
         call nml_read(filename,group_ytopo,"gl_sep",            par%gl_sep,           init=init_pars)

@@ -110,7 +110,8 @@
     tau_ice             = 250.0e3           ! [Pa] Ice strength failure
 
     ! === threshold method ===
-    Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_flt          = 200.0             ! [m] Calving limit in ice thickness - floating (thinner ice calves)
+    Hc_ref_grnd         = 200.0             ! [m] Calving limit in ice thickness - marine-terminating (thinner ice calves)
     Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean

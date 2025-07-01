@@ -471,7 +471,7 @@ end if
 
         ! == Determine thickness threshold for calving spatially ==
 
-        call define_calving_thickness_threshold(tpo%now%H_calv,tpo%now%z_bed_filt,tpo%par%Hc_ref, &
+        call define_calving_thickness_threshold(tpo%now%H_calv,tpo%now%z_bed_filt,tpo%par%Hc_ref_flt, &
                                             tpo%par%Hc_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)
 
         ! Define factor for calving stress spatially
@@ -690,6 +690,9 @@ end if
                 tpo%now%cmb_flt_x = -1*u_acx_fill
                 tpo%now%cmb_flt_y = -1*v_acy_fill
     
+            case("threshold")
+                call calc_calving_threshold_lsf(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%par%boundaries)
+        
             case("vm16")
                 ! TO DO
                 call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2, &
@@ -700,7 +703,7 @@ end if
     
             ! TO DO: Add new laws
     
-            ! CalvMIP laws
+            ! === CalvMIP laws ===
             case("exp1","exp3")
                 call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
     
@@ -708,8 +711,7 @@ end if
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
             
             case("exp5")
-                !call calvmip_exp5(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref,tpo%par%boundaries)
-                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref,tpo%par%boundaries)
+                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%par%boundaries)
 
             case DEFAULT
     
@@ -724,6 +726,11 @@ end if
 
             case("zero","none")
                 ! Do nothing. No calving.
+
+            case("threshold")
+                ! Ice thickness threshold.
+                !call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%par%boundaries)
+        
 
             ! TO DO
             ! Add new laws
@@ -1166,9 +1173,10 @@ end if
         call nml_read(filename,group_ycalv,"kt_deep",           par%kt_deep,            init=init_pars)
         call nml_read(filename,group_ycalv,"tau_ice",           par%tau_ice,            init=init_pars)
         ! Threshold method
-        call nml_read(filename,group_ycalv,"Hc_ref",            par%Hc_ref,             init=init_pars)
-        call nml_read(filename,group_ycalv,"Hc_ref_thin",       par%Hc_ref_thin,        init=init_pars)
-        call nml_read(filename,group_ycalv,"Hc_deep",           par%Hc_deep,            init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref_flt",        par%Hc_ref_flt,       init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref_grnd",       par%Hc_ref_grnd,      init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref_thin",       par%Hc_ref_thin,      init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_deep",           par%Hc_deep,          init=init_pars)
         call nml_read(filename,group_ycalv,"zb_deep_0",         par%zb_deep_0,        init=init_pars)
         call nml_read(filename,group_ycalv,"zb_deep_1",         par%zb_deep_1,        init=init_pars)
         call nml_read(filename,group_ycalv,"zb_sigma",          par%zb_sigma,         init=init_pars)

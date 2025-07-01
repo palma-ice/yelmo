@@ -126,7 +126,8 @@ module yelmo_defs
         real(wp)           :: w2  
         real(wp)           :: kt_ref
         real(wp)           :: kt_deep
-        real(wp)           :: Hc_ref
+        real(wp)           :: Hc_ref_flt
+        real(wp)           :: Hc_ref_grnd
         real(wp)           :: Hc_deep
         real(wp)           :: zb_deep_0
         real(wp)           :: zb_deep_1

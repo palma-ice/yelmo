@@ -8,35 +8,20 @@ module calving_ac
 
     implicit none 
     private 
-
-    ! TO DO
-    !public :: apply_calving_rate_thin
-    !public :: calc_calving_rate_tongues
-    !public :: calc_calving_rate_kill 
     
-    ! Calving related stress/strain routines 
+    ! === Calving related stress/strain routines === 
     !public :: calc_eps_eff
-    public :: calc_tau_eff_ac
+    !public :: calc_tau_eff_ac
 
-    ! TO DO
-    ! Floating calving routines 
-    !public :: define_calving_thickness_threshold
-    !public :: calc_calving_rate_threshold
-
-    !public :: define_calving_stress_factor
-    !public :: calc_calving_rate_vonmises_v23
-
-    !public :: calc_calving_rate_eigen
+    ! === Floating calving routines === 
+    public :: calc_calving_threshold_lsf
     
-    ! Grounded calving routines 
-    ! TO DO
-    !public :: calc_calving_ground_rate_stress_b12
-    !public :: calc_calving_ground_rate_stdev
+    ! === Grounded calving routines === 
 
-    !=== CalvMIP calving rates ===
+    ! === CalvMIP calving rates ===
     public :: calvmip_exp1
     public :: calvmip_exp2
-    public :: calvmip_exp5
+    public :: calvmip_exp5_ac
     public :: calvmip_exp5_aa
 
 contains 
@@ -206,42 +191,67 @@ contains
     !
     ! ===================================================================
     
-    subroutine calc_calving_rate_threshold(mb_calv,H_ice,f_ice,H_calv,tau)
-        ! Calculate the calving rate [m/a] based on a simple threshold rule
-        ! H_ice < H_calv
-
-        implicit none 
-
-        real(wp), intent(OUT) :: mb_calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)                 ! [m] Ice thickness 
-        real(wp), intent(IN)  :: f_ice(:,:)                 ! [--] Ice area fraction
-        real(wp), intent(IN)  :: H_calv(:,:)                ! [m] Calving thickness threshold
-        real(wp), intent(IN)  :: tau                        ! [a] Calving timescale, ~ 1yr
-
-        ! Local variables 
-        integer  :: i, j
-        real(wp) :: H_eff
-
-        ! Initially set calving rate to zero 
-        mb_calv = 0.0 
-
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,H_eff)
-        do j=1,size(H_ice,2)
-        do i=1,size(H_ice,1)
+    subroutine calc_calving_threshold_lsf(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+        ! Threshold calving rate flux based on CalvingMIP experiment 5.
+        ! Valid for floating and grounded ice.
+            
+        implicit none
+            
+        real(wp), intent(OUT) :: cr_acx(:,:), cr_acy(:,:)
+        real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: H_ice_c
+        character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
                 
-            ! Calculate current ice thickness (H_eff = H_ice/f_ice)
-            call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
-
-            ! Calving rate cannot be positive
-            mb_calv(i,j) = - max(( f_ice(i,j) * ( (H_calv(i,j)-H_eff) / tau ) ),0.0_wp)
-
+        ! local variables
+        integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
+        real(wp) :: uxy_aa,uxy_acx,uxy_acy,u_acy,v_acx
+        real(wp), allocatable :: H_ice_fill(:,:), wv_aa(:,:) 
+            
+        nx = size(u_acx,1)
+        ny = size(u_acx,2) 
+        allocate(H_ice_fill(nx,ny))
+        allocate(wv_aa(nx,ny))
+    
+        ! Initialize    
+        uxy_aa     = 0.0_wp
+        H_ice_fill = H_ice
+        wv_aa      = 0.0_wp
+                
+        ! since we compute on ac-nodes and ice thickness are on aa-nodes
+        ! we need to extrapolate ice thickness to the ocean
+        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,H_ice)
+    
+        do j = 1, ny
+            do i = 1, nx
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                ! velocity on aa-node
+                uxy_aa     = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
+                wv_aa(i,j) = MAX(0.0_wp,1.0_wp+(H_ice_c-H_ice_fill(i,j))/H_ice_c)*uxy_aa                
+            end do
         end do
+
+        do j = 1, ny
+            do i = 1, nx
+                ! Stagger velocities x/y ac-velocities into y/x ac-nodes
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
+                v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
+                ! x-direction
+                uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
+                cr_acx(i,j) = -(u_acx(i,j)/uxy_acx)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
+                ! y-direction
+                uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
+                cr_acy(i,j) = -(v_acy(i,j)/uxy_acy)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
+            end do
         end do
-        !!$omp end parallel do
 
-        return 
-
-    end subroutine calc_calving_rate_threshold
+        deallocate(H_ice_fill)
+        deallocate(wv_aa)
+    
+        return
+        
+    end subroutine calc_calving_threshold_lsf
 
     subroutine calc_calving_rate_vonmises_l19(mb_calv,H_ice,f_ice,f_grnd,tau_eff,dx,kt,boundaries)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
@@ -409,423 +419,13 @@ contains
 
     end subroutine calc_calving_rate_eigen
      
-    subroutine calc_calving_rate_kill(mb_calv,H_ice,mask,tau,dt)
-        ! Kill all ice in a given mask using a characteristic timescale tau
-    
-        implicit none 
-    
-        real(wp), intent(OUT) :: mb_calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        logical,  intent(IN)  :: mask(:,:) 
-        real(wp), intent(IN)  :: tau 
-        real(wp), intent(IN)  :: dt 
-    
-        ! Local variables
-        real(wp) :: dt_kill 
-    
-        ! Make sure dt is not zero
-        dt_kill = dt 
-        if (dt_kill .eq. 0.0) dt_kill = 1.0_wp 
-            
-        ! Reset calving field to zero
-        mb_calv = 0.0
-    
-        ! Kill all ice immediately 
-        ! Ensure all ice calves by imposing a higher rate than ice exists
-    
-        where (mask) mb_calv = - (H_ice / dt_kill * 1.1)
-    
-        ! ajr: in principle, we could make use of a timescale as below,
-        ! however, for most 'kill' applications, this added complexity is
-        ! not helpful (ie, shelves might not be fully killed when they are
-        ! expected to be). This needs further development, so far now,
-        ! the lines above are active where all ice is calved immediately.
-            
-        ! if (tau .eq. 0.0_wp) then 
-        !     ! Kill all ice immediately 
-    
-        !     where (mask) calv = H_ice / dt
-    
-        ! else 
-        !     ! Kill using characteristic timescale 
-        !     where (mask) calv = H_ice / tau 
-    
-        ! end if 
-    
-        return 
-    
-    end subroutine calc_calving_rate_kill
-
     ! ===================================================================
     !
     ! Calving - grounded ice 
     !
     ! ===================================================================
 
-    subroutine calc_calving_ground_rate_stress_b12(mb_calv,H_ice,f_ice,f_grnd,z_bed,H_ocn,tau,rho_ice,rho_sw,g,boundaries)
-        ! Remove marginal ice that exceeds a stress threshold following
-        ! Bassis and Walker (2012), Eq. 2.12 
-
-        implicit none 
-
-        real(wp), intent(OUT) :: mb_calv(:,:)           ! [m/yr] Grounded calving mass balance
-        real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness 
-        real(wp), intent(IN)  :: f_ice(:,:)             ! [--] Ice area fraction 
-        real(wp), intent(IN)  :: f_grnd(:,:)            ! [-] Grounded fraction
-        real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation 
-        real(wp), intent(IN)  :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
-        real(wp), intent(IN)  :: tau                    ! [yr] Calving timescale 
-        real(wp), intent(IN)  :: rho_ice 
-        real(wp), intent(IN)  :: rho_sw
-        real(wp), intent(IN)  :: g
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer  :: i, j, nx, ny
-        integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: tau_c, H_eff, H_max, H_ocn_now 
-        logical  :: is_grnd_margin  
-        real(wp) :: rho_ice_g, rho_sw_ice, rho_ice_sw  
-
-        real(wp), parameter :: C0    = 1e6                ! [Pa] Depth-averaged shear stress in ice 
-        real(wp), parameter :: alpha = 0.0                ! [--] Friction coefficient for Bassis and Walker (2012), Eq. 2.13
-        real(wp), parameter :: r     = 0.0                ! [--] Crevasse fraction 
-        
-        logical  :: mask_neighb(4) 
-
-        rho_ice_g  = rho_ice * g 
-        rho_sw_ice = rho_sw / rho_ice 
-        rho_ice_sw = rho_ice / rho_sw 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        ! Intialize calving rate to zero 
-        mb_calv = 0.0 
-
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,mask_neighb,is_grnd_margin,H_eff,H_ocn_now,tau_c,H_max)
-        do j = 1, ny
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            
-            ! Check if neighbors are ice free and not at higher bedrock elevation
-            mask_neighb = ([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .and. &
-                          ([z_bed(im1,j),z_bed(ip1,j),z_bed(i,jm1),z_bed(i,jp1)] .le. z_bed(i,j))
-
-            ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
-            is_grnd_margin = (f_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
-                                                  .and. count(mask_neighb) .gt. 0)
-
-            if (is_grnd_margin) then 
-                ! Margin point with potential for grounded stress calving
-
-                ! Get effective ice thickness 
-                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
-
-                ! Calculate depth of seawater (limited by ice thickness and flotation criterion)
-                if (H_ocn(i,j) .gt. 0.0) then 
-                    H_ocn_now = min(rho_ice_sw*H_eff,H_ocn(i,j))
-                else 
-                    ! Bedrock is above sea level, ocean depth is zero
-                    H_ocn_now = 0.0 
-                end if 
-
-                ! Get depth-averaged shear-stress in ice, Bassis and Walker (2012), Eq. 2.13 vertically averaged
-                ! alpha = 0.65: model S1 validated for cold ice 
-                ! alpha = 0.4 : model S2 for warmer ice 
-                ! alpha = 0.0 : model S3 for purely plastic yielding (default)
-                tau_c = C0 + 0.5*alpha*rho_ice_g*H_eff
-
-                ! Get critical ice thickness to cause stress failure
-                H_max = (1.0-r)*tau_c/rho_ice_g + sqrt(((1.0-r)*tau_c/rho_ice_g)**2 + rho_sw_ice*H_ocn_now**2)
-
-                if (H_eff .gt. H_max) then 
-                    ! Critical stress exceeded, determine mass balance calving rate 
-
-                    mb_calv(i,j) = - ( f_ice(i,j) * max(H_eff-H_max,0.0) / tau )
-
-                end if 
-
-            end if
-
-        end do 
-        end do
-        !!$omp end parallel do
-
-        return 
-
-    end subroutine calc_calving_ground_rate_stress_b12
-
-    subroutine calc_calving_ground_rate_stdev(mb_calv,H_ice,f_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,tau,boundaries)
-        ! Parameterize grounded ice-margin calving as a function of 
-        ! standard deviation of bedrock at each grid point.
-        ! Assumes that higher variability in subgrid implies cliffs
-        ! that are not represented at low resolution. 
     
-        implicit none 
-    
-        real(wp), intent(OUT) :: mb_calv(:,:)             ! [m/yr] Calculated calving rate 
-        real(wp), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
-        real(wp), intent(IN)  :: f_ice(:,:)               ! [-] Ice area fraction
-        real(wp), intent(IN)  :: f_grnd(:,:)              ! [-] Grounded fraction
-        real(wp), intent(IN)  :: z_bed_sd(:,:)            ! [m] Standard deviation of bedrock topography
-        real(wp), intent(IN)  :: sd_min                   ! [m] stdev(z_bed) at/below which calv=0
-        real(wp), intent(IN)  :: sd_max                   ! [m] stdev(z_bed) at/above which calv=calv_max 
-        real(wp), intent(IN)  :: calv_max                 ! [m/yr] Maximum allowed calving rate
-        real(wp), intent(IN)  :: tau                      ! [yr] Calving timescale       
-        character(len=*), intent(IN) :: boundaries 
-    
-        ! Local variables
-        integer  :: i, j, nx, ny  
-        integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: f_scale 
-        real(wp) :: H_eff
-        logical  :: is_grnd_margin 
-    
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-    
-        ! Intialize calving rate to zero 
-        mb_calv = 0.0 
-    
-        if (calv_max .gt. 0.0) then 
-            ! Determine grounded calving rate 
-    
-            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_grnd_margin,f_scale,H_eff)
-            do j = 1, ny
-            do i = 1, nx 
-    
-                f_scale = (z_bed_sd(i,j) - sd_min)/(sd_max-sd_min)
-                if (f_scale .lt. 0.0) f_scale = 0.0 
-                if (f_scale .gt. 1.0) f_scale = 1.0 
-    
-                ! Get effective ice thickness 
-                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
-    
-                ! Calculate mass balance calving rate from linear function, 
-                ! limited to available (effective) ice thickness 
-                mb_calv(i,j) = -( min(f_scale*calv_max, H_eff/tau) )
-                        
-            end do 
-            end do
-            !!$omp end parallel do
-    
-        end if 
-    
-        return 
-    
-    end subroutine calc_calving_ground_rate_stdev
-
-    ! ===================================================================
-    !
-    ! Additional routines 
-    !
-    ! ===================================================================
-
-
-
-    ! Additional routines
-        subroutine apply_calving_rate_thin(mb_calv,H_ice,f_ice,f_grnd,calv_thin,Hc_ref_thin,boundaries)
-            ! Adjust calving rate based on ice thickness 
-            ! to ensure that thin ice (calv_thin*1yr=Xm) is removed
-            ! following Pattyn (2017), Eq. 24. Typical parameters 
-            ! calv_thin = 30 m/yr 
-            ! H_ref     = 200 m 
-    
-            implicit none 
-    
-            real(wp), intent(INOUT) :: mb_calv(:,:) 
-            real(wp), intent(IN)    :: H_ice(:,:) 
-            real(wp), intent(IN)    :: f_ice(:,:) 
-            real(wp), intent(IN)    :: f_grnd(:,:) 
-            real(wp), intent(IN)    :: calv_thin
-            real(wp), intent(IN)    :: Hc_ref_thin      ! [m] Thickness below which to scale calving rate
-            character(len=*), intent(IN) :: boundaries 
-    
-            ! Local variables
-            integer  :: i, j, nx, ny, n_mrgn, n_grnd 
-            integer  :: im1, ip1, jm1, jp1
-            real(wp) :: H_eff 
-            real(wp) :: wt 
-            
-            nx = size(mb_calv,1)
-            ny = size(mb_calv,2) 
-    
-            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,wt)
-            do j = 1, ny 
-            do i = 1, nx 
-    
-                ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-    
-                ! Count number of grounded ice-covered neighbors
-                n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
-                               [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)].gt.0.0)
-    
-                ! Determine if point is at the floating margin with no grounded neighbors
-                if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. n_grnd .eq. 0) then 
-                    ! Floating point, diagnose number of ice-free neighbors 
-    
-                    n_mrgn = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0 )
-    
-                else 
-    
-                    n_mrgn = 0 
-    
-                end if 
-    
-                if (n_mrgn .gt. 0) then 
-                    ! Floating ice margin point
-    
-                    ! Calculate current ice thickness (H_eff = H_ice/f_ice)
-                    call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
-    
-                    ! Get weighting factor based on effective ice thickness 
-                    wt = min(1.0_wp,H_eff/Hc_ref_thin)
-    
-                    ! Calculate adjusted calving rate, weighted
-                    ! between minimum rate and actual value 
-                    ! -calv_thin since mb_calv has calving as negative
-                    mb_calv(i,j) = -calv_thin*(1.0_wp-wt) + mb_calv(i,j)*wt 
-    
-                end if 
-    
-            end do 
-            end do  
-            !!$omp end parallel do
-    
-            return 
-    
-        end subroutine apply_calving_rate_thin
-    
-        subroutine calc_calving_rate_tongues(mb_calv,H_ice,f_ice,f_grnd,tau,boundaries)
-            ! Increase calving for floating margin points with 3+ calving
-            ! fronts to avoid protruding ice tongues. 
-    
-            implicit none 
-    
-            real(wp), intent(INOUT) :: mb_calv(:,:) 
-            real(wp), intent(IN)    :: H_ice(:,:) 
-            real(wp), intent(IN)    :: f_ice(:,:) 
-            real(wp), intent(IN)    :: f_grnd(:,:)  
-            real(wp), intent(IN)    :: tau 
-            character(len=*), intent(IN) :: boundaries 
-    
-            ! Local variables 
-            integer  :: i, j, nx, ny
-            integer  :: im1, ip1, jm1, jp1 
-            integer  :: n_mrgn, n_grnd
-            real(wp) :: H_eff 
-            logical  :: embayed 
-    
-            nx = size(H_ice,1)
-            ny = size(H_ice,2) 
-    
-            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,embayed)
-            do j = 1, ny 
-            do i = 1, nx
-    
-                ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-    
-                ! Count number of grounded ice-covered neighbors
-                n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
-                               [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)].gt.0.0)
-    
-                if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. n_grnd .eq. 0) then 
-                    ! Floating point with no grounded neighbors, diagnose number of ice-free neighbors 
-    
-                    n_mrgn = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0 )
-    
-                else 
-    
-                    n_mrgn = 0 
-    
-                end if 
-    
-    
-                if (n_mrgn .gt. 2) then 
-                    ! For points with more than two ice-free neighbors, increase calving rate 
-                    ! (this is designed to handle rare, ice peninsulas that can protrude
-                    !  from the main ice body)
-                    
-                    ! Calculate effective ice thickness for current cell
-                    if (f_ice(i,j) .gt. 0.0_prec) then 
-                        H_eff = H_ice(i,j) / f_ice(i,j) 
-                    else
-                        H_eff = H_ice(i,j) 
-                    end if 
-    
-                    mb_calv(i,j) = mb_calv(i,j) - max(1000.0-H_eff,0.0)/tau 
-    
-                end if 
-    
-    
-                ! Also check for points with an ice-free direct neighbor
-                ! but two ice-covered neighbors in the corners. Assume that this
-                ! should reduce the calving rate. 
-                if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .eq. 1.0) then 
-                    ! Floating point with full ice coverage
-    
-                    embayed = .FALSE.
-    
-                    ! Embayed to the right?
-                    if (   (f_grnd(ip1,j)   .eq. 0.0 .and. f_ice(ip1,j)   .eq. 0.0) &
-                     .and. (f_grnd(ip1,jm1) .eq. 0.0 .and. f_ice(ip1,jm1) .eq. 1.0) &
-                     .and. (f_grnd(ip1,jp1) .eq. 0.0 .and. f_ice(ip1,jp1) .eq. 1.0) ) then 
-    
-                        embayed = .TRUE. 
-    
-                    end if 
-    
-                    ! Embayed to the left?
-                    if (   (f_grnd(im1,j)   .eq. 0.0 .and. f_ice(im1,j)   .eq. 0.0) &
-                     .and. (f_grnd(im1,jm1) .eq. 0.0 .and. f_ice(im1,jm1) .eq. 1.0) &
-                     .and. (f_grnd(im1,jp1) .eq. 0.0 .and. f_ice(im1,jp1) .eq. 1.0) ) then 
-    
-                        embayed = .TRUE. 
-    
-                    end if 
-    
-                    ! Embayed to the top?
-                    if (   (f_grnd(i,jp1)   .eq. 0.0 .and. f_ice(i,jp1)   .eq. 0.0) &
-                     .and. (f_grnd(im1,jp1) .eq. 0.0 .and. f_ice(im1,jp1) .eq. 1.0) &
-                     .and. (f_grnd(ip1,jp1) .eq. 0.0 .and. f_ice(ip1,jp1) .eq. 1.0) ) then 
-    
-                        embayed = .TRUE. 
-    
-                    end if 
-    
-                    ! Embayed to the bottom?
-                    if (   (f_grnd(i,jm1)   .eq. 0.0 .and. f_ice(i,jm1)   .eq. 0.0) &
-                     .and. (f_grnd(im1,jm1) .eq. 0.0 .and. f_ice(im1,jm1) .eq. 1.0) &
-                     .and. (f_grnd(ip1,jm1) .eq. 0.0 .and. f_ice(ip1,jm1) .eq. 1.0) ) then 
-    
-                        embayed = .TRUE. 
-    
-                    end if 
-    
-    
-                    ! ajr: this code needs testing in realistic setting - not activated yet!
-    
-                    if (embayed) then 
-    
-                        mb_calv(i,j) = 0.5_wp * mb_calv(i,j)
-                    
-                    end if 
-    
-                end if 
-    
-            end do 
-            end do
-            !!$omp end parallel do
-    
-            return 
-            
-        end subroutine calc_calving_rate_tongues
-
     ! ===================================================================
     !
     !                      CalvMIP experiments
@@ -963,7 +563,7 @@ contains
     
     end subroutine calvmip_exp2
 
-    subroutine calvmip_exp5(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+    subroutine calvmip_exp5_ac(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
         ! Experiment 5 of CalvMIP
         
         implicit none
@@ -1014,7 +614,7 @@ contains
 
         return
     
-    end subroutine calvmip_exp5
+    end subroutine calvmip_exp5_ac
 
     subroutine calvmip_exp5_aa(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
         ! Experiment 5 of CalvMIP
@@ -1077,6 +677,11 @@ contains
         
     end subroutine calvmip_exp5_aa
     
+    ! ===================================================================
+    !
+    !                 Ocean extrapolation routines
+    !
+    ! ===================================================================
 
     subroutine extrapolate_ocn_laplace_simple(mask_fill, mask_orig,mask)
         ! Routine to extrapolate values using the Laplace equation.

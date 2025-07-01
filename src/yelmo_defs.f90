@@ -139,6 +139,7 @@ module yelmo_defs
         logical            :: use_lsf
         real(wp)           :: dt_lsf
         real(wp)           :: tau_ice
+        logical            :: grounded_melt
 
         ! Internal parameters 
         real(dp)           :: time 

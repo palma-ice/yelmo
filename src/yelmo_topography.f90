@@ -37,7 +37,7 @@ module yelmo_topography
     
 contains
     
-    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step,use_H_pred)
+    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,dta,time,topo_fixed,pc_step,use_H_pred)
 
         implicit none 
 
@@ -45,7 +45,8 @@ contains
         type(ydyn_class),   intent(IN)    :: dyn
         type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm  
-        type(ybound_class), intent(IN)    :: bnd 
+        type(ybound_class), intent(IN)    :: bnd
+        type(ydata_class),  intent(IN)    :: dta 
         real(wp),           intent(IN)    :: time
         logical,            intent(IN)    :: topo_fixed  
         character(len=*),   intent(IN)    :: pc_step 
@@ -187,7 +188,7 @@ end if
                     ! grounded/floating fraction of grid cells 
                     call calc_bmb_total(tpo%now%bmb_ref,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice, &
                                         tpo%now%H_grnd,tpo%now%f_grnd_bmb,tpo%par%gz_Hg0,tpo%par%gz_Hg1, &
-                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%boundaries)
+                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%grounded_melt,dta%pd%mask_bed,tpo%par%boundaries)
 
                     if (tpo%par%use_bmb) then
                         call calc_G_mbal(tpo%now%bmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%bmb_ref,dt)

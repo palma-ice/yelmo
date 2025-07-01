@@ -616,8 +616,9 @@ end if
 
     end subroutine calc_ytopo_calving
 
-    ! jablasco: lsf routine
     subroutine calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,H_prev,time_now)
+        ! Calving computed as a flux. LSF mask is updated with velocity - calving front velocity.
+        ! Points in ocean domain (LSF > 0) will be deleted with a melt equal to the ice thickness.
 
         implicit none
     
@@ -725,6 +726,11 @@ end if
             case("zero","none")
                 ! Do nothing. No calving.
 
+            case("equil")
+                ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
+                tpo%now%cmb_grnd_x = -1*u_acx_fill
+                tpo%now%cmb_grnd_y = -1*v_acy_fill
+
             case("threshold")
                 ! Ice thickness threshold.
                 call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%par%boundaries)
@@ -749,9 +755,39 @@ end if
         tpo%now%cr_acx = 0.0_wp
         tpo%now%cr_acy = 0.0_wp
         
-
-        tpo%now%cr_acx = tpo%now%cmb_flt_x
-        tpo%now%cr_acy = tpo%now%cmb_flt_y
+        do j=1,ny
+        do i=1,nx
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            ! x-ac node
+            if (tpo%now%f_grnd_acx(i,j) .eq. 0.0) then
+                ! Floating point
+                tpo%now%cr_acx(i,j) = tpo%now%cmb_flt_x(i,j)
+            else
+                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(ip1,j)) .gt. 0.0_wp) then
+                    ! Point above sea level. Do nothing for now.
+                    tpo%now%cr_acx(i,j) = 0.0_wp
+                else
+                    ! Marine-terminating point.
+                    tpo%now%cr_acx(i,j) = tpo%now%cmb_grnd_x(i,j)
+                end if
+            end if
+                
+            ! y-ac node
+            if (tpo%now%f_grnd_acy(i,j) .eq. 0.0) then
+                ! Floating point
+                tpo%now%cr_acy(i,j) = tpo%now%cmb_flt_y(i,j)
+            else
+                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(i,jp1)) .gt. 0.0_wp) then
+                    ! Point above sea level. Do nothing for now.
+                    tpo%now%cr_acy(i,j) = 0.0_wp
+                else
+                    ! Marine-terminating point.
+                    tpo%now%cr_acy(i,j) = tpo%now%cmb_grnd_y(i,j)
+                end if
+            end if
+    
+        end do
+        end do
 
         ! === LSF advection ===
         ! Store previous lsf mask. Necessary to avoid compute it two times.

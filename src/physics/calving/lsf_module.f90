@@ -42,10 +42,6 @@ contains
         where(H_ice .gt. 0.0_wp) LSF = -1.0_wp
         where(z_bed .gt. 0.0_wp) LSF = -1.0_wp 
 
-        !call eikonal_equation(LSF,z_bed)
-        !LSF = LSF * dx
-        !where(LSF .le. 0.0) LSF = -1.0
-
         return
         
     end subroutine LSFinit
@@ -171,7 +167,7 @@ contains
         
     subroutine LSFadvec_simple(dlsf,LSF, u, v, dt, dx, boundaries)
         ! Simple LSF advection routine. Not diagonilized.
-        ! Test
+        ! Test.
 
         implicit none
             

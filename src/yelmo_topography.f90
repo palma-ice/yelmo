@@ -322,9 +322,7 @@ end if
                     tpo%now%pred%fmb        = tpo%now%fmb
                     tpo%now%pred%dmb        = tpo%now%dmb
                     tpo%now%pred%cmb        = tpo%now%cmb 
-                    tpo%now%pred%cmb_flt    = tpo%now%cmb_flt
-                    tpo%now%pred%cmb_flt_x  = tpo%now%cmb_flt_x
-                    tpo%now%pred%cmb_flt_y  = tpo%now%cmb_flt_y 
+                    tpo%now%pred%cmb_flt    = tpo%now%cmb_flt 
                     tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd
                     tpo%now%pred%lsf        = tpo%now%lsf 
                     
@@ -342,9 +340,7 @@ end if
                     tpo%now%corr%fmb        = tpo%now%fmb
                     tpo%now%corr%dmb        = tpo%now%dmb
                     tpo%now%corr%cmb        = tpo%now%cmb 
-                    tpo%now%corr%cmb_flt    = tpo%now%cmb_flt
-                    tpo%now%corr%cmb_flt_x  = tpo%now%cmb_flt_x
-                    tpo%now%corr%cmb_flt_y  = tpo%now%cmb_flt_y 
+                    tpo%now%corr%cmb_flt    = tpo%now%cmb_flt 
                     tpo%now%corr%cmb_grnd   = tpo%now%cmb_grnd
                     tpo%now%corr%lsf        = tpo%now%lsf
                     
@@ -379,8 +375,6 @@ end if
                         tpo%now%dmb         = tpo%now%pred%dmb 
                         tpo%now%cmb         = tpo%now%pred%cmb 
                         tpo%now%cmb_flt     = tpo%now%pred%cmb_flt
-                        tpo%now%cmb_flt_x   = tpo%now%pred%cmb_flt_x
-                        tpo%now%cmb_flt_y   = tpo%now%pred%cmb_flt_y 
                         tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd
                         tpo%now%lsf         = tpo%now%pred%lsf 
                         
@@ -397,8 +391,6 @@ end if
                         tpo%now%dmb         = tpo%now%corr%dmb 
                         tpo%now%cmb         = tpo%now%corr%cmb 
                         tpo%now%cmb_flt     = tpo%now%corr%cmb_flt
-                        tpo%now%cmb_flt_x   = tpo%now%corr%cmb_flt_x 
-                        tpo%now%cmb_flt_y   = tpo%now%corr%cmb_flt_y
                         tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd
                         tpo%now%lsf         = tpo%now%corr%lsf 
                         
@@ -722,6 +714,12 @@ end if
         end select
     
         ! === Marine terminating calving laws ===
+
+        ! Initialize the calving rates
+        tpo%now%cmb_grnd_x = 0.0_wp
+        tpo%now%cmb_grnd_y = 0.0_wp
+        tpo%now%cmb_grnd   = 0.0_wp
+
         select case(trim(tpo%par%calv_grnd_method))
 
             case("zero","none")
@@ -729,10 +727,8 @@ end if
 
             case("threshold")
                 ! Ice thickness threshold.
-                !call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%par%boundaries)
+                call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%par%boundaries)
         
-
-            ! TO DO
             ! Add new laws
             ! MICI should be a marine terminating calving law (only for grounding-line points?)
 
@@ -746,15 +742,21 @@ end if
         
         ! === Land terminating calving laws ===
         ! For the moment we will assume no calving laws for land-terminating ice points.
+        ! Only deformation.
     
         ! === Merge all calving law ===
-        ! The idea is to merge then all calving-rates into a single velocity field.
-    
+        ! Merge all calving-rates into a single velocity field.
+        tpo%now%cr_acx = 0.0_wp
+        tpo%now%cr_acy = 0.0_wp
+        
+
+        tpo%now%cr_acx = tpo%now%cmb_flt_x
+        tpo%now%cr_acy = tpo%now%cmb_flt_y
 
         ! === LSF advection ===
         ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
-        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill, &
+        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,u_acx_fill,v_acy_fill, &
                         var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
         ! === Calving ===
@@ -997,8 +999,6 @@ end if
                 tpo%now%rates%dmb           = 0.0
                 tpo%now%rates%cmb           = 0.0
                 tpo%now%rates%cmb_flt       = 0.0
-                tpo%now%rates%cmb_flt_x     = 0.0
-                tpo%now%rates%cmb_flt_y     = 0.0
                 tpo%now%rates%cmb_grnd      = 0.0
                 tpo%now%rates%dlsfdt        = 0.0
 
@@ -1020,8 +1020,6 @@ end if
                 tpo%now%rates%dmb           = tpo%now%rates%dmb         + tpo%now%dmb*dt
                 tpo%now%rates%cmb           = tpo%now%rates%cmb         + tpo%now%cmb*dt
                 tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt     + tpo%now%cmb_flt*dt
-                tpo%now%rates%cmb_flt_x     = tpo%now%rates%cmb_flt_x   + tpo%now%cmb_flt_x*dt
-                tpo%now%rates%cmb_flt_y     = tpo%now%rates%cmb_flt_y   + tpo%now%cmb_flt_y*dt
                 tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd    + tpo%now%cmb_grnd*dt
                 tpo%now%rates%dlsfdt        = tpo%now%rates%dlsfdt      + tpo%now%dlsfdt*dt
 
@@ -1046,8 +1044,6 @@ end if
                     tpo%now%rates%dmb           = tpo%now%rates%dmb / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb           = tpo%now%rates%cmb / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt / tpo%now%rates%dt_tot
-                    tpo%now%rates%cmb_flt_x     = tpo%now%rates%cmb_flt_x / tpo%now%rates%dt_tot
-                    tpo%now%rates%cmb_flt_y     = tpo%now%rates%cmb_flt_y / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd / tpo%now%rates%dt_tot
                     tpo%now%rates%dlsfdt        = tpo%now%rates%dlsfdt / tpo%now%rates%dt_tot
                     
@@ -1075,8 +1071,6 @@ end if
                         tpo%now%dmb         = tpo%now%rates%dmb
                         tpo%now%cmb         = tpo%now%rates%cmb
                         tpo%now%cmb_flt     = tpo%now%rates%cmb_flt
-                        tpo%now%cmb_flt_x   = tpo%now%rates%cmb_flt_x
-                        tpo%now%cmb_flt_y   = tpo%now%rates%cmb_flt_y
                         tpo%now%cmb_grnd    = tpo%now%rates%cmb_grnd
                         tpo%now%dlsfdt      = tpo%now%rates%dlsfdt
 
@@ -1238,8 +1232,6 @@ end if
         allocate(now%rates%dmb(nx,ny))
         allocate(now%rates%cmb(nx,ny))
         allocate(now%rates%cmb_flt(nx,ny))
-        allocate(now%rates%cmb_flt_x(nx,ny))
-        allocate(now%rates%cmb_flt_y(nx,ny))
         allocate(now%rates%cmb_grnd(nx,ny))
         allocate(now%rates%dlsfdt(nx,ny))
         
@@ -1265,6 +1257,10 @@ end if
         allocate(now%cmb_flt_x(nx,ny))
         allocate(now%cmb_flt_y(nx,ny))
         allocate(now%cmb_grnd(nx,ny))
+        allocate(now%cmb_grnd_x(nx,ny))
+        allocate(now%cmb_grnd_y(nx,ny))
+        allocate(now%cr_acx(nx,ny))
+        allocate(now%cr_acy(nx,ny))
 
         allocate(now%lsf(nx,ny))       
         allocate(now%dlsfdt(nx,ny))
@@ -1329,8 +1325,6 @@ end if
         now%rates%dmb           = 0.0
         now%rates%cmb           = 0.0
         now%rates%cmb_flt       = 0.0
-        now%rates%cmb_flt_x     = 0.0
-        now%rates%cmb_flt_y     = 0.0
         now%rates%cmb_grnd      = 0.0
         now%rates%dlsfdt        = 0.0
 
@@ -1425,8 +1419,6 @@ end if
         if (allocated(now%rates%dmb))           deallocate(now%rates%dmb)
         if (allocated(now%rates%cmb))           deallocate(now%rates%cmb)
         if (allocated(now%rates%cmb_flt))       deallocate(now%rates%cmb_flt)
-        if (allocated(now%rates%cmb_flt_x))     deallocate(now%rates%cmb_flt_x)
-        if (allocated(now%rates%cmb_flt_y))     deallocate(now%rates%cmb_flt_y)
         if (allocated(now%rates%cmb_grnd))      deallocate(now%rates%cmb_grnd)
         if (allocated(now%rates%dlsfdt))        deallocate(now%rates%dlsfdt)
         
@@ -1450,6 +1442,10 @@ end if
         if (allocated(now%cmb_flt_x))   deallocate(now%cmb_flt_x)
         if (allocated(now%cmb_flt_y))   deallocate(now%cmb_flt_y)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
+        if (allocated(now%cmb_grnd_x))  deallocate(now%cmb_grnd_x)
+        if (allocated(now%cmb_grnd_y))  deallocate(now%cmb_grnd_y)
+        if (allocated(now%cr_acx))      deallocate(now%cr_acx)
+        if (allocated(now%cr_acy))      deallocate(now%cr_acy)
         if (allocated(now%lsf))         deallocate(now%lsf)       
         if (allocated(now%dlsfdt))      deallocate(now%dlsfdt)
         
@@ -1525,8 +1521,6 @@ end if
         allocate(pc%dmb(nx,ny))
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
-        allocate(pc%cmb_flt_x(nx,ny))
-        allocate(pc%cmb_flt_y(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
         allocate(pc%lsf(nx,ny))
         
@@ -1541,9 +1535,7 @@ end if
         pc%fmb          = 0.0
         pc%dmb          = 0.0
         pc%cmb          = 0.0      
-        pc%cmb_flt      = 0.0
-        pc%cmb_flt_x    = 0.0
-        pc%cmb_flt_y    = 0.0            
+        pc%cmb_flt      = 0.0 
         pc%cmb_grnd     = 0.0
         pc%lsf          = 0.0            
         
@@ -1567,8 +1559,6 @@ end if
         if (allocated(pc%fmb))          deallocate(pc%fmb)
         if (allocated(pc%cmb))          deallocate(pc%cmb)
         if (allocated(pc%cmb_flt))      deallocate(pc%cmb_flt)
-        if (allocated(pc%cmb_flt_x))    deallocate(pc%cmb_flt_x)
-        if (allocated(pc%cmb_flt_y))    deallocate(pc%cmb_flt_y)
         if (allocated(pc%cmb_grnd))     deallocate(pc%cmb_grnd)
         if (allocated(pc%lsf))          deallocate(pc%lsf)
         

@@ -1593,12 +1593,12 @@ end if
                 call calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, &
                     gz_nx, boundaries, 1)
 
-            case("pmpt-polyref")
+            case("pmpt-gausscdf")
 
                 call calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, &
                     gz_nx, boundaries, 2)
-
-            case("pmpt-gausscdf")
+                    
+            case("pmpt-polyref")
 
                 call calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, &
                     gz_nx, boundaries, 3)
@@ -1846,9 +1846,9 @@ end if
                         ! Within grounding zone
                         wt = (Hg_int(i1,j1)-gz_Hg0) / (gz_Hg1 - gz_Hg0)
                     else if (method .eq. 2) then
-                        wt = polyref_tides(m * Hg_int(i1,j1) + p)
-                    else if (method .eq. 3) then
                         wt = cdf(m * Hg_int(i1,j1) + p, mu_ssh, sigma_ssh)
+                    else if (method .eq. 3) then
+                        wt = polyref_tides(m * Hg_int(i1,j1) + p)
                     end if
 
                     ! Get subgrid bmb weighted between floating and grounded contributions

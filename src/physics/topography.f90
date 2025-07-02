@@ -1587,10 +1587,21 @@ end if
 
                 end where 
 
-            case("pmpt")
+            case("pmpt-lin")
                 ! Partial melt parameterization with tidal grounding zone
 
-                call calc_bmb_gl_pmpt(bmb,bmb_grnd,bmb_shlf,H_grnd,gz_Hg0,gz_Hg1,gz_nx,boundaries)
+                call calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, &
+                    gz_nx, boundaries, 1)
+
+            case("pmpt-polyref")
+
+                call calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, &
+                    gz_nx, boundaries, 2)
+
+            case("pmpt-gausscdf")
+
+                call calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, &
+                    gz_nx, boundaries, 3)
 
             case("nmp")
                 ! No melt parameterization
@@ -1740,7 +1751,8 @@ end if
 
     end subroutine calc_fmb_total
 
-    subroutine calc_bmb_gl_pmpt(bmb,bmb_grnd,bmb_shlf,H_grnd,gz_Hg0,gz_Hg1,nxi,boundaries)
+    subroutine calc_bmb_gl_pmpt(bmb, bmb_grnd, bmb_shlf, H_grnd, gz_Hg0, gz_Hg1, nxi,
+        boundaries, method)
         ! Calculate basal mass balance, with bmb at the grounding line
         ! determined via subgrid calculation of flotation and parameterization
         ! for tidal-induced grounded melt. 
@@ -1755,12 +1767,15 @@ end if
         real(wp), intent(IN)  :: gz_Hg1             ! Upper limit in H_grnd for grounding zone
         integer,  intent(IN)  :: nxi                ! Number of interpolation points per side (nxi*nxi)
         character(len=*), intent(IN) :: boundaries 
+        integer, intent(IN)   :: method             ! 1 = linear, 2 = polyref, 3 = cdf of normal dist
 
         ! Local variables
         integer  :: i, j, i1, j1, nx, ny
         integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
-        real(wp) :: wt 
+        real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid
+        real(wp) :: wt
+        real(wp) :: m, p                    ! coeffs for lin. transform prior to nonlin. one
+        real(wp) :: mu_ssh, sigma_ssh       ! stat. moments of sea-surface height anoms
 
         real(wp), allocatable :: Hg_int(:,:)
         real(wp), allocatable :: bmb_int(:,:)
@@ -1775,7 +1790,17 @@ end if
             write(io_unit_err,*) "calc_bmb_gl_pmpt:: Error: upper limit on grounding zone must be >= 0.0."
             write(io_unit_err,*) "gz_Hg1 = ", gz_Hg1
             stop 
-        end if 
+        end if
+
+        ! Assume that tides generates sea surface elevation anomalies from -100 to +100cm
+        ! that are centered around 0 and have a standard deviation of 40 m, as supported
+        ! by the tests performed on the data of Rignot et al. (2024) and Chen et al. (2023)
+        if (method .geq. 2) then
+            mu_ssh = 0
+            sigma_ssh = 40
+            m = 200 / (gz_Hg1 - gz_Hg0)
+            p = 100 - m * gz_Hg1
+        end if
 
         nx = size(H_grnd,1)
         ny = size(H_grnd,2) 
@@ -1817,10 +1842,14 @@ end if
                     else if (Hg_int(i1,j1) .ge. gz_Hg1) then
                         ! Grounded, outside of grounding zone
                         wt = 1.0 
-                    else
+                    else if (method .eq. 1) then
                         ! Within grounding zone
                         wt = (Hg_int(i1,j1)-gz_Hg0) / (gz_Hg1 - gz_Hg0)
-                    end if 
+                    else if (method .eq. 2) then
+                        wt = polyref_tides(m * Hg_int(i1,j1) + p)
+                    else if (method .eq. 3) then
+                        wt = cdf(m * Hg_int(i1,j1) + p, mu_ssh, sigma_ssh)
+                    end if
 
                     ! Get subgrid bmb weighted between floating and grounded contributions
                     bmb_int(i1,j1) = wt*bmb_grnd(i,j) + (1.0-wt)*bmb_shlf(i,j) 
@@ -1840,7 +1869,36 @@ end if
         return
         
     end subroutine calc_bmb_gl_pmpt
-    
+
+    elemental function polyref_tides(x) result(y)
+        ! Calculate the gounded fraction based on a reference polynomial
+        ! of degree 5 (hard-coded since best fit, optionally in nml in future)
+
+        implicit none
+        real(wp), intent(IN)  :: x
+
+        ! Local variables
+        real(wp) :: y
+        integer  :: i, n
+        real(wp), allocatable :: gn(:)
+        real(wp) :: x0, x1, y0, y1
+
+        n = 2
+        data gn/10, -15, 6/        
+        y = 0
+        x0 = -100
+        x1 = 100
+        y0 = 0
+        y1 = 1
+
+        do i = 1,3
+            y += (y1-y0) * gn(i) * ((x - x0) / (x1 - x0)) ** (n + i)
+        end do
+        
+        return
+
+    end function polyref_tides
+
 !! f_grnd calculations from IMAU-ICE / CISM 
 
 ! == Routines for determining the grounded fraction on all four grids

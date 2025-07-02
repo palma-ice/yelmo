@@ -518,8 +518,8 @@ contains
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp) mask_clvmip = 1
             
         ! compute subgrid floating margin
-        call calc_ice_fraction_new(fice_subgrid,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%bnd%z_sl,ylmo%bnd%c%rho_ice, &
-            ylmo%bnd%c%rho_sw,ylmo%tpo%par%boundaries,.TRUE.)
+        !call calc_ice_fraction_new(fice_subgrid,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%bnd%z_sl,ylmo%bnd%c%rho_ice, &
+        !    ylmo%bnd%c%rho_sw,ylmo%tpo%par%boundaries,.TRUE.)
 
         ! convert velocities into aa-nodes    
         do i=2, ylmo%grd%nx-1

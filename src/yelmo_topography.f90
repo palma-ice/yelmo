@@ -637,6 +637,7 @@ end if
         real(wp), allocatable :: mbal_now(:,:)
         real(wp), allocatable :: var_dot(:,:)
         real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
+        integer, allocatable  :: mask_ocn(:,:)
         
         ! Make sure dt is not zero
         dt_kill = dt 
@@ -649,8 +650,12 @@ end if
         allocate(var_dot(nx,ny))
         allocate(u_acx_fill(nx,ny))
         allocate(v_acy_fill(nx,ny))
-        var_dot = 0.0               
-    
+        allocate(mask_ocn(nx,ny))
+
+        var_dot  = 0.0               
+        mask_ocn = 0
+        where(tpo%now%H_ice .gt. 0.0_wp) mask_ocn = 1
+
         ! === Floating calving laws ===
         
         ! Initialize the calving rates
@@ -684,16 +689,11 @@ end if
                 tpo%now%cmb_flt_y = -1*v_acy_fill
     
             case("threshold")
-                call calc_calving_threshold_lsf(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%par%boundaries)
+                call calc_calving_threshold_lsf(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,mask_ocn,tpo%par%boundaries)
         
-            case("vm16")
-                ! TO DO
-                call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2, &
-                                  tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
-                ! jablasco: change!
-                !call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt,dyn%now%uxy_bar,tpo%now%f_ice, &
-                !                                    tpo%now%f_grnd,tpo%now%tau_eff,tpo%par%dx,tau_max=0.75e6)
-    
+            case("vm-m16")
+                call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,mat%now%strs2D%tau_eig_1,tpo%par%tau_ice,mask_ocn,tpo%par%boundaries)
+                
             ! TO DO: Add new laws
     
             ! === CalvMIP laws ===
@@ -704,7 +704,7 @@ end if
                 call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
             
             case("exp5")
-                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%par%boundaries)
+                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,mask_ocn,tpo%par%boundaries)
 
             case DEFAULT
     
@@ -733,7 +733,7 @@ end if
 
             case("threshold")
                 ! Ice thickness threshold.
-                call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%par%boundaries)
+                call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,mask_ocn,tpo%par%boundaries)
         
             ! Add new laws
             ! MICI should be a marine terminating calving law (only for grounding-line points?)
@@ -855,6 +855,9 @@ end if
                 where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
             end if
         end if
+
+        ! Deallocate local variables
+        deallocate(mask_ocn)
 
         return
     

@@ -15,6 +15,7 @@ module calving_ac
 
     ! === Floating calving routines === 
     public :: calc_calving_threshold_lsf
+    public :: calc_calving_rate_vonmises_m16
     
     ! === Grounded calving routines === 
 
@@ -191,7 +192,7 @@ contains
     !
     ! ===================================================================
     
-    subroutine calc_calving_threshold_lsf(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+    subroutine calc_calving_threshold_lsf(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,mask_ocn,boundaries)
         ! Threshold calving rate flux based on CalvingMIP experiment 5.
         ! Valid for floating and grounded ice.
             
@@ -201,6 +202,7 @@ contains
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
+        integer, intent(IN)     :: mask_ocn(:,:)                ! Ocean mask. Extrapolate values into that mask.
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
                 
         ! local variables
@@ -220,7 +222,7 @@ contains
                 
         ! since we compute on ac-nodes and ice thickness are on aa-nodes
         ! we need to extrapolate ice thickness to the ocean
-        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,H_ice)
+        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
     
         do j = 1, ny
             do i = 1, nx
@@ -253,108 +255,72 @@ contains
         
     end subroutine calc_calving_threshold_lsf
 
-    subroutine calc_calving_rate_vonmises_l19(mb_calv,H_ice,f_ice,f_grnd,tau_eff,dx,kt,boundaries)
-        ! Calculate the 'horizontal' calving rate [m/yr] based on the 
-        ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
-        ! Eqs. 73-75.
-        ! L19: kt = 0.0025 m yr-1 Pa-1, w2=25
-    
+    subroutine calc_calving_rate_vonmises_m16(cr_acx,cr_acy,u_acx,v_acy,tau_1,tau_ice_c,mask_ocn,boundaries)
+        ! Calculate the calving rate [m/yr] based on the 
+        ! von Mises stress approach, as outlined by Morlighem et al. (2016)
+        ! DOI: 10.1002/2016gl067695
+        ! Eq. 4: c = v*tau_eff/tau_ice
+
         implicit none 
-    
-        real(wp), intent(OUT) :: mb_calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: f_grnd(:,:)  
-        real(wp), intent(IN)  :: tau_eff(:,:)
-        real(wp), intent(IN)  :: dx
-        real(wp), intent(IN)  :: kt(:,:)
+
+        real(wp), intent(INOUT) :: cr_acx(:,:), cr_acy(:,:) ! Simulated calving rate. ac-nodes.
+        real(wp), intent(IN)    :: u_acx(:,:),  v_acy(:,:)  ! Velocity fields. ac-nodes.
+        real(wp), intent(IN)    :: tau_1(:,:)               ! 1st principal stress [Pa]. aa-nodes.
+        real(wp), intent(IN)    :: tau_ice_c                ! Ice fracture strength [Pa].
+        integer, intent(IN)     :: mask_ocn(:,:)            ! Ocean mask. Extrapolate values into that mask.
         character(len=*), intent(IN) :: boundaries 
-    
-        ! Local variables 
-        integer  :: i, j
-        integer  :: im1, jm1, ip1, jp1
-        integer  :: nx, ny 
-        real(wp) :: dy   
-        real(wp) :: calv_ref
-        real(wp) :: calv_now
-        real(wp) :: H_eff 
-        real(wp) :: wt
+
+        ! local variables
+        integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
+        real(wp) :: uxy_aa,uxy_acx,uxy_acy,u_acy,v_acx
+        real(wp), allocatable :: tau_1_fill(:,:), wv_aa(:,:) 
+                    
+        nx = size(u_acx,1)
+        ny = size(u_acx,2) 
+        allocate(tau_1_fill(nx,ny))
+        allocate(wv_aa(nx,ny))
             
-        real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
-    
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-    
-        ! Assume square grid cells 
-        dy = dx 
-    
-        mb_calv = 0.0_wp
-    
-            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
-        do j = 1, ny
-        do i = 1, nx  
+        ! Initialize    
+        uxy_aa     = 0.0_wp
+        wv_aa      = 0.0_wp
+        tau_1_fill = 0.0_wp
 
-            ! Calculate lateral calving rate 
-            calv_ref = kt(i,j)*tau_eff(i,j) 
-    
-            calv_now = min(calv_now,calv_lim)
-                        
-            ! Get calving mass balance rate
-            mb_calv(i,j) = -calv_now
-
-        end do
-        end do
-        !!$omp end parallel do
-    
-        return 
-    
-    end subroutine calc_calving_rate_vonmises_l19
-
-    subroutine calc_calving_rate_vonmises_v23(mb_calv,tau_eff,tau_ice,u_acx,v_acy)
-        ! Calculate the 'horizontal' calving rate [m/yr] based on the 
-        ! von Mises stress approach, as outlined by Wilner et al. (2023)
-        ! Eq. 2.
-        ! c = v*tau_eff/tau_ice
-
-        implicit none 
-
-        real(wp), intent(OUT) :: mb_calv(:,:) 
-        real(wp), intent(IN)  :: tau_eff(:,:)
-        real(wp), intent(IN)  :: tau_ice
-        real(wp), intent(IN)  :: u_acx(:,:)
-        real(wp), intent(IN)  :: v_acy(:,:)
-
-        ! Local variables 
-        integer  :: i, j
-        real(wp) :: calv_ref
-        real(wp) :: calv_now
-        
-        real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
-
-        ! Initializa calving 
-        mb_calv = 0.0_wp
+        ! Extrapolate tau_1 values into the ocean
+        call extrapolate_ocn_laplace_simple(tau_1_fill,tau_1,mask_ocn)
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
-        do j = 1, size(tau_eff,2)
-        do i = 1, size(tau_eff,1)  
-            
-            ! Calculate lateral calving rate
-            ! jablasco: to do! 
-            calv_ref = u_acx(i,j)*tau_eff(i,j)/tau_ice 
-
-            ! Apply calving limit
-            calv_now = min(calv_ref,calv_lim)
-                    
-            ! Get calving mass balance rate
-            mb_calv(i,j) = -calv_now
-
+        do j = 1, ny
+        do i = 1, nx
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            ! velocity on aa-node
+            uxy_aa = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
+            ! Calving rate on aa-node
+            wv_aa  = uxy_aa*tau_1(i,j)/(MAX(tau_ice_c,1e-8))
         end do
         end do
+
         !!$omp end parallel do
+        do j = 1, ny
+        do i = 1, nx
+            ! Stagger velocities x/y ac-velocities into y/x ac-nodes
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
+            v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
+            ! x-direction
+            uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
+            cr_acx(i,j) = -(u_acx(i,j)/uxy_acx)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
+            ! y-direction
+            uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
+            cr_acy(i,j) = -(v_acy(i,j)/uxy_acy)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
+        end do
+        end do
+
+        deallocate(tau_1_fill)
+        deallocate(wv_aa)
 
         return 
 
-    end subroutine calc_calving_rate_vonmises_v23
+    end subroutine calc_calving_rate_vonmises_m16
        
     subroutine calc_calving_rate_eigen(mb_calv,H_ice,f_ice,f_grnd,eps_eff,dx,k2,boundaries)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
@@ -563,7 +529,7 @@ contains
     
     end subroutine calvmip_exp2
 
-    subroutine calvmip_exp5_ac(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+    subroutine calvmip_exp5_ac(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,mask_ocn,boundaries)
         ! Experiment 5 of CalvMIP
         
         implicit none
@@ -572,6 +538,7 @@ contains
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
+        integer,  intent(IN)  :: mask_ocn(:,:)
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
             
         ! local variables
@@ -596,7 +563,7 @@ contains
             
         ! since we compute on ac-nodes and ice thickness are on aa-nodes
         ! we need to extrapolate ice thickness to the ocean
-        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,H_ice)
+        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
 
         do j = 1, ny
             do i = 1, nx
@@ -616,7 +583,7 @@ contains
     
     end subroutine calvmip_exp5_ac
 
-    subroutine calvmip_exp5_aa(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,boundaries)
+    subroutine calvmip_exp5_aa(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,mask_ocn,boundaries)
         ! Experiment 5 of CalvMIP
             
         implicit none
@@ -625,6 +592,7 @@ contains
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
+        integer, intent(IN)   :: mask_ocn(:,:)
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
                 
         ! local variables
@@ -644,7 +612,7 @@ contains
                 
         ! since we compute on ac-nodes and ice thickness are on aa-nodes
         ! we need to extrapolate ice thickness to the ocean
-        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,H_ice)
+        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
     
         do j = 1, ny
             do i = 1, nx
@@ -683,15 +651,15 @@ contains
     !
     ! ===================================================================
 
-    subroutine extrapolate_ocn_laplace_simple(mask_fill, mask_orig,mask)
+    subroutine extrapolate_ocn_laplace_simple(mask_fill,mask_orig,mask)
         ! Routine to extrapolate values using the Laplace equation.
         ! Assumes that value 0 in mask represents ice-free points
                 
         implicit none
             
         real(wp), intent(INOUT) :: mask_fill(:,:)
-        real(wp), intent(IN) :: mask_orig(:,:)
-        real(wp), intent(IN) :: mask(:,:)
+        real(wp), intent(IN)    :: mask_orig(:,:)
+        integer(wp), intent(IN) :: mask(:,:)
                 
         ! Local variables
         integer :: i, j, iter
@@ -715,7 +683,7 @@ contains
                 
             do i = 2, size(mask_orig,1)-1
                 do j = 2, size(mask_orig,2)-1
-                    if (mask(i,j) .eq. 0.0_wp) then
+                    if (mask(i,j) .eq. 0) then
                         mask_new(i,j) = 0.25_wp * (mask_fill(i+1,j) + mask_fill(i-1,j) + mask_fill(i,j+1) + mask_fill(i,j-1))
                         error = error + abs(mask_new(i,j) - mask_fill(i,j))
                     end if

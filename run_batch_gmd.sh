@@ -19,7 +19,7 @@ make benchmarks
 ./runme ${runopt} -q 12h -w  1:00:00 -e benchmarks -o ${fldr}/moving-diva -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva" ydyn.beta_method=0 ydyn.beta_const=1e4 ctrl.time_end=30e3 ctrl.dt2D_out=200
 
 # EISMINT1 EXPA-like domain with sloping bed and shelves possible for testing symmetry (not part of GMD suite of tests)
-# Set code sections to true: set bedrock to follow mismip-definition, set initial ice thickness via dome_init.
+# In yelmo_benchmarks, set hard-coded parameter to `sym_test_with_shelves=.TRUE.`
 # Fixed topo, fixed beta
 # Fixed topo
 # Dynamic simulation

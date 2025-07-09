@@ -308,35 +308,41 @@ contains
         allocate(now%H_ice_ref(nx,ny))
         allocate(now%z_bed_ref(nx,ny))
         
+        allocate(now%domain_mask(nx,ny))
+        allocate(now%tau_relax(nx,ny))
+
         allocate(now%z_bed_corr(nx,ny))
         allocate(now%dzbdt_corr (nx,ny))
         
-        now%z_bed       = 0.0_prec 
-        now%z_bed_sd    = 0.0_prec
-        now%z_sl        = 0.0_prec 
-        now%H_sed       = 0.0_prec 
-        now%smb         = 0.0_prec 
-        now%T_srf       = 0.0_prec 
-        now%bmb_shlf    = 0.0_prec 
-        now%fmb_shlf    = 0.0_prec 
-        now%T_shlf      = 0.0_prec 
-        now%Q_geo       = 0.0_prec 
+        now%z_bed       = 0.0_wp 
+        now%z_bed_sd    = 0.0_wp
+        now%z_sl        = 0.0_wp 
+        now%H_sed       = 0.0_wp 
+        now%smb         = 0.0_wp 
+        now%T_srf       = 0.0_wp 
+        now%bmb_shlf    = 0.0_wp 
+        now%fmb_shlf    = 0.0_wp 
+        now%T_shlf      = 0.0_wp 
+        now%Q_geo       = 0.0_wp 
 
-        now%enh_srf     = 1.0_prec 
+        now%enh_srf     = 1.0_wp 
 
-        now%basins      = 0.0_prec 
-        now%basin_mask  = 0.0_prec 
-        now%regions     = 0.0_prec 
-        now%region_mask = 0.0_prec 
+        now%basins      = 0.0_wp 
+        now%basin_mask  = 0.0_wp 
+        now%regions     = 0.0_wp 
+        now%region_mask = 0.0_wp 
         
         now%ice_allowed = .TRUE.  ! By default allow ice everywhere 
         now%calv_mask   = .FALSE. ! By default no, no calving mask 
 
-        now%H_ice_ref   = 0.0_prec 
-        now%z_bed_ref   = 0.0_prec
+        now%H_ice_ref   = 0.0_wp 
+        now%z_bed_ref   = 0.0_wp
 
-        now%z_bed_corr  = 0.0_prec
-        now%dzbdt_corr  = 0.0_prec
+        now%domain_mask = 1.0_wp    ! By default, ice is solved everywhere
+        now%tau_relax   = -1.0_wp   ! By default, no relaxation anywhere
+
+        now%z_bed_corr  = 0.0_wp
+        now%dzbdt_corr  = 0.0_wp
         
         return 
 
@@ -372,6 +378,9 @@ contains
         if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref) 
         if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref)
 
+        if (allocated(now%domain_mask)) deallocate(now%domain_mask)
+        if (allocated(now%tau_relax))   deallocate(now%tau_relax)
+        
         if (allocated(now%z_bed_corr))  deallocate(now%z_bed_corr)
         if (allocated(now%dzbdt_corr )) deallocate(now%dzbdt_corr )
 

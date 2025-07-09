@@ -237,22 +237,29 @@ end if
                     ! If desired, finally relax solution to reference state
                     if (tpo%par%topo_rel .ne. 0) then 
 
+                        if (tpo%par%topo_rel .eq. -1) then
+                            ! Use externally defined tau_relax field
+                            tpo%now%tau_relax = bnd%tau_relax
+                        else
+                            ! Define the relaxation timescale field, if needed
+                            call set_tau_relax(tpo%now%tau_relax,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,bnd%H_ice_ref, &
+                                               tpo%par%topo_rel,tpo%par%topo_rel_tau,tpo%par%boundaries)
+                        end if
+
                         select case(trim(tpo%par%topo_rel_field))
 
                             case("H_ref")
                                 ! Relax towards reference ice thickness field H_ref
 
-                                call calc_G_relaxation(tpo%now%mb_relax,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
-                                                            bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
-                            
+                                call calc_G_relaxation(tpo%now%mb_relax,tpo%now%H_ice,bnd%H_ice_ref,tpo%now%tau_relax,dt)
+
                             case("H_ice_n")
                                 ! Relax towards previous iteration ice thickness 
                                 ! (ie slow down changes)
                                 ! ajr: needs testing, not sure if this works well or helps anything.
 
-                                call calc_G_relaxation(tpo%now%mb_relax,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
-                                                            tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
-                            
+                                call calc_G_relaxation(tpo%now%mb_relax,tpo%now%H_ice,tpo%now%H_ice_n,tpo%now%tau_relax,dt)
+
                             case DEFAULT 
 
                                 write(*,*) "calc_ytopo:: Error: topo_rel_field not recognized."
@@ -1056,6 +1063,8 @@ end if
         allocate(now%H_ice_dyn(nx,ny))
         allocate(now%f_ice_dyn(nx,ny))
 
+        allocate(now%tau_relax(nx,ny))
+
         now%rates%dzsdt         = 0.0
         now%rates%dHidt         = 0.0
         now%rates%dHidt_dyn     = 0.0
@@ -1131,6 +1140,8 @@ end if
         now%H_ice_dyn   = 0.0 
         now%f_ice_dyn   = 0.0 
         
+        now%tau_relax   = 0.0
+
         return 
 
     end subroutine ytopo_alloc
@@ -1222,6 +1233,8 @@ end if
         
         if (allocated(now%H_ice_dyn))   deallocate(now%H_ice_dyn)
         if (allocated(now%f_ice_dyn))   deallocate(now%f_ice_dyn)
+        
+        if (allocated(now%tau_relax))   deallocate(now%tau_relax)
         
         return 
 

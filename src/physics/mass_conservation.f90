@@ -18,6 +18,7 @@ module mass_conservation
     public :: calc_G_mbal
     public :: calc_G_calv
     public :: calc_G_boundaries
+    public :: set_tau_relax
     public :: calc_G_relaxation
 
     public :: extend_floating_slab
@@ -771,7 +772,100 @@ contains
 
     end subroutine calc_G_boundaries
 
-    subroutine calc_G_relaxation(dHdt,H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt,boundaries)
+    subroutine set_tau_relax(tau_relax,H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,boundaries)
+        ! This routines allows ice within a given mask to be
+        ! relaxed to a reference state with certain timescale tau 
+        ! (if tau=0), then H_ice = H_ice_ref directly 
+
+        implicit none 
+
+        real(wp), intent(OUT)   :: tau_relax(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:)  
+        integer,  intent(IN)    :: mask_grz(:,:) 
+        real(wp), intent(IN)    :: H_ref(:,:) 
+        integer,  intent(IN)    :: topo_rel 
+        real(wp), intent(IN)    :: tau
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            select case(topo_rel)
+
+                case(1) 
+                    ! Relax the shelf (floating) ice and ice-free points
+                
+                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) then
+                        tau_relax(i,j) = tau
+                    else
+                        tau_relax(i,j) = -1.0
+                    end if
+            
+                case(2) 
+                    ! Relax the shelf (floating) ice and ice-free points
+                    ! and the grounding-line ice too
+                    
+                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) then
+                        tau_relax(i,j) = tau
+                    
+                    else if (f_grnd(i,j) .gt. 0.0 .and. &
+                            (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 &
+                            .or. f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0)) then
+
+                        tau_relax(i,j) = tau
+                    
+                    else
+
+                        tau_relax(i,j) = -1.0
+
+                    end if
+            
+                case(3)
+                    ! Relax all points
+                    
+                    tau_relax(i,j) = tau
+                
+                case(4) 
+                    ! Relax all grounded grounding-zone points 
+
+                    if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
+
+                        tau_relax(i,j) = tau
+                    
+                    else
+
+                        tau_relax(i,j) = -1.0
+
+                    end if 
+
+                case DEFAULT ! topo_rel == 0
+
+                    ! No relaxation
+
+                    tau_relax(i,j) = -1.0
+
+            end select
+            
+        end do 
+        end do 
+
+
+        return 
+
+    end subroutine set_tau_relax
+    
+    subroutine calc_G_relaxation(dHdt,H_ice,H_ref,tau_relax,dt)
         ! This routines allows ice within a given mask to be
         ! relaxed to a reference state with certain timescale tau 
         ! (if tau=0), then H_ice = H_ice_ref directly 
@@ -780,18 +874,12 @@ contains
 
         real(wp), intent(OUT)   :: dHdt(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
-        real(wp), intent(IN)    :: f_grnd(:,:)  
-        integer,  intent(IN)    :: mask_grz(:,:) 
         real(wp), intent(IN)    :: H_ref(:,:) 
-        integer,  intent(IN)    :: topo_rel 
-        real(wp), intent(IN)    :: tau
+        real(wp), intent(IN)    :: tau_relax(:,:)
         real(wp), intent(IN)    :: dt 
-        character(len=*), intent(IN) :: boundaries 
-
+        
         ! Local variables 
-        integer  :: i, j, nx, ny 
-        integer  :: im1, ip1, jm1, jp1
-        logical  :: apply_relax 
+        integer  :: i, j, nx, ny
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -801,73 +889,24 @@ contains
         do j = 1, ny
         do i = 1, nx 
 
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            
-            ! No relaxation to start
-            apply_relax = .FALSE.
+            if (tau_relax(i,j) .eq. 0.0) then
+                ! Impose ice thickness 
 
-            select case(topo_rel)
-
-                case(1) 
-                    ! Relax the shelf (floating) ice and ice-free points
-                
-                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
-            
-                case(2) 
-                    ! Relax the shelf (floating) ice and ice-free points
-                    ! and the grounding-line ice too
-                    
-                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
-                    
-                    if (f_grnd(i,j) .gt. 0.0 .and. &
-                        (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 &
-                        .or. f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0)) apply_relax = .TRUE. 
-            
-                case(3)
-                    ! Relax all points
-                    
-                    apply_relax = .TRUE. 
-                
-                case(4) 
-                    ! Relax all grounded grounding-zone points 
-
-                    if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
-
-                        apply_relax = .TRUE. 
-
-                    end if 
-
-                case DEFAULT
-                    ! No relaxation
-
-                    apply_relax = .FALSE.
-
-            end select
-            
-
-            if (apply_relax) then 
-
-                if (tau .eq. 0.0) then
-                    ! Impose ice thickness 
-
-                    if (dt .gt. 0.0) then
-                        dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / dt
-                    else
-                        dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / 1.0
-                    end if
-
+                if (dt .gt. 0.0) then
+                    dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / dt
                 else
-                    ! Apply relaxation to reference state 
+                    dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / 1.0
+                end if
 
-                    dHdt = (H_ref(i,j) - H_ice(i,j)) / tau 
+            else if (tau_relax(i,j) .gt. 0.0) then
+                ! Apply relaxation to reference state 
 
-                end if 
-            end if 
+                dHdt = (H_ref(i,j) - H_ice(i,j)) / tau_relax(i,j)
+
+            end if
 
         end do 
         end do 
-
 
         return 
 

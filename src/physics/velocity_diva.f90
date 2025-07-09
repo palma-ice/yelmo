@@ -1,6 +1,6 @@
 module velocity_diva
 
-    use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL_UNDERFLOW
+    use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL, TOL_UNDERFLOW, is_equal
     use yelmo_tools, only : get_neighbor_indices, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
@@ -191,7 +191,7 @@ contains
 
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
-        call set_inactive_margins(ux_bar,uy_bar,f_ice,par%boundaries)
+        !call set_inactive_margins(ux_bar,uy_bar,f_ice,par%boundaries)
 
         if (write_ssa_diagnostics) then 
             call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
@@ -447,7 +447,7 @@ end if
         !!$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
-            if (f_ice(i,j) .eq. 1.0) then 
+            if ( is_equal(f_ice(i,j),1.0) ) then 
                 F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)
             end if  
         end do
@@ -598,7 +598,7 @@ end if
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .FALSE.
+        logical, parameter :: use_gq3D = .TRUE.
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
@@ -792,7 +792,7 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            if (f_ice(i,j) .eq. 1.0_wp) then 
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then 
 
                 ! Get neighbor indices
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
@@ -867,7 +867,7 @@ end if
             ! Calculate the vertically averaged viscosity for this point
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
-            if (f_ice(i,j) .eq. 1.0) then 
+            if ( is_equal(f_ice(i,j),1.0) ) then 
                 visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
                 visc_eff_int(i,j) = visc_eff_mean 
@@ -911,7 +911,7 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            if (f_ice(i,j) .eq. 1.0) then 
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then 
                 ! Viscosity should be nonzero here, perform integration 
 
                 H_eff = H_ice(i,j) / f_ice(i,j) 
@@ -1106,12 +1106,12 @@ end if
         real(wp), intent(IN) :: f1
         real(wp) :: var_mid 
 
-        if (f0 .eq. 1.0_wp .and. f1 .lt. 1.0_wp) then 
+        if (is_equal(f0,1.0_wp) .and. f1 .lt. 1.0_wp) then 
             ! At the margin 
 
             var_mid = var0 
 
-        else if (f0 .lt. 1.0_wp .and. f1 .eq. 1.0_wp) then 
+        else if (f0 .lt. 1.0_wp .and. is_equal(f1,1.0_wp)) then 
             ! At the margin 
 
             var_mid = var1 

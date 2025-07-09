@@ -1,6 +1,6 @@
 module topography 
 
-    use yelmo_defs, only : wp, dp, io_unit_err, pi
+    use yelmo_defs, only : wp, dp, io_unit_err, pi, TOL, is_equal
     use yelmo_tools, only : get_neighbor_indices
     use subgrid, only : calc_subgrid_array, calc_subgrid_array_cell
 
@@ -74,7 +74,7 @@ contains
 
             mask = mask_bed_grline
 
-        else if (f_ice .eq. 0.0) then 
+        else if ( is_equal(f_ice,0.0_wp) ) then 
             ! Ice-free points 
 
             if (f_grnd .gt. 0.0) then
@@ -499,7 +499,8 @@ contains
                     ! for safety 
 
                     if (H_eff .gt. 0.0_wp) then 
-                        f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
+                        f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp )
+                        if (f_ice(i,j) .lt. TOL) f_ice(i,j) = TOL
                     else 
                         f_ice(i,j) = 1.0_wp 
                     end if 
@@ -539,7 +540,7 @@ contains
 
         integer, parameter :: val_ice_free  = -1 
         integer, parameter :: val_flt       = 1
-        integer, parameter :: val_marine    = 2
+        integer, parameter :: val_marine    = 1 !2
         integer, parameter :: val_grnd      = 3
         
         nx = size(mask_frnt,1) 
@@ -558,7 +559,7 @@ contains
             f_neighb = [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
             n = count(f_neighb .lt. 1.0)
 
-            if (f_ice(i,j) .eq. 1.0 .and. n .gt. 0) then 
+            if ( is_equal(f_ice(i,j),1.0_wp) .and. n .gt. 0) then 
                 ! This point is an ice front. 
 
                 if (f_grnd(i,j) .gt. 0.0 .and. (z_sl(i,j) .le. z_bed(i,j)) ) then 
@@ -723,15 +724,15 @@ contains
 
             f_grnd_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
 
-            if (f_grnd(i,j) .eq. 0.0 .and. count(f_grnd_neighb .gt. 0.0).gt.0) then
+            if ( is_equal(f_grnd(i,j),0.0_wp) .and. count(f_grnd_neighb .gt. 0.0).gt.0) then
                 is_grline = .TRUE. 
-            else if (f_grnd(i,j) .gt. 0.0 .and. count(f_grnd_neighb .eq. 0.0).gt.0) then
+            else if (f_grnd(i,j) .gt. 0.0 .and. count((abs(f_grnd_neighb-0.0_wp).lt.TOL)).gt.0 ) then
                 is_grline = .TRUE. 
             else 
                 is_grline = .FALSE. 
             end if 
 
-            if (is_grline .and. f_ice(i,j) .eq. 1.0) then 
+            if ( is_grline .and. is_equal(f_ice(i,j),1.0_wp) ) then 
                 ! Only treat grounding line points that are fully ice-covered:  
                 ! Perform subgrid calculations 
 
@@ -1243,7 +1244,7 @@ end if
                 mu    = z_bed(i,j) 
                 sigma = z_bed_sd(i,j) 
 
-                if (sigma .eq. 0.0_wp) then 
+                if ( is_equal(sigma,0.0_wp) ) then 
                     ! sigma not available, set f_grnd to zero 
 
                     f_grnd(i,j) = 0.0_wp 
@@ -1396,8 +1397,8 @@ end if
 
             ! Grounded point or partially floating point with floating neighbors
             if (f_grnd(i,j) .gt. 0.0 .and. &
-                (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
-                 f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
+                ( is_equal(f_grnd(im1,j),0.0_wp) .or. is_equal(f_grnd(ip1,j),0.0_wp) .or. &
+                 is_equal(f_grnd(i,jm1),0.0_wp) .or. is_equal(f_grnd(i,jp1),0.0_wp) ) ) then 
                 
                 dist_gl(i,j)  = 0.0_wp 
 
@@ -1418,7 +1419,7 @@ end if
             do j = 1, ny 
             do i = 1, nx
 
-                if (dist_gl(i,j) .eq. dist_max) then 
+                if ( is_equal(dist_gl(i,j),dist_max) ) then 
                     ! Distance needs to be determined for this point 
 
                     ! Get neighbor indices

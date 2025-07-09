@@ -1039,6 +1039,26 @@ contains
 
     end function yelmo_get_precision
 
+    pure function is_equal(value1, value2, eps) result(equal)
+        implicit none
+        real(wp), intent(IN) :: value1
+        real(wp), intent(IN) :: value2
+        real(wp), intent(IN), optional :: eps
+
+        ! Local variables
+        logical :: equal
+        real(wp) :: epsilon
+
+        ! Set default tolerance if not provided
+        if (present(eps)) then
+            epsilon = eps
+        else
+            epsilon = TOL
+        end if
+
+        equal = abs(value1 - value2) <= epsilon
+
+    end function is_equal
         
     subroutine yelmo_parse_path(path,domain,grid_name)
 

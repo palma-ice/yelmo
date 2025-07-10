@@ -111,7 +111,7 @@ contains
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0
 
-        if (.FALSE.) then
+        if (.TRUE.) then
             ! plot retreat rate instead of calving rate
             cr_acx = wx
             cr_acy = wy

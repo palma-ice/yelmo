@@ -1,13 +1,13 @@
 &ctl
 
     exp         = "exp4"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx           = 5.0                 ! [km] Grid resolution
+    dx           = 25.0                 ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 1e3                  ! [yr] Ending time 
     dtt          = 1.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 1.0                 ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 100.0                 ! [yr] Frequency of writing 2D output files 
 
 /
 
@@ -27,7 +27,7 @@
     nml_masks       = "yelmo_masks"
     nml_init_topo   = "yelmo_init_topo"
     nml_data        = "yelmo_data"
-    restart         = "/home/a/a271124/Model/yelmo-lsf/output/calvmip_dx5/exp3/yelmo_restart.nc"
+    restart         = "/Users/jablas001/Models/yelmo-ucm/yelmo_main_lsf/output/exp3/yelmo_restart.nc"
     restart_z_bed   = True             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True             ! Take H_ice from restart file
     restart_relax   = 0.0              ! [yrs] Years to relax from restart=>input topography
@@ -62,6 +62,7 @@
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
+    grounded_melt       = False
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
@@ -110,7 +111,8 @@
     tau_ice             = 250.0e3           ! [Pa] Ice strength failure
 
     ! === threshold method ===
-    Hc_ref              = 275.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_flt          = 275.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_grnd         = 275.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean

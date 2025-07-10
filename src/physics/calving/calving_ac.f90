@@ -212,30 +212,28 @@ contains
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
+        !$omp end parallel do
         do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Stagger ice thickness into ac-nodes                        
-                if(f_ice(i,j) .gt. 0.0_wp) then
-                    H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
-                    H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
+                H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
+                H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
                     
-                    ! Special case for border
-                    ! x-axis  
-                    if((f_ice(ip1,j) .eq. 0.0_wp) .or. (f_ice(im1,j) .eq. 0.0_wp)) then
-                        H_acx = H_ice(i,j)
-                    end if
+                ! Special case for border
+                ! x-axis  
+                if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(ip1,j) .eq. 0.0_wp)) then
+                    H_acx = H_ice(i,j)
+                else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(ip1,j) .gt. 0.0_wp)) then
+                    H_acx = H_ice(ip1,j)
+                end if
 
-                    ! y-axis
-                    if((f_ice(i,jp1) .eq. 0.0_wp) .or. (f_ice(i,jm1) .eq. 0.0_wp)) then
-                        H_acy = H_ice(i,j)
-                    end if
-
-                else
-                    ! Ocean points
-                    H_acx = 0.0_wp
-                    H_acy = 0.0_wp
+                ! y-axis  
+                if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(i,jp1) .eq. 0.0_wp)) then
+                    H_acy = H_ice(i,j)
+                else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(i,jp1) .gt. 0.0_wp)) then
+                    H_acy = H_ice(i,jp1)
                 end if
 
                 ! Compute calving-rates on ac-nodes
@@ -268,49 +266,42 @@ contains
 
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: uxy_aa,uxy_acx,uxy_acy,u_acy,v_acx
-        real(wp), allocatable :: tau_1_fill(:,:), wv_aa(:,:) 
+        real(wp) :: tau1_acx,tau1_acy,wv_acx,wv_acy
                     
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
-        allocate(tau_1_fill(nx,ny))
-        allocate(wv_aa(nx,ny))
-            
-        ! Initialize    
-        uxy_aa     = 0.0_wp
-        wv_aa      = 0.0_wp
-        tau_1_fill = 0.0_wp
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
-        do j = 1, ny
-        do i = 1, nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            ! velocity on aa-node
-            uxy_aa = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
-            ! Calving rate on aa-node
-            wv_aa(i,j)  = tau_1_fill(i,j)/tau_ice_c
-        end do
-        end do
-        
         !!$omp end parallel do
         do j = 1, ny
-        do i = 1, nx
-            ! Stagger velocities x/y ac-velocities into y/x ac-nodes
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
-            v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
-            ! x-direction
-            uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
-            cr_acx(i,j) = -u_acx(i,j)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
-            ! y-direction
-            uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
-            cr_acy(i,j) = -v_acy(i,j)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
-        end do
-        end do
+            do i = 1, nx
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                    
+                ! Stagger 1st ppal stress into ac-nodes                        
+                tau1_acx = 0.5*(tau_1(i,j)+tau_1(ip1,j))
+                tau1_acy = 0.5*(tau_1(i,j)+tau_1(i,jp1))
+                        
+                ! Special case for border
+                ! x-axis  
+                if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(ip1,j) .eq. 0.0_wp)) then
+                    tau1_acx = tau_1(i,j)
+                else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(ip1,j) .gt. 0.0_wp)) then
+                    tau1_acx = tau_1(ip1,j)
+                end if
 
-        cr_acx = tau_1_fill !tau_1 = tau_1_fill
-        deallocate(tau_1_fill)
-        deallocate(wv_aa)
+                ! y-axis  
+                if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(i,jp1) .eq. 0.0_wp)) then
+                    tau1_acy = tau_1(i,j)
+                else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(i,jp1) .gt. 0.0_wp)) then
+                    tau1_acy = tau_1(i,jp1)
+                end if
+
+                ! Compute calving-rates on ac-nodes
+                wv_acx      = MAX(0.0_wp,tau1_acx/tau_ice_c)
+                cr_acx(i,j) = -u_acx(i,j)*wv_acx
+                wv_acy      = MAX(0.0_wp,tau1_acy/tau_ice_c)
+                cr_acy(i,j) = -v_acy(i,j)*wv_acy
+        end do
+        end do
 
         return 
 
@@ -524,51 +515,60 @@ contains
     end subroutine calvmip_exp2
 
     subroutine calvmip_exp5_ac(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,f_ice,boundaries)
-        ! Experiment 5 of CalvMIP
-        
+        ! Threshold calving rate flux based on CalvingMIP experiment 5.
+        ! Valid for floating and grounded ice.
+            
         implicit none
-        
+            
         real(wp), intent(OUT) :: cr_acx(:,:), cr_acy(:,:)
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
-        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)                ! Ocean mask. Extrapolate values into that mask.
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
-            
+                
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv_acx,wv_acy,wvr,uxy_acx,uxy_acy,u_acy,v_acx 
-        real(wp), allocatable :: H_ice_fill(:,:)  
-        
+        real(wp) :: wv_acx,wv_acy,H_acx,H_acy
+            
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
-        allocate(H_ice_fill(nx,ny))
 
-        ! Initialize    
-        wv_acx  = 0.0_wp
-        wv_acy  = 0.0_wp
-        uxy_acx = 0.0_wp
-        uxy_acy = 0.0_wp
-        u_acy   = 0.0_wp
-        v_acx   = 0.0_wp
-        cr_acx  = 0.0_wp
-        cr_acy  = 0.0_wp
-        H_ice_fill = H_ice
-            
         do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                ! x-direction
-                wv_acx = MAX(0.0_wp,1.0_wp+(H_ice_c-(0.5*(H_ice_fill(i,j)+H_ice_fill(ip1,j))))/H_ice_c)
+
+                ! Stagger ice thickness into ac-nodes                        
+                if(f_ice(i,j) .gt. 0.0_wp) then
+                    H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
+                    H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
+                    
+                    ! Special case for border
+                    ! x-axis  
+                    if((f_ice(ip1,j) .eq. 0.0_wp) .or. (f_ice(im1,j) .eq. 0.0_wp)) then
+                        H_acx = H_ice(i,j)
+                    end if
+
+                    ! y-axis
+                    if((f_ice(i,jp1) .eq. 0.0_wp) .or. (f_ice(i,jm1) .eq. 0.0_wp)) then
+                        H_acy = H_ice(i,j)
+                    end if
+
+                else
+                    ! Ocean points
+                    H_acx = 0.0_wp
+                    H_acy = 0.0_wp
+                end if
+
+                ! Compute calving-rates on ac-nodes
+                wv_acx      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acx)/H_ice_c)
                 cr_acx(i,j) = -u_acx(i,j)*wv_acx
-                ! y-direction
-                wv_acy = MAX(0.0_wp,1.0_wp+(H_ice_c-(0.5*(H_ice_fill(i,j)+H_ice_fill(i,jp1))))/H_ice_c)
+                wv_acy      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acy)/H_ice_c)
                 cr_acy(i,j) = -v_acy(i,j)*wv_acy
+
             end do
         end do
-
-        deallocate(H_ice_fill)
-
+    
         return
     
     end subroutine calvmip_exp5_ac

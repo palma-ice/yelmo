@@ -635,8 +635,7 @@ end if
         integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
         real(wp) :: dt_kill
         real(wp), allocatable :: mbal_now(:,:)
-        !real(wp), allocatable :: var_dot(:,:)
-        real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
+        !real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
         
         ! Make sure dt is not zero
         dt_kill = dt 
@@ -647,10 +646,8 @@ end if
        
         allocate(mbal_now(nx,ny))
         !allocate(var_dot(nx,ny))
-        allocate(u_acx_fill(nx,ny))
-        allocate(v_acy_fill(nx,ny))
-
-        !var_dot  = 0.0               
+        !allocate(u_acx_fill(nx,ny))
+        !allocate(v_acy_fill(nx,ny))
 
         ! === Floating calving laws ===
         
@@ -773,7 +770,7 @@ end if
         ! === LSF advection ===
         ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
-        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,u_acx_fill,v_acy_fill, &
+        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
                        tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
         ! === Calving ===

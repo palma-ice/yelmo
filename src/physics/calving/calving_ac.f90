@@ -192,7 +192,7 @@ contains
     !
     ! ===================================================================
     
-    subroutine calc_calving_threshold_lsf(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,mask_ocn,boundaries)
+    subroutine calc_calving_threshold_lsf(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,f_ice,boundaries)
         ! Threshold calving rate flux based on CalvingMIP experiment 5.
         ! Valid for floating and grounded ice.
             
@@ -202,7 +202,7 @@ contains
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
-        integer, intent(IN)     :: mask_ocn(:,:)                ! Ocean mask. Extrapolate values into that mask.
+        real(wp), intent(IN)  :: f_ice(:,:)                ! Ocean mask. Extrapolate values into that mask.
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
                 
         ! local variables
@@ -222,7 +222,7 @@ contains
                 
         ! since we compute on ac-nodes and ice thickness are on aa-nodes
         ! we need to extrapolate ice thickness to the ocean
-        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
+        !call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
     
         do j = 1, ny
             do i = 1, nx
@@ -255,19 +255,19 @@ contains
         
     end subroutine calc_calving_threshold_lsf
 
-    subroutine calc_calving_rate_vonmises_m16(cr_acx,cr_acy,u_acx,v_acy,tau_1,tau_ice_c,mask_ocn,boundaries)
+    subroutine calc_calving_rate_vonmises_m16(cr_acx,cr_acy,u_acx,v_acy,tau_1,tau_ice_c,f_ice,boundaries)
         ! Calculate the calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Morlighem et al. (2016)
         ! DOI: 10.1002/2016gl067695
-        ! Eq. 4: c = v*tau_eff/tau_ice
+        ! Eq. 4: c = v*tau_1/tau_ice
 
         implicit none 
 
         real(wp), intent(INOUT) :: cr_acx(:,:), cr_acy(:,:) ! Simulated calving rate. ac-nodes.
         real(wp), intent(IN)    :: u_acx(:,:),  v_acy(:,:)  ! Velocity fields. ac-nodes.
-        real(wp), intent(IN)    :: tau_1(:,:)               ! 1st principal stress [Pa]. aa-nodes.
+        real(wp), intent(INOUT) :: tau_1(:,:)               ! 1st principal stress [Pa]. aa-nodes.
         real(wp), intent(IN)    :: tau_ice_c                ! Ice fracture strength [Pa].
-        integer, intent(IN)     :: mask_ocn(:,:)            ! Ocean mask. Extrapolate values into that mask.
+        real(wp), intent(IN)    :: f_ice(:,:)               ! Ocean mask. Extrapolate values into that mask.
         character(len=*), intent(IN) :: boundaries 
 
         ! local variables
@@ -285,9 +285,6 @@ contains
         wv_aa      = 0.0_wp
         tau_1_fill = 0.0_wp
 
-        ! Extrapolate tau_1 values into the ocean
-        call extrapolate_ocn_laplace_simple(tau_1_fill,tau_1,mask_ocn)
-
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
         do j = 1, ny
         do i = 1, nx
@@ -295,10 +292,10 @@ contains
             ! velocity on aa-node
             uxy_aa = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
             ! Calving rate on aa-node
-            wv_aa  = uxy_aa*tau_1(i,j)/(MAX(tau_ice_c,1e-8))
+            wv_aa(i,j)  = tau_1_fill(i,j)/tau_ice_c
         end do
         end do
-
+        
         !!$omp end parallel do
         do j = 1, ny
         do i = 1, nx
@@ -308,13 +305,14 @@ contains
             v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
             ! x-direction
             uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
-            cr_acx(i,j) = -(u_acx(i,j)/uxy_acx)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
+            cr_acx(i,j) = -u_acx(i,j)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
             ! y-direction
             uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
-            cr_acy(i,j) = -(v_acy(i,j)/uxy_acy)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
+            cr_acy(i,j) = -v_acy(i,j)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
         end do
         end do
 
+        cr_acx = tau_1_fill !tau_1 = tau_1_fill
         deallocate(tau_1_fill)
         deallocate(wv_aa)
 
@@ -529,7 +527,7 @@ contains
     
     end subroutine calvmip_exp2
 
-    subroutine calvmip_exp5_ac(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,mask_ocn,boundaries)
+    subroutine calvmip_exp5_ac(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,f_ice,boundaries)
         ! Experiment 5 of CalvMIP
         
         implicit none
@@ -538,7 +536,7 @@ contains
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
-        integer,  intent(IN)  :: mask_ocn(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
             
         ! local variables
@@ -561,10 +559,6 @@ contains
         cr_acy  = 0.0_wp
         H_ice_fill = H_ice
             
-        ! since we compute on ac-nodes and ice thickness are on aa-nodes
-        ! we need to extrapolate ice thickness to the ocean
-        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
-
         do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
@@ -583,7 +577,7 @@ contains
     
     end subroutine calvmip_exp5_ac
 
-    subroutine calvmip_exp5_aa(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,mask_ocn,boundaries)
+    subroutine calvmip_exp5_aa(cr_acx,cr_acy,u_acx,v_acy,H_ice,H_ice_c,f_ice,boundaries)
         ! Experiment 5 of CalvMIP
             
         implicit none
@@ -592,7 +586,7 @@ contains
         real(wp), intent(IN)  :: u_acx(:,:),  v_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: H_ice_c
-        integer, intent(IN)   :: mask_ocn(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
         character(len=*), intent(IN)  :: boundaries             ! Boundary conditions to impose
                 
         ! local variables
@@ -610,10 +604,6 @@ contains
         H_ice_fill = H_ice
         wv_aa      = 0.0_wp
                 
-        ! since we compute on ac-nodes and ice thickness are on aa-nodes
-        ! we need to extrapolate ice thickness to the ocean
-        call extrapolate_ocn_laplace_simple(H_ice_fill,H_ice,mask_ocn)
-    
         do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
@@ -697,5 +687,81 @@ contains
         return
             
     end subroutine extrapolate_ocn_laplace_simple
+
+    subroutine extrapolate_ocn_neighbor(mask_fill, mask_orig, mask)
+        ! Routine to extrapolate values using neighboring land points.
+        ! Assumes that value 0 in mask represents ocean points
+        
+        implicit none
+        
+        real(wp), intent(INOUT) :: mask_fill(:,:)
+        real(wp), intent(IN)    :: mask_orig(:,:)
+        integer(wp), intent(IN) :: mask(:,:)
+        
+        ! Local variables
+        integer :: i, j, iter, count_changes
+        integer :: nx, ny
+        real(wp), allocatable :: mask_new(:,:)
+        real(wp) :: sum_neighbors
+        integer  :: num_neighbors
+        
+        ! Allocate memory for the temporary array
+        nx = size(mask_orig, 1)
+        ny = size(mask_orig, 2)
+        allocate(mask_new(nx, ny))
+        
+        ! Initialize variables
+        mask_fill     = mask_orig
+        mask_new      = mask_orig
+        iter          = 0
+        count_changes = 1
+        
+        ! Iterate until no more changes are detected
+        do while (count_changes .gt. 0)
+            count_changes = 0
+            iter = iter + 1
+        
+            do i = 2, nx-1
+                do j = 2, ny-1
+                    if (mask(i,j) .eq. 0 .and. mask_fill(i,j) .eq. 0) then
+                        ! Calculate the sum of neighboring land points
+                        sum_neighbors = 0.0_wp
+                        num_neighbors = 0
+        
+                        if (mask_fill(i+1,j) == 1) then
+                            sum_neighbors = sum_neighbors + 1.0_wp
+                            num_neighbors = num_neighbors + 1
+                        end if
+                        if (mask_fill(i-1,j) == 1) then
+                            sum_neighbors = sum_neighbors + 1.0_wp
+                            num_neighbors = num_neighbors + 1
+                        end if
+                        if (mask_fill(i,j+1) == 1) then
+                            sum_neighbors = sum_neighbors + 1.0_wp
+                            num_neighbors = num_neighbors + 1
+                        end if
+                        if (mask_fill(i,j-1) == 1) then
+                            sum_neighbors = sum_neighbors + 1.0_wp
+                            num_neighbors = num_neighbors + 1
+                        end if
+        
+                        ! Update the ocean point based on the average of neighboring land points
+                        if (num_neighbors .gt. 0) then
+                            mask_new(i,j) = sum_neighbors / num_neighbors
+                            count_changes = count_changes + 1
+                        end if
+                    end if
+                end do
+            end do
+        
+            ! Update mask_fill with the new values
+            mask_fill = mask_new
+        end do
+        
+        deallocate(mask_new)
+        
+        return
+        
+    end subroutine extrapolate_ocn_neighbor        
 
 end module calving_ac

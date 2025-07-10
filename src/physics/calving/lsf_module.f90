@@ -46,7 +46,7 @@ contains
         
     end subroutine LSFinit
 
-    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,var_dot,mask_adv,dx,dy,dt,solver)
+    subroutine LSFupdate(dlsf,lsf,cr_acx,cr_acy,u_acx,v_acy,mask_adv,dx,dy,dt,solver)
 
         implicit none
 
@@ -55,7 +55,6 @@ contains
         real(wp),       intent(INOUT) :: cr_acx(:,:),cr_acy(:,:) ! [m/yr] calving rate (vertical)
         real(wp),       intent(IN)    :: u_acx(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
         real(wp),       intent(IN)    :: v_acy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
-        real(wp),       intent(IN)    :: var_dot(:,:)            ! [dvar/dt] Source term for variable (needed?)
         integer,        intent(IN)    :: mask_adv(:,:)           ! Advection mask
         real(wp),       intent(IN)    :: dx                      ! [m] Horizontal resolution, x-direction
         real(wp),       intent(IN)    :: dy                      ! [m] Horizontal resolution, y-direction
@@ -66,22 +65,37 @@ contains
         integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
         real(wp), allocatable :: wx(:,:), wy(:,:), mask_lsf(:,:)
         integer,  allocatable :: mask_new_adv(:,:)
+        real(wp), allocatable :: var_dot(:,:)                    ! [dvar/dt] Source term for variable. Not used in LSF.
 
         nx = size(lsf,1)
         ny = size(lsf,2)
         allocate(wx(nx,ny))
         allocate(wy(nx,ny))
         allocate(mask_lsf(nx,ny))
+        allocate(var_dot(nx,ny))
         
         ! Initialize variables
         dlsf         = 0.0_wp  ! LSF change in a time dt
         wx           = 0.0_wp  ! retreat-rate x direction (ac-node)
         wy           = 0.0_wp  ! retreat-rate y direction (ac-node)
         mask_lsf     = 1.0_wp  ! Allow all LSF mask to be advected
+        var_dot      = 0.0_wp
 
-        ! lsf velocity
+        ! net lsf velocity
         wx = u_acx + cr_acx
         wy = v_acy + cr_acy   
+
+        ! Extrapolate lsf velocities outside of the ice domain.
+        if (.TRUE.) then
+            ! simple extrapolation (only x or y direction, nearest neighbour)
+            call extrapolate_ocn_acx(wx,wx,u_acx)
+            call extrapolate_ocn_acy(wy,wy,v_acy)
+        else
+            ! laplace extrapolation (weighting on the x and y direction)
+            ! computationally more expensive
+            call extrapolate_ocn_laplace_simple(wx,wx,u_acx)
+            call extrapolate_ocn_laplace_simple(wy,wy,v_acy)
+        end if
 
         ! Compute the advected LSF field
         if (.TRUE.) then

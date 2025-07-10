@@ -1,7 +1,7 @@
 &ctl
 
     exp         = "exp3"                ! "exp1", "exp2", "exp3", "exp4", "exp5"
-    dx           = 5.0                 ! [km] Grid resolution
+    dx           = 25.0                 ! [km] Grid resolution
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
@@ -42,7 +42,7 @@
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
-    pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
+    pc_use_H_pred   = True             ! Use predicted H_ice instead of corrected H_ice 
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 10                ! How many times can the same iteration be repeated (when high error exists)
@@ -62,6 +62,7 @@
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
+    grounded_melt       = False
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
@@ -110,7 +111,8 @@
     tau_ice             = 250.0e3           ! [Pa] Ice strength failure
 
     ! === threshold method ===
-    Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_flt          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_grnd         = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean

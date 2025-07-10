@@ -470,6 +470,7 @@ contains
         real(wp), allocatable :: H_frnt(:,:)
         real(wp), allocatable :: calverate(:,:)
         real(wp), allocatable :: fice_subgrid(:,:)
+        real(wp), allocatable :: tau_rate(:,:)
 
         ! Profile A variables
         !real(wp), allocatable :: lithkA(:,:),sA(:,:),xvelmeanA(:,:),yvelmeanA(:,:),maskA(:,:)
@@ -481,6 +482,7 @@ contains
         allocate(uy_bar_aa(ylmo%grd%nx,ylmo%grd%ny)) 
         allocate(calverate(ylmo%grd%nx,ylmo%grd%ny))
         allocate(fice_subgrid(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(tau_rate(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Profile A
         !allocate(lithkA(1,1+INT(0.5*(ylmo%grd%ny+1))))
@@ -500,7 +502,7 @@ contains
         ux_bar_aa   = 0.0_wp
         uy_bar_aa   = 0.0_wp
         H_clvmip    = ylmo%tpo%now%H_ice
-        H_frnt    = ylmo%tpo%now%H_ice
+        H_frnt      = ylmo%tpo%now%H_ice
         calverate   = ylmo%tpo%now%cmb_flt
     
         ! Open the file for writing
@@ -560,6 +562,15 @@ contains
                     standard_name="land_ice_vertical_mean_x_velocity_ac", dims=dims,ncid=ncid)
             call nc_write(filename,"yvelmean_ac",ylmo%dyn%now%uy_bar,start=[1,1,n],units="m a-1",long_name="Y velocity", &
                     standard_name="land_ice_vertical_mean_y_velocity_ac", dims=dims,ncid=ncid)
+            tau_rate = ylmo%mat%now%strs2D%tau_eig_1/ylmo%tpo%par%tau_ice
+            call nc_write(filename,"tau_rate",tau_rate,start=[1,1,n],units="Pa",long_name="1st ppal stress", &
+                    standard_name="1sr_ppal_stress", dims=dims,ncid=ncid)
+            call nc_write(filename,"tau_1",ylmo%mat%now%strs2D%tau_eig_1,start=[1,1,n],units="Pa",long_name="1st ppal stress", &
+                    standard_name="1sr_ppal_stress", dims=dims,ncid=ncid)        
+            call nc_write(filename,"cr_acx",ylmo%tpo%now%cr_acx,start=[1,1,n],units="m a-1",long_name="X velocity LSF", &
+                    standard_name="land_ice_vertical_mean_x_velocity_ac", dims=dims,ncid=ncid)
+            call nc_write(filename,"cr_acy",ylmo%tpo%now%cr_acy,start=[1,1,n],units="m a-1",long_name="Y velocity LSF", &
+                    standard_name="land_ice_vertical_mean_y_velocity_ac", dims=dims,ncid=ncid)      
         end if
 
         ! Close the netcdf file

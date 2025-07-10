@@ -43,7 +43,7 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo
         type(ydyn_class),   intent(IN)    :: dyn
-        type(ymat_class),   intent(IN)    :: mat
+        type(ymat_class),   intent(INOUT)    :: mat
         type(ytherm_class), intent(IN)    :: thrm  
         type(ybound_class), intent(IN)    :: bnd
         type(ydata_class),  intent(IN)    :: dta 
@@ -624,7 +624,7 @@ end if
     
         type(ytopo_class),  intent(INOUT) :: tpo
         type(ydyn_class),   intent(IN)    :: dyn
-        type(ymat_class),   intent(IN)    :: mat
+        type(ymat_class),   intent(INOUT)    :: mat
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd
         real(wp),           intent(IN)    :: dt
@@ -635,9 +635,8 @@ end if
         integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
         real(wp) :: dt_kill
         real(wp), allocatable :: mbal_now(:,:)
-        real(wp), allocatable :: var_dot(:,:)
+        !real(wp), allocatable :: var_dot(:,:)
         real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
-        integer, allocatable  :: mask_ocn(:,:)
         
         ! Make sure dt is not zero
         dt_kill = dt 
@@ -647,14 +646,11 @@ end if
         ny = size(tpo%now%H_ice,2)
        
         allocate(mbal_now(nx,ny))
-        allocate(var_dot(nx,ny))
+        !allocate(var_dot(nx,ny))
         allocate(u_acx_fill(nx,ny))
         allocate(v_acy_fill(nx,ny))
-        allocate(mask_ocn(nx,ny))
 
-        var_dot  = 0.0               
-        mask_ocn = 0
-        where(tpo%now%H_ice .gt. 0.0_wp) mask_ocn = 1
+        !var_dot  = 0.0               
 
         ! === Floating calving laws ===
         
@@ -663,21 +659,6 @@ end if
         tpo%now%cmb_flt_y = 0.0_wp
         tpo%now%cmb_flt   = 0.0_wp
 
-        ! Extrapolate velocities into the ocean.
-        u_acx_fill = dyn%now%ux_bar
-        v_acy_fill = dyn%now%uy_bar
-
-        if (.TRUE.) then
-            ! simple extrapolation (only x or y direction, nearest neighbour)
-            call extrapolate_ocn_acx(u_acx_fill,dyn%now%ux_bar,dyn%now%ux_bar)
-            call extrapolate_ocn_acy(v_acy_fill,dyn%now%uy_bar,dyn%now%uy_bar)
-        else
-            ! laplace extrapolation (weighting on the x and y direction)
-            ! computationally more expensive
-            call extrapolate_ocn_laplace_simple(u_acx_fill,dyn%now%ux_bar,dyn%now%ux_bar)
-            call extrapolate_ocn_laplace_simple(v_acy_fill,dyn%now%uy_bar,dyn%now%uy_bar)
-        end if
-
         select case(trim(tpo%par%calv_flt_method))
     
             case("zero","none")
@@ -685,26 +666,26 @@ end if
                 
             case("equil")
                 ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
-                tpo%now%cmb_flt_x = -1*u_acx_fill
-                tpo%now%cmb_flt_y = -1*v_acy_fill
+                tpo%now%cmb_flt_x = -1*dyn%now%ux_bar
+                tpo%now%cmb_flt_y = -1*dyn%now%uy_bar
     
             case("threshold")
-                call calc_calving_threshold_lsf(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,mask_ocn,tpo%par%boundaries)
+                call calc_calving_threshold_lsf(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%now%f_ice,tpo%par%boundaries)
         
             case("vm-m16")
-                call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,mat%now%strs2D%tau_eig_1,tpo%par%tau_ice,mask_ocn,tpo%par%boundaries)
+                call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,mat%now%strs2D%tau_eig_1,tpo%par%tau_ice,tpo%now%f_ice,tpo%par%boundaries)
                 
             ! TO DO: Add new laws
     
             ! === CalvMIP laws ===
             case("exp1","exp3")
-                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
     
             case("exp2","exp4")
-                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,time_now,tpo%par%boundaries)
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
             
             case("exp5")
-                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_flt,mask_ocn,tpo%par%boundaries)
+                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%now%f_ice,tpo%par%boundaries)
 
             case DEFAULT
     
@@ -728,12 +709,12 @@ end if
 
             case("equil")
                 ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
-                tpo%now%cmb_grnd_x = -1*u_acx_fill
-                tpo%now%cmb_grnd_y = -1*v_acy_fill
+                tpo%now%cmb_grnd_x = -1*dyn%now%ux_bar
+                tpo%now%cmb_grnd_y = -1*dyn%now%uy_bar
 
             case("threshold")
                 ! Ice thickness threshold.
-                call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,u_acx_fill,v_acy_fill,tpo%now%H_ice,tpo%par%Hc_ref_grnd,mask_ocn,tpo%par%boundaries)
+                call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%now%f_ice,tpo%par%boundaries)
         
             ! Add new laws
             ! MICI should be a marine terminating calving law (only for grounding-line points?)
@@ -793,7 +774,7 @@ end if
         ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,u_acx_fill,v_acy_fill, &
-                        var_dot,tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
+                       tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
         ! === Calving ===
         ! Apply calving as a melt rate equal to ice thickness where lsf is positive
@@ -855,9 +836,6 @@ end if
                 where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
             end if
         end if
-
-        ! Deallocate local variables
-        deallocate(mask_ocn)
 
         return
     

@@ -713,6 +713,9 @@ end if
                 ! Ice thickness threshold.
                 call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%now%f_ice,tpo%par%boundaries)
         
+            case("vm-m16")
+                call calc_calving_rate_vonmises_m16(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,dyn%now%ux_bar,dyn%now%uy_bar,mat%now%strs2D%tau_eig_1,tpo%par%tau_ice,tpo%now%f_ice,tpo%par%boundaries)    
+
             ! Add new laws
             ! MICI should be a marine terminating calving law (only for grounding-line points?)
 
@@ -730,6 +733,7 @@ end if
     
         ! === Merge all calving law ===
         ! Merge all calving-rates into a single velocity field.
+        ! Using ac-nodes for indices now.
         tpo%now%cr_acx = 0.0_wp
         tpo%now%cr_acy = 0.0_wp
         

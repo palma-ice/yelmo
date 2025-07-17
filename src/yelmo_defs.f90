@@ -126,7 +126,8 @@ module yelmo_defs
         real(wp)           :: w2  
         real(wp)           :: kt_ref
         real(wp)           :: kt_deep
-        real(wp)           :: Hc_ref
+        real(wp)           :: Hc_ref_flt
+        real(wp)           :: Hc_ref_grnd
         real(wp)           :: Hc_deep
         real(wp)           :: zb_deep_0
         real(wp)           :: zb_deep_1
@@ -136,6 +137,10 @@ module yelmo_defs
         real(wp)           :: dmb_sigma_ref
         real(wp)           :: dmb_m_d 
         real(wp)           :: dmb_m_r
+        logical            :: use_lsf
+        real(wp)           :: dt_lsf
+        real(wp)           :: tau_ice
+        logical            :: grounded_melt
 
         ! Internal parameters 
         real(dp)           :: time 
@@ -179,7 +184,8 @@ module yelmo_defs
         real(wp), allocatable :: dmb(:,:)
         real(wp), allocatable :: cmb(:,:)
         real(wp), allocatable :: cmb_flt(:,:)
-        real(wp), allocatable :: cmb_grnd(:,:)
+        real(wp), allocatable :: cmb_grnd(:,:)  
+        real(wp), allocatable :: lsf(:,:)
 
     end type
 
@@ -198,6 +204,7 @@ module yelmo_defs
         real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
         real(wp), allocatable :: cmb_flt(:,:)     ! Calving rate, floating (applied) [m/a]
         real(wp), allocatable :: cmb_grnd(:,:)    ! Calving rate, grounded (applied) [m/a]
+        real(wp), allocatable :: dlsfdt(:,:)      ! LSF rate of change [m/a] 
 
         real(wp) :: dt_tot
     end type
@@ -229,8 +236,16 @@ module yelmo_defs
         real(wp), allocatable   :: fmb_ref(:,:)     ! Combined field of fmb_grnd and fmb_shlf    
         real(wp), allocatable   :: dmb_ref(:,:)     ! Subgrid discharge mb rate
 
-        real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate, aa-node [m/a]
+        real(wp), allocatable   :: cmb_flt_x(:,:)   ! Reference floating calving rate, ac-node [m/a]
+        real(wp), allocatable   :: cmb_flt_y(:,:)   ! Reference floating calving rate, ac-node [m/a]
         real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
+        real(wp), allocatable   :: cmb_grnd_x(:,:)  ! Reference grounded calving rate, ac-node [m/a]
+        real(wp), allocatable   :: cmb_grnd_y(:,:)  ! Reference grounded calving rate, ac-node [m/a]
+        real(wp), allocatable   :: cr_acx(:,:)      ! LSF net calving rate, ac-node [m/a]
+        real(wp), allocatable   :: cr_acy(:,:)      ! LSF net calving rate, ac-node [m/a]
+        real(wp), allocatable   :: lsf(:,:)         ! LSF mask
+        real(wp), allocatable   :: dlsfdt(:,:)      ! LSF rate of change 
         
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
@@ -275,7 +290,8 @@ module yelmo_defs
         real(wp), allocatable   :: dHidt_dyn_n(:,:) ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
-        
+        real(wp), allocatable   :: lsf_n(:,:)       ! [-] LSF mask from previous timestep 
+
         real(wp), allocatable   :: H_ice_dyn(:,:) 
         real(wp), allocatable   :: f_ice_dyn(:,:) 
         
@@ -804,7 +820,7 @@ module yelmo_defs
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(wp), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
         integer,  allocatable :: mask_bed(:,:)
-        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
+        real(wp), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) , lsf(:,:)
         real(wp), allocatable :: T_srf(:,:), smb(:,:)
         real(wp), allocatable :: depth_iso(:,:,:)  
         
@@ -850,9 +866,10 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
-        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt,  cmb_grnd
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
+        real(wp)   :: lsf
 
         ! ===== Grounded ice variables =====
         real(wp)   :: H_ice_g, z_srf_g, V_ice_g, A_ice_g, uxy_bar_g, uxy_s_g, uxy_b_g
@@ -932,6 +949,7 @@ module yelmo_defs
         
         ! nml group names
         character(len=32)   :: nml_ytopo
+        character(len=32)   :: nml_ycalv    
         character(len=32)   :: nml_ydyn
         character(len=32)   :: nml_ytill
         character(len=32)   :: nml_yneff

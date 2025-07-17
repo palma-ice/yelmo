@@ -235,25 +235,32 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 16 
+            qtot = 23 
             allocate(names(qtot))
-            names(1)  = "H_ice"
-            names(2)  = "z_srf"
-            names(3)  = "z_bed"
-            names(4)  = "mask_bed"
-            names(5)  = "uxy_b"
-            names(6)  = "uxy_s"
-            names(7)  = "uxy_bar"
-            names(8)  = "beta"
-            names(9)  = "visc_bar"
-            names(10) = "T_prime_b"
-            names(11) = "H_w"
-            names(12) = "mb_net"
-            names(13) = "smb"
-            names(14) = "bmb"
-            names(15) = "cmb"
-            names(16) = "z_sl"
-
+                names(1)  = "H_ice"
+                names(2)  = "z_srf"
+                names(3)  = "z_bed"
+                names(4)  = "mask_bed"
+                names(5)  = "uxy_b"
+                names(6)  = "uxy_s"
+                names(7)  = "uxy_bar"
+                names(8)  = "ux_bar"
+                names(9)  = "uy_bar"
+                names(10) = "beta"
+                names(11) = "visc_bar"
+                names(12) = "T_prime_b"
+                names(13) = "H_w"
+                names(14) = "mb_net"
+                names(15) = "mb_resid"
+                names(16) = "mb_relax"
+                names(17) = "smb"
+                names(18) = "bmb"
+                names(19) = "cmb"
+                names(20) = "cmb_flt_x"
+                names(21) = "cmb_flt_y"
+                names(22) = "z_sl"
+                names(23) = "lsf"
+                !names(24) = "dlsfdt"
         end if 
 
         write_pd_metrics = .FALSE. 
@@ -648,48 +655,52 @@ contains
         
         ! == ytopo variables ===
 
-        call nc_read_interp(filename,"H_ice",       tpo%now%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"z_srf",       tpo%now%z_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"z_base",      tpo%now%z_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dzsdt",       tpo%now%dzsdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dHidt",       tpo%now%dHidt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dHidt_dyn",   tpo%now%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mb_net",      tpo%now%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mb_relax",    tpo%now%mb_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mb_resid",    tpo%now%mb_resid,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mb_err",      tpo%now%mb_err,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"smb",         tpo%now%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"bmb",         tpo%now%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"fmb",         tpo%now%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dmb",         tpo%now%dmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"cmb",         tpo%now%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"cmb_flt",     tpo%now%cmb_flt,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dzsdx",       tpo%now%dzsdx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        call nc_read_interp(filename,"dzsdy",       tpo%now%dzsdy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        call nc_read_interp(filename,"dHidx",       tpo%now%dHidx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dHidy",       tpo%now%dHidy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dzbdx",       tpo%now%dzbdx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        call nc_read_interp(filename,"dzbdy",       tpo%now%dzbdy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        call nc_read_interp(filename,"H_eff",       tpo%now%H_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"H_grnd",      tpo%now%H_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"f_grnd",      tpo%now%f_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        call nc_read_interp(filename,"f_grnd_acx",  tpo%now%f_grnd_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"f_grnd_acy",  tpo%now%f_grnd_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"f_ice",       tpo%now%f_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"H_ice",       tpo%now%H_ice,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"z_srf",       tpo%now%z_srf,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"z_base",      tpo%now%z_base,     ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dzsdt",       tpo%now%dzsdt,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dHidt",       tpo%now%dHidt,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dHidt_dyn",   tpo%now%dHidt_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mb_net",      tpo%now%mb_net,     ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mb_relax",    tpo%now%mb_relax,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mb_resid",    tpo%now%mb_resid,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mb_err",      tpo%now%mb_err,     ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"smb",         tpo%now%smb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"bmb",         tpo%now%bmb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"fmb",         tpo%now%fmb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dmb",         tpo%now%dmb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb",         tpo%now%cmb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt",     tpo%now%cmb_flt,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"lsf",         tpo%now%lsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"dlsf",        tpo%now%dlsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dzsdx",       tpo%now%dzsdx,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"dzsdy",       tpo%now%dzsdy,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"dHidx",       tpo%now%dHidx,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dHidy",       tpo%now%dHidy,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dzbdx",       tpo%now%dzbdx,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"dzbdy",       tpo%now%dzbdy,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"H_eff",       tpo%now%H_eff,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"H_grnd",      tpo%now%H_grnd,     ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"f_grnd",      tpo%now%f_grnd,     ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"f_grnd_acx",  tpo%now%f_grnd_acx, ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"f_grnd_acy",  tpo%now%f_grnd_acy, ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"f_ice",       tpo%now%f_ice,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
         call nc_read_interp(filename,"dist_margin", tpo%now%dist_margin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"dist_grline", tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"mask_bed",    tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mask_grz",    tpo%now%mask_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mask_bed",    tpo%now%mask_bed,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mask_grz",    tpo%now%mask_grz,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
 
         call nc_read_interp(filename,"dHidt_dyn_n", tpo%now%dHidt_dyn_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"H_ice_n",     tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"z_srf_n",     tpo%now%z_srf_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"H_ice_n",     tpo%now%H_ice_n,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"z_srf_n",     tpo%now%z_srf_n,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
-        call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
         
         call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         
@@ -1049,6 +1060,12 @@ contains
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("cmb_grnd")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_grnd(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("lsf")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%lsf(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("dlsfdt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dlsfdt(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("z_srf")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_srf(i1:i2,j1:j2), &

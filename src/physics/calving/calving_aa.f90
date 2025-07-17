@@ -1,5 +1,6 @@
-module calving
-    ! Definitions for various calving laws 
+module calving_aa
+    ! Definitions for various calving laws on aa nodes. 
+    ! This will be used for mass balance calving 
 
     use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW
     use yelmo_tools, only : get_neighbor_indices
@@ -929,4 +930,4 @@ contains
 
     end subroutine calc_calving_ground_rate_stdev
 
-end module calving
+end module calving_aa

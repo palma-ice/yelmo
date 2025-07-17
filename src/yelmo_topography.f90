@@ -8,7 +8,9 @@ module yelmo_topography
     use yelmo_tools 
     
     use mass_conservation
-    use calving
+    use calving_aa
+    use calving_ac
+    use lsf_module
     use topography 
     use discharge
 
@@ -35,15 +37,16 @@ module yelmo_topography
     
 contains
     
-    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step,use_H_pred)
+    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,dta,time,topo_fixed,pc_step,use_H_pred)
 
         implicit none 
 
         type(ytopo_class),  intent(INOUT) :: tpo
         type(ydyn_class),   intent(IN)    :: dyn
-        type(ymat_class),   intent(IN)    :: mat
+        type(ymat_class),   intent(INOUT)    :: mat
         type(ytherm_class), intent(IN)    :: thrm  
-        type(ybound_class), intent(IN)    :: bnd 
+        type(ybound_class), intent(IN)    :: bnd
+        type(ydata_class),  intent(IN)    :: dta 
         real(wp),           intent(IN)    :: time
         logical,            intent(IN)    :: topo_fixed  
         character(len=*),   intent(IN)    :: pc_step 
@@ -97,7 +100,8 @@ contains
                     ! (the latter only for calculating rate of change later)
                     tpo%now%dHidt_dyn_n = tpo%now%dHidt_dyn
                     tpo%now%H_ice_n     = tpo%now%H_ice 
-                    tpo%now%z_srf_n     = tpo%now%z_srf 
+                    tpo%now%z_srf_n     = tpo%now%z_srf
+                    tpo%now%lsf_n       = tpo%now%lsf
 
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -125,6 +129,7 @@ end if
 
                     ! Set current thickness to predicted thickness
                     tpo%now%H_ice = tpo%now%pred%H_ice 
+                    tpo%now%lsf   = tpo%now%pred%lsf
 
                     ! Get ice-fraction mask for predicted ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -145,6 +150,7 @@ end if
                     
                     ! Apply rate and update ice thickness (corrected)
                     tpo%now%H_ice = tpo%now%H_ice_n
+                    tpo%now%lsf   = tpo%now%lsf_n
                     call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.FALSE.)
                     
             end select
@@ -165,7 +171,6 @@ end if
                     ! For either predictor or corrector step, also calculate all mass balance changes
 
                     ! === smb =====
-
                     call calc_G_mbal(tpo%now%smb,tpo%now%H_ice,tpo%now%f_grnd,bnd%smb,dt)
 
                     ! Apply rate and update ice thickness
@@ -183,7 +188,7 @@ end if
                     ! grounded/floating fraction of grid cells 
                     call calc_bmb_total(tpo%now%bmb_ref,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice, &
                                         tpo%now%H_grnd,tpo%now%f_grnd_bmb,tpo%par%gz_Hg0,tpo%par%gz_Hg1, &
-                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%boundaries)
+                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%grounded_melt,dta%pd%mask_bed,tpo%par%boundaries)
 
                     if (tpo%par%use_bmb) then
                         call calc_G_mbal(tpo%now%bmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%bmb_ref,dt)
@@ -224,11 +229,17 @@ end if
                     call apply_tendency(tpo%now%H_ice,tpo%now%dmb,dt,"dmb",adjust_mb=.TRUE.)
                     
                     ! === mb_net =====
-
                     tpo%now%mb_net = tpo%now%smb + tpo%now%bmb + tpo%now%fmb + tpo%now%dmb 
 
+                    ! === calving ===
                     ! Calculate and apply calving
-                    call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
+                    if (tpo%par%use_lsf) then
+                        ! Level-set function as calving
+                        call calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,H_prev,time)
+                    else
+                        ! Mass balance calving
+                        call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
+                    end if
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -292,9 +303,13 @@ end if
                     ! Add residual tendency to mb_net for proper accounting of mass change
                     tpo%now%mb_net = tpo%now%mb_net + tpo%now%mb_resid
 
+                    ! jablasco: kill ice
+                    !where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
+
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+                    
 
             end select 
 
@@ -315,7 +330,8 @@ end if
                     tpo%now%pred%dmb        = tpo%now%dmb
                     tpo%now%pred%cmb        = tpo%now%cmb 
                     tpo%now%pred%cmb_flt    = tpo%now%cmb_flt 
-                    tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd 
+                    tpo%now%pred%cmb_grnd   = tpo%now%cmb_grnd
+                    tpo%now%pred%lsf        = tpo%now%lsf 
                     
                 case("corrector")
                     ! Determine corrected ice thickness 
@@ -333,11 +349,13 @@ end if
                     tpo%now%corr%cmb        = tpo%now%cmb 
                     tpo%now%corr%cmb_flt    = tpo%now%cmb_flt 
                     tpo%now%corr%cmb_grnd   = tpo%now%cmb_grnd
+                    tpo%now%corr%lsf        = tpo%now%lsf
                     
                     ! Restore main ice thickness field to original 
                     ! value at the beginning of the timestep for 
                     ! calculation of remaining quantities (thermo, material)
                     tpo%now%H_ice = tpo%now%H_ice_n 
+                    tpo%now%lsf   = tpo%now%lsf_n 
 
                 case("advance")
                     ! Now let's actually advance the ice thickness field
@@ -363,8 +381,9 @@ end if
                         tpo%now%fmb         = tpo%now%pred%fmb 
                         tpo%now%dmb         = tpo%now%pred%dmb 
                         tpo%now%cmb         = tpo%now%pred%cmb 
-                        tpo%now%cmb_flt     = tpo%now%pred%cmb_flt 
-                        tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd 
+                        tpo%now%cmb_flt     = tpo%now%pred%cmb_flt
+                        tpo%now%cmb_grnd    = tpo%now%pred%cmb_grnd
+                        tpo%now%lsf         = tpo%now%pred%lsf 
                         
                     else
                         ! Load corrector fields in current state variables
@@ -378,16 +397,18 @@ end if
                         tpo%now%fmb         = tpo%now%corr%fmb 
                         tpo%now%dmb         = tpo%now%corr%dmb 
                         tpo%now%cmb         = tpo%now%corr%cmb 
-                        tpo%now%cmb_flt     = tpo%now%corr%cmb_flt 
-                        tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd 
+                        tpo%now%cmb_flt     = tpo%now%corr%cmb_flt
+                        tpo%now%cmb_grnd    = tpo%now%corr%cmb_grnd
+                        tpo%now%lsf         = tpo%now%corr%lsf 
                         
                     end if
                     
             end select
 
             ! Determine rates of change
-            tpo%now%dHidt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
-            tpo%now%dzsdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
+            tpo%now%dHidt  = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+            tpo%now%dzsdt  = (tpo%now%z_srf - tpo%now%z_srf_n) / dt
+            tpo%now%dlsfdt = (tpo%now%lsf   - tpo%now%lsf_n) / dt
 
             ! Determine mass balance error by comparing mass_in - mass_out to dHidt
             tpo%now%mb_err = tpo%now%dHidt - (tpo%now%mb_net + tpo%now%cmb)
@@ -449,7 +470,7 @@ end if
 
         ! == Determine thickness threshold for calving spatially ==
 
-        call define_calving_thickness_threshold(tpo%now%H_calv,tpo%now%z_bed_filt,tpo%par%Hc_ref, &
+        call define_calving_thickness_threshold(tpo%now%H_calv,tpo%now%z_bed_filt,tpo%par%Hc_ref_flt, &
                                             tpo%par%Hc_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)
 
         ! Define factor for calving stress spatially
@@ -578,11 +599,8 @@ end if
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb_grnd,dt,"calv_grnd",adjust_mb=.TRUE.)
 
-
-
         ! Finally, get the total combined calving mass balance
         tpo%now%cmb = tpo%now%cmb_flt + tpo%now%cmb_grnd 
-
 
         ! Update ice fraction mask 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
@@ -604,6 +622,229 @@ end if
         return
 
     end subroutine calc_ytopo_calving
+
+    subroutine calc_ytopo_calving_lsf(tpo,dyn,mat,thrm,bnd,dt,H_prev,time_now)
+        ! Calving computed as a flux. LSF mask is updated with velocity - calving front velocity.
+        ! Points in ocean domain (LSF > 0) will be deleted with a melt equal to the ice thickness.
+
+        implicit none
+    
+        type(ytopo_class),  intent(INOUT) :: tpo
+        type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(INOUT)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd
+        real(wp),           intent(IN)    :: dt
+        real(wp),           intent(IN)    :: H_prev(:,:)
+        real(wp), optional, intent(IN)    :: time_now
+    
+        ! Local variables
+        integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
+        real(wp) :: dt_kill
+        real(wp), allocatable :: mbal_now(:,:)
+        !real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
+        
+        ! Make sure dt is not zero
+        dt_kill = dt 
+        if (dt_kill .eq. 0.0) dt_kill = 1.0_wp
+    
+        nx = size(tpo%now%H_ice,1)
+        ny = size(tpo%now%H_ice,2)
+       
+        allocate(mbal_now(nx,ny))
+
+        ! === Floating calving laws ===
+        
+        ! Initialize the calving rates
+        tpo%now%cmb_flt_x = 0.0_wp
+        tpo%now%cmb_flt_y = 0.0_wp
+        tpo%now%cmb_flt   = 0.0_wp
+
+        select case(trim(tpo%par%calv_flt_method))
+    
+            case("zero","none")
+                ! Do nothing. No calving.
+                
+            case("equil")
+                ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
+                tpo%now%cmb_flt_x = -1*dyn%now%ux_bar
+                tpo%now%cmb_flt_y = -1*dyn%now%uy_bar
+    
+            case("threshold")
+                call calc_calving_threshold_lsf(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%now%f_ice,tpo%par%boundaries)
+        
+            case("vm-m16")
+                call calc_calving_rate_vonmises_m16(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,mat%now%strs2D%tau_eig_1,tpo%par%tau_ice,tpo%now%f_ice,tpo%par%boundaries)
+                
+            ! TO DO: Add new laws
+    
+            ! === CalvMIP laws ===
+            case("exp1","exp3")
+                call calvmip_exp1(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%lsf,tpo%par%dx,tpo%par%boundaries) 
+    
+            case("exp2","exp4")
+                call calvmip_exp2(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,time_now,tpo%par%boundaries)
+            
+            case("exp5")
+                call calvmip_exp5_aa(tpo%now%cmb_flt_x,tpo%now%cmb_flt_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_flt,tpo%now%f_ice,tpo%par%boundaries)
+
+            case DEFAULT
+    
+                write(*,*) "calc_ytopo:: Error: floating calving method not recognized."
+                write(*,*) "calv_flt_method = ", trim(tpo%par%calv_flt_method)
+                stop
+    
+        end select
+    
+        ! === Marine terminating calving laws ===
+
+        ! Initialize the calving rates
+        tpo%now%cmb_grnd_x = 0.0_wp
+        tpo%now%cmb_grnd_y = 0.0_wp
+        tpo%now%cmb_grnd   = 0.0_wp
+
+        select case(trim(tpo%par%calv_grnd_method))
+
+            case("zero","none")
+                ! Do nothing. No calving.
+
+            case("equil")
+                ! For an equilibrated ice sheet calving rates should be opposite to ice velocity
+                tpo%now%cmb_grnd_x = -1*dyn%now%ux_bar
+                tpo%now%cmb_grnd_y = -1*dyn%now%uy_bar
+
+            case("threshold")
+                ! Ice thickness threshold.
+                call calc_calving_threshold_lsf(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%par%Hc_ref_grnd,tpo%now%f_ice,tpo%par%boundaries)
+        
+            case("vm-m16")
+                call calc_calving_rate_vonmises_m16(tpo%now%cmb_grnd_x,tpo%now%cmb_grnd_y,dyn%now%ux_bar,dyn%now%uy_bar,mat%now%strs2D%tau_eig_1,tpo%par%tau_ice,tpo%now%f_ice,tpo%par%boundaries)    
+
+            ! Add new laws
+            ! MICI should be a marine terminating calving law (only for grounding-line points?)
+
+            case DEFAULT
+    
+                write(*,*) "calc_ytopo:: Error: grounded calving method not recognized."
+                write(*,*) "calv_grnd_method = ", trim(tpo%par%calv_grnd_method)
+                stop
+    
+        end select
+        
+        ! === Land terminating calving laws ===
+        ! For the moment we will assume no calving laws for land-terminating ice points.
+        ! Only deformation.
+    
+        ! === Merge all calving law ===
+        ! Merge all calving-rates into a single velocity field.
+        ! Using ac-nodes for indices now.
+        tpo%now%cr_acx = 0.0_wp
+        tpo%now%cr_acy = 0.0_wp
+        
+        do j=1,ny
+        do i=1,nx
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            ! x-ac node
+            if (tpo%now%f_grnd_acx(i,j) .eq. 0.0) then
+                ! Floating point
+                tpo%now%cr_acx(i,j) = tpo%now%cmb_flt_x(i,j)
+            else
+                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(ip1,j)) .gt. 0.0_wp) then
+                    ! Point above sea level. Do nothing for now.
+                    tpo%now%cr_acx(i,j) = 0.0_wp
+                else
+                    ! Marine-terminating point.
+                    tpo%now%cr_acx(i,j) = tpo%now%cmb_grnd_x(i,j)
+                end if
+            end if
+                
+            ! y-ac node
+            if (tpo%now%f_grnd_acy(i,j) .eq. 0.0) then
+                ! Floating point
+                tpo%now%cr_acy(i,j) = tpo%now%cmb_flt_y(i,j)
+            else
+                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(i,jp1)) .gt. 0.0_wp) then
+                    ! Point above sea level. Do nothing for now.
+                    tpo%now%cr_acy(i,j) = 0.0_wp
+                else
+                    ! Marine-terminating point.
+                    tpo%now%cr_acy(i,j) = tpo%now%cmb_grnd_y(i,j)
+                end if
+            end if
+    
+        end do
+        end do
+
+        ! === LSF advection ===
+        ! Store previous lsf mask. Necessary to avoid compute it two times.
+        tpo%now%lsf_n = tpo%now%lsf
+        call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
+                       tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
+
+        ! LSF should not affect points above sea level
+        where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = -1.0_wp
+
+        ! === Calving ===
+        ! Apply calving as a melt rate equal to ice thickness where lsf is positive
+        tpo%now%cmb = 0.0_wp
+        do j=1,ny
+        do i=1,nx
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            ! Compute the mean calving rate in every aa node
+            tpo%now%cmb_flt(i,j) = ((0.5*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
+                                    (0.5*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
+
+            ! Redefine LSF    
+            if(tpo%now%lsf(i,j) .gt. 0.0_wp) then
+                ! Calve ice outside LSF mask (cmb = H_ice)
+                tpo%now%cmb(i,j) =  -(tpo%now%H_ice(i,j) / dt_kill)
+
+                ! reset LSF border
+                if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .and. &
+                    (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
+                    tpo%now%lsf(i,j) = 1.0_wp
+                end if
+            else
+                ! reset LSF border
+                if ((tpo%now%lsf(im1,j) .le. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .le. 0.0_wp) .and. &
+                    (tpo%now%lsf(i,jm1) .le. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .le. 0.0_wp)) then
+                    tpo%now%lsf(i,j) = -1.0_wp
+                end if
+            end if
+        end do
+        end do
+
+        ! Apply rate and update ice thickness
+        call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)
+
+        ! Update ice fraction mask 
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+            bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+
+        ! Treat fractional points that are not connected to full ice-covered points
+        call calc_G_remove_fractional_ice(mbal_now,tpo%now%H_ice,tpo%now%f_ice,dt)
+
+        ! Apply rate and update ice thickness
+        mbal_now = 0.0_wp
+        call apply_tendency(tpo%now%H_ice,mbal_now,dt,"frac",adjust_mb=.TRUE.)
+
+        ! Add this rate to calving tendency
+        tpo%now%cmb = tpo%now%cmb + mbal_now
+
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
+                        bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
+
+        ! reset LSF function after dt_lsf (only if dt_lsf is positive)
+        if (tpo%par%dt_lsf .gt. 0.0) then
+            if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
+                where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
+                where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
+            end if
+        end if
+
+        return
+    
+    end subroutine calc_ytopo_calving_lsf
 
     subroutine calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
         ! Calculate adjustments to surface elevation, bedrock elevation
@@ -781,6 +1022,7 @@ end if
                 tpo%now%rates%cmb           = 0.0
                 tpo%now%rates%cmb_flt       = 0.0
                 tpo%now%rates%cmb_grnd      = 0.0
+                tpo%now%rates%dlsfdt        = 0.0
 
                 tpo%now%rates%dt_tot = 0.0 
 
@@ -801,6 +1043,8 @@ end if
                 tpo%now%rates%cmb           = tpo%now%rates%cmb         + tpo%now%cmb*dt
                 tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt     + tpo%now%cmb_flt*dt
                 tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd    + tpo%now%cmb_grnd*dt
+                tpo%now%rates%dlsfdt        = tpo%now%rates%dlsfdt      + tpo%now%dlsfdt*dt
+
 
                 tpo%now%rates%dt_tot = tpo%now%rates%dt_tot + dt  
                 
@@ -823,7 +1067,8 @@ end if
                     tpo%now%rates%cmb           = tpo%now%rates%cmb / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb_flt       = tpo%now%rates%cmb_flt / tpo%now%rates%dt_tot
                     tpo%now%rates%cmb_grnd      = tpo%now%rates%cmb_grnd / tpo%now%rates%dt_tot
-
+                    tpo%now%rates%dlsfdt        = tpo%now%rates%dlsfdt / tpo%now%rates%dt_tot
+                    
                     ! Check that dt_tot matches outer dt value
                     if ( abs(dt - tpo%now%rates%dt_tot) .gt. tol_dt) then
                         write(*,*) "calc_ytopo_rates: dt, dt_tot : ", dt, tpo%now%rates%dt_tot
@@ -849,6 +1094,7 @@ end if
                         tpo%now%cmb         = tpo%now%rates%cmb
                         tpo%now%cmb_flt     = tpo%now%rates%cmb_flt
                         tpo%now%cmb_grnd    = tpo%now%rates%cmb_grnd
+                        tpo%now%dlsfdt      = tpo%now%rates%dlsfdt
 
                     end if
                 end if 
@@ -875,11 +1121,12 @@ end if
 
     end subroutine calc_ytopo_rates
     
-    subroutine ytopo_par_load(par,filename,group,nx,ny,dx,init)
+    subroutine ytopo_par_load(par,filename,group_ytopo,group_ycalv,nx,ny,dx,init)
 
         type(ytopo_param_class), intent(OUT) :: par
         character(len=*),        intent(IN)  :: filename
-        character(len=*),        intent(IN)  :: group       ! Usually "ytopo"
+        character(len=*),        intent(IN)  :: group_ytopo ! Usually "ytopo"
+        character(len=*),        intent(IN)  :: group_ycalv ! calving group
         integer,                 intent(IN)  :: nx, ny 
         real(wp),                intent(IN)  :: dx  
         logical, optional,       intent(IN)  :: init 
@@ -891,53 +1138,66 @@ end if
         if (present(init)) init_pars = .TRUE. 
  
         ! Store parameter values in output object
-        call nml_read(filename,group,"solver",            par%solver,           init=init_pars)
-        call nml_read(filename,group,"surf_gl_method",    par%surf_gl_method,   init=init_pars)
-        call nml_read(filename,group,"calv_flt_method",   par%calv_flt_method,  init=init_pars)
-        call nml_read(filename,group,"calv_grnd_method",  par%calv_grnd_method, init=init_pars)
-        call nml_read(filename,group,"bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
-        call nml_read(filename,group,"fmb_method",        par%fmb_method,       init=init_pars)
-        call nml_read(filename,group,"dmb_method",        par%dmb_method,       init=init_pars)
-        call nml_read(filename,group,"margin2nd",         par%margin2nd,        init=init_pars)
-        call nml_read(filename,group,"margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
-        call nml_read(filename,group,"use_bmb",           par%use_bmb,          init=init_pars)
-        call nml_read(filename,group,"topo_fixed",        par%topo_fixed,       init=init_pars)
-        call nml_read(filename,group,"topo_rel",          par%topo_rel,         init=init_pars)
-        call nml_read(filename,group,"topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
-        call nml_read(filename,group,"topo_rel_field",    par%topo_rel_field,   init=init_pars)
-        call nml_read(filename,group,"calv_tau",          par%calv_tau,         init=init_pars)
-        call nml_read(filename,group,"calv_thin",         par%calv_thin,        init=init_pars)
-        call nml_read(filename,group,"H_min_grnd",        par%H_min_grnd,       init=init_pars)
-        call nml_read(filename,group,"H_min_flt",         par%H_min_flt,        init=init_pars)
-        call nml_read(filename,group,"sd_min",            par%sd_min,           init=init_pars)
-        call nml_read(filename,group,"sd_max",            par%sd_max,           init=init_pars)
-        call nml_read(filename,group,"calv_grnd_max",     par%calv_grnd_max,    init=init_pars)
-        call nml_read(filename,group,"grad_lim",          par%grad_lim,         init=init_pars)
-        call nml_read(filename,group,"grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
-        call nml_read(filename,group,"dist_grz",          par%dist_grz,         init=init_pars)
-        call nml_read(filename,group,"gl_sep",            par%gl_sep,           init=init_pars)
-        call nml_read(filename,group,"gz_nx",             par%gz_nx,            init=init_pars)
-        call nml_read(filename,group,"gz_Hg0",            par%gz_Hg0,           init=init_pars)
-        call nml_read(filename,group,"gz_Hg1",            par%gz_Hg1,           init=init_pars)
-        call nml_read(filename,group,"fmb_scale",         par%fmb_scale,        init=init_pars)
-        call nml_read(filename,group,"k2",                par%k2,               init=init_pars)
-        call nml_read(filename,group,"w2",                par%w2,               init=init_pars)
-        call nml_read(filename,group,"kt_ref",            par%kt_ref,           init=init_pars)
-        call nml_read(filename,group,"kt_deep",           par%kt_deep,          init=init_pars)
-        call nml_read(filename,group,"Hc_ref",            par%Hc_ref,           init=init_pars)
-        call nml_read(filename,group,"Hc_ref_thin",       par%Hc_ref_thin,      init=init_pars)
-        call nml_read(filename,group,"Hc_deep",           par%Hc_deep,          init=init_pars)
-        call nml_read(filename,group,"zb_deep_0",         par%zb_deep_0,        init=init_pars)
-        call nml_read(filename,group,"zb_deep_1",         par%zb_deep_1,        init=init_pars)
-        call nml_read(filename,group,"zb_sigma",          par%zb_sigma,         init=init_pars)
-        call nml_read(filename,group,"dmb_alpha_max",     par%dmb_alpha_max,    init=init_pars)
-        call nml_read(filename,group,"dmb_tau",           par%dmb_tau,          init=init_pars)
-        call nml_read(filename,group,"dmb_sigma_ref",     par%dmb_sigma_ref,    init=init_pars)
-        call nml_read(filename,group,"dmb_m_d",           par%dmb_m_d,          init=init_pars)
-        call nml_read(filename,group,"dmb_m_r",           par%dmb_m_r,          init=init_pars)
-        
-        ! === Set internal parameters =====
+        call nml_read(filename,group_ytopo,"solver",            par%solver,           init=init_pars)
+        call nml_read(filename,group_ytopo,"surf_gl_method",    par%surf_gl_method,   init=init_pars)
+        call nml_read(filename,group_ytopo,"grad_lim",          par%grad_lim,         init=init_pars)
+        call nml_read(filename,group_ytopo,"grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
+        call nml_read(filename,group_ytopo,"margin2nd",         par%margin2nd,        init=init_pars)
+        call nml_read(filename,group_ytopo,"margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
+        call nml_read(filename,group_ytopo,"use_bmb",           par%use_bmb,          init=init_pars)
+        call nml_read(filename,group_ytopo,"topo_fixed",        par%topo_fixed,       init=init_pars)
+        call nml_read(filename,group_ytopo,"topo_rel",          par%topo_rel,         init=init_pars)
+        call nml_read(filename,group_ytopo,"topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
+        call nml_read(filename,group_ytopo,"topo_rel_field",    par%topo_rel_field,   init=init_pars)
+        call nml_read(filename,group_ytopo,"grounded_melt",     par%grounded_melt,    init=init_pars)
+        ! Grounding line
+        call nml_read(filename,group_ytopo,"bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
+        call nml_read(filename,group_ytopo,"gl_sep",            par%gl_sep,           init=init_pars)
+        call nml_read(filename,group_ytopo,"gz_nx",             par%gz_nx,            init=init_pars)
+        ! pmpt method
+        call nml_read(filename,group_ytopo,"dist_grz",          par%dist_grz,         init=init_pars)
+        call nml_read(filename,group_ytopo,"gz_Hg0",            par%gz_Hg0,           init=init_pars)
+        call nml_read(filename,group_ytopo,"gz_Hg1",            par%gz_Hg1,           init=init_pars)
+        ! dmb
+        call nml_read(filename,group_ytopo,"dmb_method",        par%dmb_method,       init=init_pars)
+        call nml_read(filename,group_ytopo,"dmb_alpha_max",     par%dmb_alpha_max,    init=init_pars)
+        call nml_read(filename,group_ytopo,"dmb_tau",           par%dmb_tau,          init=init_pars)
+        call nml_read(filename,group_ytopo,"dmb_sigma_ref",     par%dmb_sigma_ref,    init=init_pars)
+        call nml_read(filename,group_ytopo,"dmb_m_d",           par%dmb_m_d,          init=init_pars)
+        call nml_read(filename,group_ytopo,"dmb_m_r",           par%dmb_m_r,          init=init_pars)
+        ! fmb
+        call nml_read(filename,group_ytopo,"fmb_method",        par%fmb_method,       init=init_pars)
+        call nml_read(filename,group_ytopo,"fmb_scale",         par%fmb_scale,        init=init_pars)
 
+        ! === read calving routine ===
+        call nml_read(filename,group_ycalv,"use_lsf",           par%use_lsf,            init=init_pars)
+        call nml_read(filename,group_ycalv,"dt_lsf",            par%dt_lsf,             init=init_pars)        
+        call nml_read(filename,group_ycalv,"calv_flt_method",   par%calv_flt_method,    init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_grnd_method",  par%calv_grnd_method,   init=init_pars)
+        ! ?
+        call nml_read(filename,group_ycalv,"H_min_grnd",        par%H_min_grnd,         init=init_pars)
+        call nml_read(filename,group_ycalv,"H_min_flt",         par%H_min_flt,          init=init_pars)
+        call nml_read(filename,group_ycalv,"sd_min",            par%sd_min,             init=init_pars)
+        call nml_read(filename,group_ycalv,"sd_max",            par%sd_max,             init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_grnd_max",     par%calv_grnd_max,      init=init_pars) 
+        !
+        call nml_read(filename,group_ycalv,"calv_tau",          par%calv_tau,           init=init_pars)
+        call nml_read(filename,group_ycalv,"calv_thin",         par%calv_thin,          init=init_pars)
+        call nml_read(filename,group_ycalv,"k2",                par%k2,                 init=init_pars)
+        call nml_read(filename,group_ycalv,"w2",                par%w2,                 init=init_pars)
+        call nml_read(filename,group_ycalv,"kt_ref",            par%kt_ref,             init=init_pars)
+        call nml_read(filename,group_ycalv,"kt_deep",           par%kt_deep,            init=init_pars)
+        call nml_read(filename,group_ycalv,"tau_ice",           par%tau_ice,            init=init_pars)
+        ! Threshold method
+        call nml_read(filename,group_ycalv,"Hc_ref_flt",        par%Hc_ref_flt,       init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref_grnd",       par%Hc_ref_grnd,      init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_ref_thin",       par%Hc_ref_thin,      init=init_pars)
+        call nml_read(filename,group_ycalv,"Hc_deep",           par%Hc_deep,          init=init_pars)
+        call nml_read(filename,group_ycalv,"zb_deep_0",         par%zb_deep_0,        init=init_pars)
+        call nml_read(filename,group_ycalv,"zb_deep_1",         par%zb_deep_1,        init=init_pars)
+        call nml_read(filename,group_ycalv,"zb_sigma",          par%zb_sigma,         init=init_pars)
+        
+        ! === Set internal parameters ====
         par%nx  = nx 
         par%ny  = ny 
         par%dx  = dx 
@@ -995,6 +1255,7 @@ end if
         allocate(now%rates%cmb(nx,ny))
         allocate(now%rates%cmb_flt(nx,ny))
         allocate(now%rates%cmb_grnd(nx,ny))
+        allocate(now%rates%dlsfdt(nx,ny))
         
         ! Remaining ytopo fields...
 
@@ -1015,7 +1276,16 @@ end if
         allocate(now%dmb(nx,ny))
         allocate(now%cmb(nx,ny))
         allocate(now%cmb_flt(nx,ny))
+        allocate(now%cmb_flt_x(nx,ny))
+        allocate(now%cmb_flt_y(nx,ny))
         allocate(now%cmb_grnd(nx,ny))
+        allocate(now%cmb_grnd_x(nx,ny))
+        allocate(now%cmb_grnd_y(nx,ny))
+        allocate(now%cr_acx(nx,ny))
+        allocate(now%cr_acy(nx,ny))
+
+        allocate(now%lsf(nx,ny))       
+        allocate(now%dlsfdt(nx,ny))
         
         allocate(now%bmb_ref(nx,ny))
         allocate(now%fmb_ref(nx,ny))
@@ -1059,6 +1329,7 @@ end if
         allocate(now%dHidt_dyn_n(nx,ny))
         allocate(now%H_ice_n(nx,ny))
         allocate(now%z_srf_n(nx,ny))
+        allocate(now%lsf_n(nx,ny))
         
         allocate(now%H_ice_dyn(nx,ny))
         allocate(now%f_ice_dyn(nx,ny))
@@ -1079,7 +1350,8 @@ end if
         now%rates%cmb           = 0.0
         now%rates%cmb_flt       = 0.0
         now%rates%cmb_grnd      = 0.0
-        
+        now%rates%dlsfdt        = 0.0
+
         now%H_ice       = 0.0 
         now%z_srf       = 0.0
         now%z_base      = 0.0  
@@ -1096,7 +1368,11 @@ end if
         now%dmb         = 0.0
         now%cmb         = 0.0
         now%cmb_flt     = 0.0
+        now%cmb_flt_x   = 0.0
+        now%cmb_flt_y   = 0.0
         now%cmb_grnd    = 0.0
+        now%lsf         = 1.0 ! init to 0.0?       
+        now%dlsfdt      = 0.0
         
         now%bmb_ref     = 0.0  
         now%fmb_ref     = 0.0
@@ -1135,7 +1411,8 @@ end if
 
         now%dHidt_dyn_n = 0.0  
         now%H_ice_n     = 0.0 
-        now%z_srf_n     = 0.0 
+        now%z_srf_n     = 0.0
+        now%lsf_n     = 0.0 
 
         now%H_ice_dyn   = 0.0 
         now%f_ice_dyn   = 0.0 
@@ -1169,6 +1446,7 @@ end if
         if (allocated(now%rates%cmb))           deallocate(now%rates%cmb)
         if (allocated(now%rates%cmb_flt))       deallocate(now%rates%cmb_flt)
         if (allocated(now%rates%cmb_grnd))      deallocate(now%rates%cmb_grnd)
+        if (allocated(now%rates%dlsfdt))        deallocate(now%rates%dlsfdt)
         
         if (allocated(now%H_ice))       deallocate(now%H_ice)
         if (allocated(now%z_srf))       deallocate(now%z_srf)
@@ -1187,7 +1465,15 @@ end if
         if (allocated(now%dmb))         deallocate(now%dmb)
         if (allocated(now%cmb))         deallocate(now%cmb)
         if (allocated(now%cmb_flt))     deallocate(now%cmb_flt)
+        if (allocated(now%cmb_flt_x))   deallocate(now%cmb_flt_x)
+        if (allocated(now%cmb_flt_y))   deallocate(now%cmb_flt_y)
         if (allocated(now%cmb_grnd))    deallocate(now%cmb_grnd)
+        if (allocated(now%cmb_grnd_x))  deallocate(now%cmb_grnd_x)
+        if (allocated(now%cmb_grnd_y))  deallocate(now%cmb_grnd_y)
+        if (allocated(now%cr_acx))      deallocate(now%cr_acx)
+        if (allocated(now%cr_acy))      deallocate(now%cr_acy)
+        if (allocated(now%lsf))         deallocate(now%lsf)       
+        if (allocated(now%dlsfdt))      deallocate(now%dlsfdt)
         
         if (allocated(now%bmb_ref))     deallocate(now%bmb_ref)
         if (allocated(now%fmb_ref))     deallocate(now%fmb_ref)
@@ -1230,6 +1516,7 @@ end if
         if (allocated(now%dHidt_dyn_n)) deallocate(now%dHidt_dyn_n)
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
         if (allocated(now%z_srf_n))     deallocate(now%z_srf_n)
+        if (allocated(now%lsf_n))       deallocate(now%lsf_n)
         
         if (allocated(now%H_ice_dyn))   deallocate(now%H_ice_dyn)
         if (allocated(now%f_ice_dyn))   deallocate(now%f_ice_dyn)
@@ -1263,6 +1550,7 @@ end if
         allocate(pc%cmb(nx,ny))      
         allocate(pc%cmb_flt(nx,ny))
         allocate(pc%cmb_grnd(nx,ny))
+        allocate(pc%lsf(nx,ny))
         
         ! Initialize to zero
         pc%H_ice        = 0.0
@@ -1275,8 +1563,9 @@ end if
         pc%fmb          = 0.0
         pc%dmb          = 0.0
         pc%cmb          = 0.0      
-        pc%cmb_flt      = 0.0
+        pc%cmb_flt      = 0.0 
         pc%cmb_grnd     = 0.0
+        pc%lsf          = 0.0            
         
         return
 
@@ -1299,6 +1588,7 @@ end if
         if (allocated(pc%cmb))          deallocate(pc%cmb)
         if (allocated(pc%cmb_flt))      deallocate(pc%cmb_flt)
         if (allocated(pc%cmb_grnd))     deallocate(pc%cmb_grnd)
+        if (allocated(pc%lsf))          deallocate(pc%lsf)
         
         return
 

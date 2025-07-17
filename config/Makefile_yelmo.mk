@@ -25,7 +25,14 @@ $(objdir)/grounding_line_flux.o: $(srcdir)/physics/grounding_line_flux.f90 $(obj
 							$(objdir)/yelmo_tools.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o
+$(objdir)/calving_aa.o: $(srcdir)/physics/calving/calving_aa.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/calving_ac.o: $(srcdir)/physics/calving/calving_ac.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/lsf_module.o: $(srcdir)/physics/calving/lsf_module.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o \
+                                                        $(objdir)/solver_advection.o $(objdir)/mass_conservation.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o
@@ -123,7 +130,7 @@ $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs
 
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
 							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \
- 							  $(objdir)/mass_conservation.o $(objdir)/calving.o \
+ 							  $(objdir)/mass_conservation.o $(objdir)/calving_ac.o $(objdir)/calving_aa.o $(objdir)/lsf_module.o \
 							  $(objdir)/discharge.o \
  							  $(objdir)/runge_kutta.o \
  							  $(objdir)/topography.o
@@ -151,7 +158,7 @@ $(objdir)/yelmo_boundaries.o: $(srcdir)/yelmo_boundaries.f90 $(objdir)/yelmo_def
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/yelmo_data.o: $(srcdir)/yelmo_data.f90 $(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o \
-						 $(objdir)/topography.o
+						 $(objdir)/topography.o $(objdir)/lsf_module.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/yelmo_regions.o: $(srcdir)/yelmo_regions.f90 $(objdir)/yelmo_defs.o $(objdir)/topography.o
@@ -202,7 +209,9 @@ yelmo_libs = 		  $(objdir)/climate_adjustments.o \
 
 yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/grounding_line_flux.o \
-					   $(objdir)/calving.o \
+					   $(objdir)/calving_ac.o \
+					   $(objdir)/calving_aa.o \
+					   $(objdir)/lsf_module.o \
 					   $(objdir)/deformation.o \
 					   $(objdir)/discharge.o \
 					   $(objdir)/thermodynamics.o \

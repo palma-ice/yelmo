@@ -69,3 +69,7 @@
 | 65 | pc_corr_fmb       | xc, yc      | m/yr        | Corrected frontal mass balance                     |
 | 66 | pc_corr_dmb       | xc, yc      | m/yr        | Corrected discharge mass balance                   |
 | 67 | pc_corr_cmb       | xc, yc      | m/yr        | Corrected calving mass balance                     |
+| 68 | lsf               | xc, yc      |             | Level-set function                                 |
+| 69 | dlsfdt            | xc, yc      |             | difference Level-set function                      |
+| 70 | cmb_flt_x         | xc, yc      | m/yr        | Floating calving rate (x-direction)                |
+| 71 | cmb_flt_y         | xc, yc      | m/yr        | Floating calving rate (y-direction)                |

@@ -14,6 +14,7 @@ module yelmo_ice
     use yelmo_io 
 
     use yelmo_topography
+    use lsf_module, only : LSFinit
     use yelmo_dynamics
     use yelmo_material
     use yelmo_thermodynamics
@@ -270,7 +271,7 @@ contains
                 ! Get predicted new ice thickness and store it for later use
                 !$ time1 = omp_get_wtime()
                 ! call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,dom%tpo%par%topo_fixed)
-                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"predictor")
+                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time_now,dom%tpo%par%topo_fixed,"predictor")
                 !$ time2 = omp_get_wtime()
                 !$ if(l_write_timer) print *,'TIME ytopo predictor',time2-time1
 
@@ -288,61 +289,62 @@ contains
                     dom%dyn%now%uy_bar = 0.5_wp*dom%dyn%now%uy_bar + 0.5_wp*dom%dyn%now%uy_bar_prev
                     
                 end if 
-                
-if (update_others_pc) then
-                ! Now, using old topography still, update additional fields.
 
-                ! Calculate material (ice properties, viscosity, etc.)
-                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+                if (update_others_pc) then
+                    ! Now, using old topography still, update additional fields.
 
-                ! Calculate thermodynamics (temperatures and enthalpy)
-                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
-end if 
+                    ! Calculate material (ice properties, viscosity, etc.)
+                    call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+
+                    ! Calculate thermodynamics (temperatures and enthalpy)
+                    call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+                end if 
 
                 ! Step 3: Perform corrector step for topography
                 ! Get corrected ice thickness and store it for later use
                 
                 !$ time1 = omp_get_wtime()
                 ! Call corrector step for topography
-                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector")
+                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time_now,dom%tpo%par%topo_fixed,"corrector")
                 !$ time2 = omp_get_wtime()
                 !$ if(l_write_timer) print *,'TIME ytopo corrector',time2-time1
 
                 ! Step 4: Determine truncation error for ice thickness
 
                 !$ time1 = omp_get_wtime()
-if (.TRUE.) then 
-    ! not rk4...
 
-                select case(trim(dom%par%pc_method))
-                    ! No default case necessary, handled earlier 
+                if (.TRUE.) then 
+                    ! not rk4...
 
-                    case("FE-SBE")
+                    select case(trim(dom%par%pc_method))
+                        ! No default case necessary, handled earlier 
+
+                        case("FE-SBE")
                         
-                        ! FE-SBE truncation error 
-                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
+                            ! FE-SBE truncation error 
+                            call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
-                    case("AB-SAM")
-                        
-                        ! AB-SAM truncation error 
-                        call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now, &
+                        case("AB-SAM")
+
+                            ! AB-SAM truncation error 
+                            call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now, &
                                                                                                 dom%tpo%par%dt_zeta)
 
-                    case("HEUN")
+                        case("HEUN")
 
-                        ! HEUN truncation error (same as FE-SBE)
-                        call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
+                            ! HEUN truncation error (same as FE-SBE)
+                            call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
-                    case("RALSTON")
+                        case("RALSTON")
 
-                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
+                            call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
-                end select 
+                    end select 
 
-else 
-    ! rk4 
-                dom%time%pc_tau = dom%tpo%rk4%tau 
-end if 
+                else 
+                    ! rk4 
+                    dom%time%pc_tau = dom%tpo%rk4%tau 
+                end if 
 
                 ! Calculate eta for this timestep 
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dom%bnd%z_bed, &
@@ -395,21 +397,21 @@ end if
             ! === Predictor-corrector completed successfully ===
 
             !$ time1 = omp_get_wtime()
-if (.not. update_others_pc) then
-            ! Now, using old topography still, update additional fields.
+            if (.not. update_others_pc) then
+                ! Now, using old topography still, update additional fields.
 
-            ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
 
-            ! Calculate thermodynamics (temperatures and enthalpy)
-            call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+                ! Calculate thermodynamics (temperatures and enthalpy)
+                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
 
-end if 
+            end if 
 
             ! Update topography accounting for advective changes
             ! and mass balance changes and calving.
 
-            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
+            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
 
             ! Update time averaging of instantaneous rates
             call calc_ytopo_rates(dom%tpo,dom%bnd,time_now,dt_now,step="step",check_mb=check_mb)
@@ -768,7 +770,7 @@ end if
         
         ! == topography ==
 
-        call ytopo_par_load(dom%tpo%par,filename,dom%par%nml_ytopo,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ytopo_par_load(dom%tpo%par,filename,dom%par%nml_ytopo,dom%par%nml_ycalv,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ytopo_alloc(dom%tpo%now,dom%tpo%par%nx,dom%tpo%par%ny)
         
@@ -1235,7 +1237,7 @@ end if
         ! will not contain regions of temperate ice. masks should be updated again
         ! after loaded remaining fields.
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for entire domain and subdomains)
         call yelmo_regions_update(dom)
@@ -1251,6 +1253,8 @@ end if
         !call yelmo_restart_write(dom,"./yelmo_check_z_bed.nc",time=0.0_wp,init=.TRUE.)
         !stop 
 
+        ! Finally lets initialize the LSF mask
+        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice,dom%bnd%z_bed,dom%tpo%par%dx)
 
         return 
 
@@ -1332,7 +1336,7 @@ end if
 
             ! Run topo and masks to make sure all fields are synchronized (masks, etc)
             !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
             ! Calculate initial thermodynamic information
             dom%thrm%par%time = dble(time) - dom%par%dt_min
@@ -1374,7 +1378,7 @@ end if
 
         ! Re-run topo again to make sure all fields are synchronized (masks, etc)
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%dta,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
 
         ! Update regional calculations (for entire domain and subdomains)
         call yelmo_regions_update(dom)
@@ -1398,6 +1402,7 @@ end if
         call nml_read(filename,group,"experiment",    par%experiment)
 
         call nml_read(filename,group,"nml_ytopo",     par%nml_ytopo)
+        call nml_read(filename,group,"nml_ycalv",     par%nml_ycalv)
         call nml_read(filename,group,"nml_ydyn",      par%nml_ydyn)
         call nml_read(filename,group,"nml_ytill",     par%nml_ytill)
         call nml_read(filename,group,"nml_yneff",     par%nml_yneff)

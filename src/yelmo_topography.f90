@@ -645,9 +645,6 @@ end if
         ny = size(tpo%now%H_ice,2)
        
         allocate(mbal_now(nx,ny))
-        !allocate(var_dot(nx,ny))
-        !allocate(u_acx_fill(nx,ny))
-        !allocate(v_acy_fill(nx,ny))
 
         ! === Floating calving laws ===
         
@@ -777,6 +774,9 @@ end if
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
                        tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
+        ! LSF should not affect points above sea level
+        where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = -1.0_wp
+
         ! === Calving ===
         ! Apply calving as a melt rate equal to ice thickness where lsf is positive
         tpo%now%cmb = 0.0_wp
@@ -806,9 +806,6 @@ end if
             end if
         end do
         end do
-
-        ! LSF should not affect points above sea level
-        where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = -1.0_wp
 
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)

@@ -6,7 +6,7 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D, &
-                            aa_to_nodes, get_neighbor_indices
+                            get_neighbor_indices
 
     use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
                             calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
@@ -952,7 +952,6 @@ contains
                         ! Subgrid interpolation using Gaussian quadrature (nxi=4 points)
 
                         ! Get H_w on Gaussian quadrature points
-                        !call aa_to_nodes(Hw_int(1,:),thrm%now%H_w,i,j,xn,yn,im1,ip1,jm1,jp1)
                         call gq2D_to_nodes(gq2D,Hw_int(1,:),thrm%now%H_w,dyn%par%dx,dyn%par%dy,"aa",i,j,im1,ip1,jm1,jp1)
                     
                         call calc_effective_pressure_till(Neff_int,Hw_int,H_eff,tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &

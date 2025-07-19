@@ -241,6 +241,7 @@ module yelmo_defs
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
         
         real(wp), allocatable   :: z_base(:,:)      ! Ice-base elevation [m]
+
         real(wp), allocatable   :: dzsdx(:,:)       ! Surface elevation slope [m m-1], acx nodes
         real(wp), allocatable   :: dzsdy(:,:)       ! Surface elevation slope [m m-1], acy nodes
         real(wp), allocatable   :: dHidx(:,:)       ! Ice thickness gradient slope [m m-1], acx nodes
@@ -248,6 +249,15 @@ module yelmo_defs
         real(wp), allocatable   :: dzbdx(:,:)       ! Bedrock elevation slope [m m-1], acx nodes
         real(wp), allocatable   :: dzbdy(:,:)       ! Bedrock elevation slope [m m-1], acy nodes
         
+        ! TESTING
+        real(wp), allocatable   :: dzsdx_aa(:,:)       ! Surface elevation slope [m m-1], acx nodes
+        real(wp), allocatable   :: dzsdy_aa(:,:)       ! Surface elevation slope [m m-1], acy nodes
+        real(wp), allocatable   :: dHidx_aa(:,:)       ! Ice thickness gradient slope [m m-1], acx nodes
+        real(wp), allocatable   :: dHidy_aa(:,:)       ! Ice thickness gradient slope [m m-1], acy nodes
+        real(wp), allocatable   :: dzbdx_aa(:,:)       ! Bedrock elevation slope [m m-1], acx nodes
+        real(wp), allocatable   :: dzbdy_aa(:,:)       ! Bedrock elevation slope [m m-1], acy nodes
+        
+
         real(wp), allocatable   :: H_eff(:,:)       ! Effective ice thickness (margin-corrected) [m]
         real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
         real(wp), allocatable   :: H_calv(:,:)

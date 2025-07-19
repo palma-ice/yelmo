@@ -13,7 +13,8 @@ module yelmo_topography
     use discharge
 
     use runge_kutta 
-    
+    use derivatives
+
     implicit none
     
     private
@@ -424,7 +425,7 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         real(wp), allocatable :: mbal_now(:,:) 
-        real(wp), allocatable :: cmb_sd(:,:) 
+        real(wp), allocatable :: cmb_sd(:,:)
 
         nx = size(tpo%now%H_ice,1) 
         ny = size(tpo%now%H_ice,2) 
@@ -617,6 +618,9 @@ end if
         type(ytherm_class), intent(IN)    :: thrm  
         type(ybound_class), intent(IN)    :: bnd 
 
+        ! Local variables
+        character(len=256) :: bcx, bcy 
+
         ! Final update of ice fraction mask (or define it now for fixed topography)
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                 bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
@@ -644,7 +648,7 @@ end if
         ! Calculate the surface slope
         ! call calc_gradient_ac(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
 
-
+if (.TRUE.) then
         ! New routines 
         call calc_gradient_acx(tpo%now%dzsdx,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
         call calc_gradient_acy(tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
@@ -654,7 +658,34 @@ end if
         
         call calc_gradient_acx(tpo%now%dzbdx,tpo%now%z_base,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
         call calc_gradient_acy(tpo%now%dzbdy,tpo%now%z_base,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
+else
+        bcx = trim(tpo%par%boundaries)
+        if (trim(bcx) .eq. "periodic-x") bcx = "periodic"
+        bcy = trim(tpo%par%boundaries)
+        if (trim(bcy) .eq. "periodic-y") bcy = "periodic"
         
+        call calc_dvdx_2D(tpo%now%dzsdx_aa,tpo%now%z_srf,tpo%par%dx,tpo%now%f_ice .gt. 0.0_wp,bcx,tpo%par%grad_lim)
+        call calc_dvdy_2D(tpo%now%dzsdy_aa,tpo%now%z_srf,tpo%par%dy,tpo%now%f_ice .gt. 0.0_wp,bcy,tpo%par%grad_lim)
+        
+        call calc_dvdx_2D(tpo%now%dHidx_aa,tpo%now%H_ice,tpo%par%dx,tpo%now%f_ice .gt. 0.0_wp,bcx,tpo%par%grad_lim)
+        call calc_dvdy_2D(tpo%now%dHidy_aa,tpo%now%H_ice,tpo%par%dy,tpo%now%f_ice .gt. 0.0_wp,bcy,tpo%par%grad_lim)
+        
+        call calc_dvdx_2D(tpo%now%dzbdx_aa,tpo%now%z_base,tpo%par%dx,tpo%now%f_ice .gt. 0.0_wp,bcx,tpo%par%grad_lim)
+        call calc_dvdy_2D(tpo%now%dzbdy_aa,tpo%now%z_base,tpo%par%dy,tpo%now%f_ice .gt. 0.0_wp,bcy,tpo%par%grad_lim)
+        
+        ! Stagger to acx and acy nodes
+
+        tpo%now%dzsdx = stagger_aa_acx(tpo%now%dzsdx_aa)
+        tpo%now%dzsdy = stagger_aa_acy(tpo%now%dzsdy_aa)
+        
+        tpo%now%dHidx = stagger_aa_acx(tpo%now%dHidx_aa)
+        tpo%now%dHidy = stagger_aa_acy(tpo%now%dHidy_aa)
+        
+        tpo%now%dzbdx = stagger_aa_acx(tpo%now%dzbdx_aa)
+        tpo%now%dzbdy = stagger_aa_acy(tpo%now%dzbdy_aa)
+
+end if
+
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
@@ -1033,6 +1064,13 @@ end if
         allocate(now%dzbdx(nx,ny))
         allocate(now%dzbdy(nx,ny))
 
+        allocate(now%dzsdx_aa(nx,ny))
+        allocate(now%dzsdy_aa(nx,ny))
+        allocate(now%dHidx_aa(nx,ny))
+        allocate(now%dHidy_aa(nx,ny))
+        allocate(now%dzbdx_aa(nx,ny))
+        allocate(now%dzbdy_aa(nx,ny))
+
         allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
         allocate(now%H_calv(nx,ny))
@@ -1112,7 +1150,15 @@ end if
         now%dHidx       = 0.0 
         now%dHidy       = 0.0
         now%dzbdx       = 0.0 
-        now%dzbdy       = 0.0 
+        now%dzbdy       = 0.0
+
+        now%dzsdx_aa    = 0.0 
+        now%dzsdy_aa    = 0.0 
+        now%dHidx_aa    = 0.0 
+        now%dHidy_aa    = 0.0
+        now%dzbdx_aa    = 0.0 
+        now%dzbdy_aa    = 0.0
+
         now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
         now%H_calv      = 0.0  
@@ -1204,6 +1250,13 @@ end if
         if (allocated(now%dHidy))       deallocate(now%dHidy)
         if (allocated(now%dzbdx))       deallocate(now%dzbdx)
         if (allocated(now%dzbdy))       deallocate(now%dzbdy)
+        
+        if (allocated(now%dzsdx_aa))       deallocate(now%dzsdx_aa)
+        if (allocated(now%dzsdy_aa))       deallocate(now%dzsdy_aa)
+        if (allocated(now%dHidx_aa))       deallocate(now%dHidx_aa)
+        if (allocated(now%dHidy_aa))       deallocate(now%dHidy_aa)
+        if (allocated(now%dzbdx_aa))       deallocate(now%dzbdx_aa)
+        if (allocated(now%dzbdy_aa))       deallocate(now%dzbdy_aa)
         
         if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)

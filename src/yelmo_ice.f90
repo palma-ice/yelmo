@@ -1209,6 +1209,9 @@ end if
             bnd_restart%H_ice_ref   = dom%bnd%H_ice_ref 
             bnd_restart%z_bed_ref   = dom%bnd%z_bed_ref 
 
+            bnd_restart%domain_mask = dom%bnd%domain_mask 
+            bnd_restart%tau_relax   = dom%bnd%tau_relax 
+
             bnd_restart%basins      = dom%bnd%basins 
             bnd_restart%basin_mask  = dom%bnd%basin_mask 
             bnd_restart%regions     = dom%bnd%regions 

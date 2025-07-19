@@ -279,6 +279,8 @@ module yelmo_defs
         real(wp), allocatable   :: H_ice_dyn(:,:) 
         real(wp), allocatable   :: f_ice_dyn(:,:) 
         
+        real(wp), allocatable :: tau_relax(:,:)
+        
     end type
 
     ! ytopo class
@@ -743,11 +745,22 @@ module yelmo_defs
         real(wp), allocatable :: regions(:,:) 
         real(wp), allocatable :: region_mask(:,:) 
 
-        logical,  allocatable :: ice_allowed(:,:)     ! Locations where ice thickness can be greater than zero 
-        logical,  allocatable :: calv_mask(:,:)       ! for calv_method="kill-loc", where calv_mask==False, calv.
+        logical,  allocatable :: ice_allowed(:,:)       ! Locations where ice thickness can be greater than zero 
+        logical,  allocatable :: calv_mask(:,:)         ! for calv_method="kill-loc", where calv_mask==False, calv.
         
-        real(wp), allocatable :: H_ice_ref(:,:)       ! Reference ice thickness, may be used for relaxation routines
-        real(wp), allocatable :: z_bed_ref(:,:)       ! Reference bedrock elevation, may be used for relaxation routines
+        real(wp), allocatable :: H_ice_ref(:,:)         ! Reference ice thickness, may be used for relaxation routines
+        real(wp), allocatable :: z_bed_ref(:,:)         ! Reference bedrock elevation, may be used for relaxation routines
+
+        ! Mask to define numerical regions within domain 
+        ! (-1: ice thickness must be zero, 0: ice thickness is prescribed, 1: ice thickness is calculated)
+        integer, allocatable :: domain_mask(:,:)
+
+        ! Field to define relaxation timescales (spatially variable), when relaxation is used
+        ! Only valid within area of domain_mask==1
+        ! tau_relax < 0: no relaxation
+        ! tau_relax   0: ice thickness imposed
+        ! tau_relax > 0: relaxation timescale used => H_ice_ref
+        real(wp), allocatable :: tau_relax(:,:)
 
         ! Other external variables that can be useful, ie maybe with tracers
         ! to do 

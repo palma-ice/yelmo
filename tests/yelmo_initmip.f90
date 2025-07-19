@@ -265,7 +265,7 @@ program yelmo_test
 
         ! Run full model (tpo,dyn,thrm) without advection to clean initial topo via mass balance
         call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=1.0_prec,topo_fixed=.FALSE.,tpo_solver="none")
-
+        
         ! Run full model with correct solver (tpo,dyn,thrm)
         call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
 

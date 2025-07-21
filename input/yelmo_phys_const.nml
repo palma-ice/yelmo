@@ -15,7 +15,7 @@
     sec_year    = 31556926.0        ! [s/a] EISMINT value
     g           = 9.81              ! [m s-2] Gravitational accel.
     T0          = 273.15            ! [K] Reference freezing temperature 
-    rho_ice     =  910.0            ! [kg m-3] Density ice            
+    rho_ice     =  917.0            ! [kg m-3] Density ice            
     rho_w       = 1000.0            ! [kg m-3] Density water          
     rho_sw      = 1028.0            ! [kg m-3] Density seawater       
     rho_a       = 3300.0            ! [kg m-3] Density asthenosphere

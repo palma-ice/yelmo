@@ -1669,12 +1669,10 @@ end if
 
                 fmb = fmb_shlf
 
-            case(1) 
-                ! Calculate fmb as proportional to local bmb_shlf value and 
-                ! scaled to the area of the grid cell itself where it will be applied
-
-                ! Note: fmb_scale=10 suggested by DeConto and Pollard (2016, nat) based
-                ! on plume modeling work of Slater et al. (2015, grl)
+            case(1,2) 
+                ! Calculate fmb (1) as proportional to local bmb_shlf value, 
+                ! or (2) from a reference field, but scaled to the area
+                ! of the grid cell itself where it will be applied
 
                 !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,mask,n_margin,dz,area_flt,bmb_eff)
                 do j = 1, ny 
@@ -1713,13 +1711,21 @@ end if
                         ! Get area of ice submerged and adjacent to seawater
                         area_flt = real(n_margin,wp)*dz*dx 
 
-                        ! Also calculate the mean bmb_shlf value for the ice-free neighbors 
-                        bmb_eff = sum([bmb_shlf(im1,j),bmb_shlf(ip1,j),bmb_shlf(i,jm1),bmb_shlf(i,jp1)], &
-                                        mask=mask) / real(n_margin,wp)
+                        if (fmb_method .eq. 1) then
+                            ! Also calculate the mean bmb_shlf value for the ice-free neighbors 
+                            bmb_eff = sum([bmb_shlf(im1,j),bmb_shlf(ip1,j),bmb_shlf(i,jm1),bmb_shlf(i,jp1)], &
+                                            mask=mask) / real(n_margin,wp)
 
-                        ! Finally calculate the effective front mass balance rate 
+                            ! Finally calculate the effective front mass balance rate 
 
-                        fmb(i,j) = bmb_eff*(area_flt/area_tot)*fmb_scale
+                            fmb(i,j) = bmb_eff*(area_flt/area_tot)*fmb_scale
+
+                        else if (fmb_method .eq. 2) then
+
+                            ! Finally calculate the scaled front mass balance rate 
+
+                            fmb(i,j) = fmb_shlf(i,j)*(area_flt/area_tot)
+                        end if
 
                     else 
                         ! Set front mass balance equal to zero 

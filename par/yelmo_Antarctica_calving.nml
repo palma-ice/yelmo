@@ -88,12 +88,12 @@
 
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
-    surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+   surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     grad_lim            = 0.5               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
-    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
-    use_bmb             = False             ! Use basal mass balance in mass conservation equation
+    margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
+    use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 

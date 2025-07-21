@@ -701,6 +701,7 @@ contains
         
         call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
+        call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         
         ! = ytopo_pc variables ===
         
@@ -745,6 +746,10 @@ contains
         
         call nc_read_interp(filename,"H_ice_ref",   bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_bed_ref",   bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
+        call nc_read_interp(filename,"domain_mask", bnd%domain_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        !call nc_read_interp(filename,"tau_relax",   bnd%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        ! Not read in, because it would conflict with tpo%now%tau_relax name, and bnd%tau_relax would always be provided anyway.
 
         ! Close the netcdf file
         call nc_close(ncid)
@@ -1164,6 +1169,10 @@ contains
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_ice_dyn(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             
+            case("tau_relax")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%tau_relax(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+
             case("pc_pred_H_ice")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%pred%H_ice(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
@@ -1817,7 +1826,12 @@ contains
             case("z_bed_ref")
                 call nc_write(filename,trim(v%varname),ylmo%bnd%z_bed_ref(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            
+            case("domain_mask")
+                call nc_write(filename,trim(v%varname),ylmo%bnd%domain_mask(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("tau_relax")
+                call nc_write(filename,trim(v%varname),ylmo%bnd%tau_relax(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case DEFAULT 
 
                 write(io_unit_err,*) 

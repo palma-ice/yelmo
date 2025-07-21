@@ -42,6 +42,7 @@
     phys_const      = "Earth"
     experiment      = "None"       
     nml_ytopo       = "ytopo"
+    nml_ycalv       = "ycalv"
     nml_ydyn        = "ydyn"
     nml_ytill       = "ytill"
     nml_yneff       = "yneff"

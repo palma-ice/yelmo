@@ -119,7 +119,8 @@ contains
         
         logical, allocatable :: is_ice(:,:)
         
-        real(wp), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(wp), parameter :: uz_min = -10.0       ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(wp), parameter :: uz_lim = -10.0       ! [m/yr] Absolute limit allowed for vertical velocity in any direction
 
         type(gq2D_class) :: gq2D
         type(gq3D_class) :: gq3D
@@ -218,10 +219,13 @@ contains
                 uz(i,j,1) = dzbdt_now + uz_grid + f_bmb*bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
-                ! Set stability limit on basal uz value.
+                ! Set stability limits on basal uz value.
                 ! This only gets applied in rare cases when something
                 ! is going wrong in the model. 
                 if (uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min
+
+                ! Extreme limit
+                call minmax(uz(i,j,1),uz_lim)
 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
@@ -277,8 +281,10 @@ end if
 
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                     
-                end do 
+                    ! Apply hard-limit to vertical velocity in rare cases (usually spinup)
+                    call minmax(uz(i,j,k),uz_lim)  
 
+                end do 
 
                 ! === Also calculate adjusted vertical velocity to be used for temperature advection
                 
@@ -336,6 +342,9 @@ end if
 
                     if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     
+                    ! Apply hard-limit to uz_star too, in rare cases (usually spinup)
+                    call minmax(uz_star(i,j,k),uz_lim)  
+
                 end do 
                 
             else 
@@ -345,6 +354,7 @@ end if
 
                     uz(i,j,k) = dzbdt_now - max(smb(i,j),0.0)
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
+                    call minmax(uz(i,j,k),uz_lim)  
 
                     uz_star(i,j,k) = uz(i,j,k)
 

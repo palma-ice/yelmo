@@ -1060,12 +1060,6 @@ contains
             case("cmb_grnd")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_grnd(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("lsf")
-                call nc_write(filename,trim(v%varname),ylmo%tpo%now%lsf(i1:i2,j1:j2), &
-                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("dlsfdt")
-                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dlsfdt(i1:i2,j1:j2), &
-                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("z_srf")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%z_srf(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
@@ -1220,6 +1214,18 @@ contains
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("pc_corr_cmb")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%corr%cmb(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("lsf")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%lsf(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("dlsfdt")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%dlsfdt(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("cmb_flt_x")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_flt_x(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("cmb_flt_y")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_flt_y(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             
             case DEFAULT 

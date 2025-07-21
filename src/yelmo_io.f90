@@ -701,7 +701,6 @@ contains
         
         call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        
         call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         
         ! = ytopo_pc variables ===

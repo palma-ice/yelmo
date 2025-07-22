@@ -1,8 +1,8 @@
 #!/bin/bash
 
-fldr='tmp/yelmo-bench-2025-05-25'
+fldr='tmp/yelmo-bench-2025-07-22'
 
-runopt='-rs'
+runopt='-rs -q 12h -w 05:00:00'
 
 ### BENCHMARK TESTS ###
 
@@ -132,6 +132,17 @@ jobrun ./runme ${runopt} -e slab -n par/yelmo_slab.nml -o ${fldr}/slab/strong -p
 # Full ensemble:
 jobrun ./runme ${runopt} -e slab -n par/yelmo_slab.nml -o ${fldr}/slab-sd0.1/weak   -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=1000 ctrl.H_stdev=0.1 ydyn.visc_const=1e5 ydyn.beta_const=1e3 ydyn.solver="diva","hybrid","l1l2","ssa","sia"
 jobrun ./runme ${runopt} -e slab -n par/yelmo_slab.nml -o ${fldr}/slab-sd0.1/strong -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=500  ctrl.H_stdev=0.1 ydyn.visc_const=4e5 ydyn.beta_const=30  ydyn.solver="diva","hybrid","l1l2","ssa","sia"
+
+
+### solver-stability Robinson 2022 ###
+
+make initmip
+
+# One simulation
+./runme ${runopt} -e initmip -n par/yelmo_initmip.nml -o ${fldr}/grl-diva-test     -p ctrl.dtt=5 ctrl.time_end=1e3 ctrl.time_equil=100 ctrl.clim_nm="clim_pd_grl" yelmo.domain="Greenland" yelmo.log_timestep=True ydyn.solver="diva" yelmo.grid_name="GRL-16KM"
+
+# All resolutions
+jobrun ./runme ${runopt} -e initmip -n par/yelmo_initmip.nml -o ${fldr}/grl-diva   -p ctrl.dtt=5 ctrl.time_end=1e3 ctrl.time_equil=100 ctrl.clim_nm="clim_pd_grl" yelmo.domain="Greenland" yelmo.log_timestep=True ydyn.solver="diva" yelmo.grid_name="GRL-32KM","GRL-16KM","GRL-8KM","GRL-4KM"
 
 ### CalvingMIP ###
 #runopt='-rs  -q 12h -w 05:00:00'

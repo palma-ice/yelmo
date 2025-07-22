@@ -86,6 +86,20 @@ jobrun ./runme -rs -q priority -w 5:00:00 -e trough -n par/yelmo_MISMIP+.nml -o 
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf10.0 -p ydyn.beta_u0=100 ytill.cf_ref=10.0
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf20.0 -p ydyn.beta_u0=100 ytill.cf_ref=20.0
 
+### ISMIP-HOM ###
+
+make ismiphom
+
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expa/diva   -p ctrl.experiment="EXPA" ctrl.L=5,10,20,40,80,160 ydyn.solver="diva"
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expa/l1l2   -p ctrl.experiment="EXPA" ctrl.L=5,10,20,40,80,160 ydyn.solver="l1l2"  
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expa/hybrid -p ctrl.experiment="EXPA" ctrl.L=5,10,20,40,80,160 ydyn.solver="hybrid"
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expc/diva   -p ctrl.experiment="EXPC" ctrl.L=5,10,20,40,80,160 ydyn.solver="diva"  
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expc/l1l2   -p ctrl.experiment="EXPC" ctrl.L=5,10,20,40,80,160 ydyn.solver="l1l2"
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expc/hybrid -p ctrl.experiment="EXPC" ctrl.L=5,10,20,40,80,160 ydyn.solver="hybrid"
+
+# One test:
+./runme -r -e ismiphom -n par/yelmo_ISMIPHOM.nml -o output/test   -p ctrl.experiment="EXPC" ctrl.L=160 ydyn.solver="diva" 
+
 
 ### SLAB-S06 ###
 

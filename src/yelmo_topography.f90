@@ -121,10 +121,11 @@ end if
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
                     tpo%now%dHidt_dyn = tpo%par%dt_beta(1)*dHidt_now + tpo%par%dt_beta(2)*tpo%now%dHidt_dyn_n 
-
+                    
                     ! Apply rate and update ice thickness (predicted)
+                    ! Limit dynamic rate of change for stability (typically < 100 m/yr)
                     tpo%now%H_ice = tpo%now%H_ice_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.FALSE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.TRUE.,mb_lim=tpo%par%dHdt_dyn_lim)
 
                 case("corrector") 
 
@@ -150,9 +151,10 @@ end if
                     tpo%now%dHidt_dyn = tpo%par%dt_beta(3)*dHidt_now + tpo%par%dt_beta(4)*tpo%now%dHidt_dyn_n 
                     
                     ! Apply rate and update ice thickness (corrected)
+                    ! Limit dynamic rate of change for stability (typically < 100 m/yr)
                     tpo%now%H_ice = tpo%now%H_ice_n
                     tpo%now%lsf   = tpo%now%lsf_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.FALSE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.TRUE.,mb_lim=tpo%par%dHdt_dyn_lim)
                     
             end select
 
@@ -1173,6 +1175,7 @@ end if
         call nml_read(filename,group_ytopo,"surf_gl_method",    par%surf_gl_method,   init=init_pars)
         call nml_read(filename,group_ytopo,"grad_lim",          par%grad_lim,         init=init_pars)
         call nml_read(filename,group_ytopo,"grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
+        call nml_read(filename,group_ytopo,"dHdt_dyn_lim",      par%dHdt_dyn_lim,     init=init_pars) 
         call nml_read(filename,group_ytopo,"margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,group_ytopo,"margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
         call nml_read(filename,group_ytopo,"use_bmb",           par%use_bmb,          init=init_pars)

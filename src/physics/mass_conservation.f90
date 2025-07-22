@@ -1,7 +1,7 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, wp, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
-    use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa
+    use yelmo_defs, only : sp, dp, wp, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err, is_equal
+    use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa, minmax
 
     use solver_advection, only : calc_advec2D  
     use velocity_general, only : set_inactive_margins 
@@ -108,7 +108,7 @@ contains
 
     end subroutine check_mass_conservation
 
-    subroutine apply_tendency(H_ice,mb_dot,dt,label,adjust_mb)
+    subroutine apply_tendency(H_ice,mb_dot,dt,label,adjust_mb,mb_lim)
 
         implicit none
 
@@ -116,16 +116,33 @@ contains
         real(wp), intent(INOUT) :: mb_dot(:,:)
         real(wp), intent(IN)    :: dt 
         character(len=*),  intent(IN) :: label 
-        logical, optional, intent(IN) :: adjust_mb
-
+        logical,  intent(IN), optional :: adjust_mb
+        real(wp), intent(IN), optional :: mb_lim
+        
         ! Local variables
         integer :: i, j, nx, ny
         real(wp) :: H_prev
         real(wp) :: dHdt 
         logical  :: allow_adjust_mb
-        
+        real(wp) :: mb_dot_now
+        real(wp) :: mb_limit
+        integer  :: n_lim
+        real(wp) :: mb_max
+
+        logical, parameter :: verbose = .TRUE.
+
         if (dt .gt. 0.0) then 
             ! Only apply this routine if dt > 0!
+
+                ! Use this to limit how much mass balance change can be applied
+            if (present(mb_lim)) then
+                mb_limit = mb_lim
+            else
+                mb_limit = 9999.0
+            end if
+
+            n_lim  = 0
+            mb_max = 0.0
 
             allow_adjust_mb = .FALSE.
             if (present(adjust_mb)) allow_adjust_mb = adjust_mb 
@@ -140,8 +157,20 @@ contains
                 ! Store previous ice thickness
                 H_prev = H_ice(i,j) 
 
+                ! Determine tendency to apply, limit extreme values to below mb_limit
+                ! and count if this value would have violated that limit, and store 
+                ! value of point with highest mb_dot above limit 
+                mb_dot_now = mb_dot(i,j)
+                call minmax(mb_dot_now,mb_limit)
+                if (.not. is_equal(mb_dot_now,mb_dot(i,j),TOL)) then
+                    n_lim = n_lim+1
+                    if (mb_dot(i,j) .gt. abs(mb_max)) then
+                        mb_max = mb_dot(i,j)
+                    end if
+                end if
+
                 ! Now update ice thickness with tendency for this timestep 
-                H_ice(i,j) = H_prev + dt*mb_dot(i,j)
+                H_ice(i,j) = H_prev + dt*mb_dot_now
 
                 ! Limit ice thickness to zero 
                 if (H_ice(i,j) .lt. 0.0) H_ice(i,j) = 0.0 
@@ -160,6 +189,11 @@ contains
             end do
             end do
             !!$omp end parallel do
+
+            if (verbose .and. mb_max .ne. 0.0_wp) then
+                write(*,*) "apply_tendency: "//trim(label)//" mb_dot > mb_lim: ", &
+                    n_lim, " points. mb_max = ", mb_max
+            end if
 
         end if 
 

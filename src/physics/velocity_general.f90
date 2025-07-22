@@ -120,7 +120,7 @@ contains
         logical, allocatable :: is_ice(:,:)
         
         real(wp), parameter :: uz_min = -10.0       ! [m/yr] Minimum allowed vertical velocity downwards for stability
-        real(wp), parameter :: uz_lim = -10.0       ! [m/yr] Absolute limit allowed for vertical velocity in any direction
+        real(wp), parameter :: uz_lim =  10.0       ! [m/yr] Absolute limit allowed for vertical velocity in any direction
 
         type(gq2D_class) :: gq2D
         type(gq3D_class) :: gq3D

@@ -116,6 +116,7 @@ module yelmo_defs
         real(wp)           :: calv_grnd_max  
         real(wp)           :: grad_lim
         real(wp)           :: grad_lim_zb
+        real(wp)           :: dHdt_dyn_lim
         real(wp)           :: dist_grz
         integer            :: gl_sep 
         integer            :: gz_nx 

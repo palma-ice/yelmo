@@ -235,7 +235,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 23 
+            qtot = 21 
             allocate(names(qtot))
                 names(1)  = "H_ice"
                 names(2)  = "z_srf"
@@ -256,11 +256,8 @@ contains
                 names(17) = "smb"
                 names(18) = "bmb"
                 names(19) = "cmb"
-                names(20) = "cmb_flt_x"
-                names(21) = "cmb_flt_y"
-                names(22) = "z_sl"
-                names(23) = "lsf"
-                !names(24) = "dlsfdt"
+                names(20) = "z_sl"
+                names(21) = "lsf"
         end if 
 
         write_pd_metrics = .FALSE. 
@@ -654,7 +651,6 @@ contains
         call nc_read_interp(filename,"pc_tau_max",   tme%pc_tau_max,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
         ! == ytopo variables ===
-
         call nc_read_interp(filename,"H_ice",       tpo%now%H_ice,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_srf",       tpo%now%z_srf,      ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_base",      tpo%now%z_base,     ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -673,8 +669,7 @@ contains
         call nc_read_interp(filename,"cmb_flt",     tpo%now%cmb_flt,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        !call nc_read_interp(filename,"lsf",         tpo%now%lsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        !call nc_read_interp(filename,"dlsf",        tpo%now%dlsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"lsf",         tpo%now%lsf,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -694,17 +689,14 @@ contains
         call nc_read_interp(filename,"dist_grline", tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"mask_bed",    tpo%now%mask_bed,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"mask_grz",    tpo%now%mask_grz,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-
         call nc_read_interp(filename,"dHidt_dyn_n", tpo%now%dHidt_dyn_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"H_ice_n",     tpo%now%H_ice_n,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"z_srf_n",     tpo%now%z_srf_n,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        
         call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-        call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         
         ! = ytopo_pc variables ===
-        
         call nc_read_interp(filename,"pc_pred_H_ice",    tpo%now%pred%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"pc_pred_dHidt_dyn",tpo%now%pred%dHidt_dyn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"pc_pred_mb_net",   tpo%now%pred%mb_net,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -723,7 +715,6 @@ contains
         call nc_read_interp(filename,"pc_corr_cmb",      tpo%now%corr%cmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
 
         ! == ybound variables ===
-
         call nc_read_interp(filename,"z_bed",       bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_bed_sd",    bnd%z_bed_sd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_sl",        bnd%z_sl,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
@@ -735,7 +726,7 @@ contains
         call nc_read_interp(filename,"T_shlf",      bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"Q_geo",       bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"enh_srf",     bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
+        
         call nc_read_interp(filename,"basins",      bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"basin_mask",  bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"regions",     bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
@@ -743,14 +734,12 @@ contains
         
         call nc_read_interp(filename,"ice_allowed", bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"calv_mask",   bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        
         call nc_read_interp(filename,"H_ice_ref",   bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_bed_ref",   bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
 
         call nc_read_interp(filename,"domain_mask", bnd%domain_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         !call nc_read_interp(filename,"tau_relax",   bnd%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         ! Not read in, because it would conflict with tpo%now%tau_relax name, and bnd%tau_relax would always be provided anyway.
-
         ! Close the netcdf file
         call nc_close(ncid)
         
@@ -1057,6 +1046,12 @@ contains
             case("cmb_flt")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_flt(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("cmb_flt_x")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_flt(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
+            case("cmb_flt_y")
+                call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_flt(i1:i2,j1:j2), &
+                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("cmb_grnd")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%cmb_grnd(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
@@ -1168,11 +1163,9 @@ contains
             case("f_ice_dyn")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%f_ice_dyn(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            
             case("tau_relax")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%tau_relax(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-
             case("pc_pred_H_ice")
                 call nc_write(filename,trim(v%varname),ylmo%tpo%now%pred%H_ice(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)

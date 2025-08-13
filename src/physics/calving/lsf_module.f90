@@ -111,8 +111,9 @@ contains
         where(lsf .gt. 1.0)  lsf = 1.0
         where(lsf .lt. -1.0) lsf = -1.0
 
-        if (.TRUE.) then
+        if (.FALSE.) then
             ! plot retreat rate instead of calving rate
+            ! use dfor diagnosis of model
             cr_acx = wx
             cr_acy = wy
         end if

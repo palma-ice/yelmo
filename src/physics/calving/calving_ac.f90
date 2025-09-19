@@ -3,7 +3,7 @@ module calving_ac
     ! This will be used for flux calving (lsf) 
 
     use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
     use topography, only : calc_H_eff 
 
     implicit none 
@@ -49,6 +49,7 @@ contains
         integer  :: i, j, nx, ny, n  
         integer  :: im1, jm1, ip1, jp1 
         real(wp) :: eps_eff_neighb(4)
+        integer  :: BC
 
         nx = size(eps_eff,1)
         ny = size(eps_eff,2) 
@@ -58,7 +59,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if (f_ice(i,j) .eq. 0.0_wp) then 
                 ! Ice-free point, no strain
@@ -115,16 +116,20 @@ contains
         integer  :: i, j, nx, ny, n  
         integer  :: im1, jm1, ip1, jp1 
         real(wp) :: tau_eff_neighb(4) 
+        integer  :: BC
 
         nx = size(tau_eff,1)
         ny = size(tau_eff,2) 
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,tau_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if (f_ice(i,j) .eq. 0.0_wp) then 
                 ! Ice-free point, no stress
@@ -207,15 +212,16 @@ contains
                 
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv_acx,wv_acy,H_acx,H_acy
-            
+        real(wp) :: wv_acx, wv_acy, H_acx, H_acy
+        integer  :: BC
+
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
         !$omp end parallel do
         do j = 1, ny
             do i = 1, nx
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Stagger ice thickness into ac-nodes                        
                 H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
@@ -266,15 +272,16 @@ contains
 
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: tau1_acx,tau1_acy,wv_acx,wv_acy
-                    
+        real(wp) :: tau1_acx, tau1_acy, wv_acx, wv_acy
+        integer  :: BC
+
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
         !!$omp end parallel do
         do j = 1, ny
             do i = 1, nx
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
                     
                 ! Stagger 1st ppal stress into ac-nodes                        
                 tau1_acx = 0.5*(tau_1(i,j)+tau_1(ip1,j))
@@ -396,10 +403,14 @@ contains
         ! Local variables
         integer  :: i, j, im1, ip1, jm1, jp1, nx, ny
         real(wp) :: r, rip1, rim1, rjp1, rjm1
-    
+        integer  :: BC
+
         nx = size(u_acx,1)
         ny = size(u_acx,2)
-    
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Initialize calving rates to opposite as velocity
         cr_acx = -u_acx 
         cr_acy = -v_acy
@@ -420,7 +431,7 @@ contains
             ! Below radius
             if (r .lt. 750e3) then
                 ! Now treat border points
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
                 rip1 = sqrt((0.5*(nx+1)-ip1)*(0.5*(nx+1)-ip1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
                 rim1 = sqrt((0.5*(nx+1)-im1)*(0.5*(nx+1)-im1) + (0.5*(ny+1)-j)*(0.5*(ny+1)-j))*dx
                 rjp1 = sqrt((0.5*(nx+1)-i)*(0.5*(nx+1)-i) + (0.5*(ny+1)-jp1)*(0.5*(ny+1)-jp1))*dx
@@ -480,11 +491,16 @@ contains
     
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv,uxy_acx,uxy_acy,u_acy,v_acx   
+        real(wp) :: wv, uxy_acx, uxy_acy, u_acy, v_acx
+        integer  :: BC
+
         real(wp), parameter :: pi = acos(-1.0)  ! Calculate pi intrinsically
 
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
+        
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialize    
         wv      = -300.0 * sin(2.0 * pi * time / 1000.0) 
@@ -498,7 +514,7 @@ contains
         do j = 1, ny
         do i = 1, nx
             ! Stagger velocities x/y ac-velocities into y/x ac-nodes
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
             v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
             ! x-direction
@@ -529,44 +545,46 @@ contains
                 
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: wv_acx,wv_acy,H_acx,H_acy
-            
+        real(wp) :: wv_acx, wv_acy, H_acx, H_acy
+        integer  :: BC
+
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
         do j = 1, ny
-            do i = 1, nx
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+        do i = 1, nx
+        
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
-                ! Stagger ice thickness into ac-nodes                        
-                if(f_ice(i,j) .gt. 0.0_wp) then
-                    H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
-                    H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
-                    
-                    ! Special case for border
-                    ! x-axis  
-                    if((f_ice(ip1,j) .eq. 0.0_wp) .or. (f_ice(im1,j) .eq. 0.0_wp)) then
-                        H_acx = H_ice(i,j)
-                    end if
-
-                    ! y-axis
-                    if((f_ice(i,jp1) .eq. 0.0_wp) .or. (f_ice(i,jm1) .eq. 0.0_wp)) then
-                        H_acy = H_ice(i,j)
-                    end if
-
-                else
-                    ! Ocean points
-                    H_acx = 0.0_wp
-                    H_acy = 0.0_wp
+            ! Stagger ice thickness into ac-nodes                        
+            if(f_ice(i,j) .gt. 0.0_wp) then
+                H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
+                H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
+                
+                ! Special case for border
+                ! x-axis  
+                if((f_ice(ip1,j) .eq. 0.0_wp) .or. (f_ice(im1,j) .eq. 0.0_wp)) then
+                    H_acx = H_ice(i,j)
                 end if
 
-                ! Compute calving-rates on ac-nodes
-                wv_acx      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acx)/H_ice_c)
-                cr_acx(i,j) = -u_acx(i,j)*wv_acx
-                wv_acy      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acy)/H_ice_c)
-                cr_acy(i,j) = -v_acy(i,j)*wv_acy
+                ! y-axis
+                if((f_ice(i,jp1) .eq. 0.0_wp) .or. (f_ice(i,jm1) .eq. 0.0_wp)) then
+                    H_acy = H_ice(i,j)
+                end if
 
-            end do
+            else
+                ! Ocean points
+                H_acx = 0.0_wp
+                H_acy = 0.0_wp
+            end if
+
+            ! Compute calving-rates on ac-nodes
+            wv_acx      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acx)/H_ice_c)
+            cr_acx(i,j) = -u_acx(i,j)*wv_acx
+            wv_acy      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acy)/H_ice_c)
+            cr_acy(i,j) = -v_acy(i,j)*wv_acy
+
+        end do
         end do
     
         return
@@ -587,41 +605,45 @@ contains
                 
         ! local variables
         integer  :: i, j, ip1, im1, jp1, jm1, nx, ny
-        real(wp) :: uxy_aa,uxy_acx,uxy_acy,u_acy,v_acx
+        real(wp) :: uxy_aa, uxy_acx, uxy_acy, u_acy, v_acx
         real(wp), allocatable :: H_ice_fill(:,:), wv_aa(:,:) 
-            
+        integer  :: BC
+
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
         allocate(H_ice_fill(nx,ny))
         allocate(wv_aa(nx,ny))
-    
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Initialize    
         uxy_aa     = 0.0_wp
         H_ice_fill = H_ice
         wv_aa      = 0.0_wp
                 
         do j = 1, ny
-            do i = 1, nx
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                ! velocity on aa-node
-                uxy_aa     = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
-                wv_aa(i,j) = MAX(0.0_wp,1.0_wp+(H_ice_c-H_ice_fill(i,j))/H_ice_c)*uxy_aa                
-            end do
+        do i = 1, nx
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
+            ! velocity on aa-node
+            uxy_aa     = ((0.5*(u_acx(i,j)+u_acx(im1,j)))**2 + (0.5*(v_acy(i,j)+v_acy(i,jm1)))**2)**0.5
+            wv_aa(i,j) = MAX(0.0_wp,1.0_wp+(H_ice_c-H_ice_fill(i,j))/H_ice_c)*uxy_aa                
+        end do
         end do
 
         do j = 1, ny
-            do i = 1, nx
-                ! Stagger velocities x/y ac-velocities into y/x ac-nodes
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
-                v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
-                ! x-direction
-                uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
-                cr_acx(i,j) = -(u_acx(i,j)/uxy_acx)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
-                ! y-direction
-                uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
-                cr_acy(i,j) = -(v_acy(i,j)/uxy_acy)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
-            end do
+        do i = 1, nx
+            ! Stagger velocities x/y ac-velocities into y/x ac-nodes
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
+            u_acy = 0.25_wp*(u_acx(i,j)+u_acx(im1,j)+u_acx(im1,jp1)+u_acx(i,jp1))
+            v_acx = 0.25_wp*(v_acy(i,j)+v_acy(i,jm1)+v_acy(ip1,jm1)+v_acy(ip1,j))
+            ! x-direction
+            uxy_acx     = MAX(1e-8,(u_acx(i,j)**2 + v_acx**2)**0.5)
+            cr_acx(i,j) = -(u_acx(i,j)/uxy_acx)*0.5*(wv_aa(i,j)+wv_aa(ip1,j))
+            ! y-direction
+            uxy_acy     = MAX(1e-8,(v_acy(i,j)**2 + u_acy**2)**0.5)
+            cr_acy(i,j) = -(v_acy(i,j)/uxy_acy)*0.5*(wv_aa(i,j)+wv_aa(i,jp1))
+        end do
         end do
 
         deallocate(H_ice_fill)

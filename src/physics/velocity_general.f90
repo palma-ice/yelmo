@@ -2,7 +2,8 @@ module velocity_general
     ! This module contains general routines that are used by several solvers. 
     
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, io_unit_err, jacobian_3D_class
-    use yelmo_tools, only : get_neighbor_indices, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
+                            integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
     use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
                                     gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
                                     gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
@@ -130,6 +131,8 @@ contains
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .TRUE.
 
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         if (use_gq3D) call gq3D_init(gq3D)
@@ -152,6 +155,9 @@ contains
             f_bmb = 0.0 
         end if 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Next, calculate vertical velocity at each point through the column
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1,ip1,jm1,jp1,k,kmid,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
@@ -162,7 +168,7 @@ contains
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -459,6 +465,8 @@ end if
         
         type(gq2D_class) :: gq2D
         
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
 
@@ -483,6 +491,9 @@ end if
             f_bmb = 0.0 
         end if 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! First calculate horizontal strain rates at each layer for later use,
         ! with no correction factor for sigma-transformation.
         ! Note: we only need dudx and dvdy, but routine also calculate cross terms, which will not be used.
@@ -503,7 +514,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -760,6 +771,8 @@ end if
         real(wp), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
         real(wp), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
+        integer  :: BC
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
@@ -775,6 +788,9 @@ end if
             f_bmb = 0.0 
         end if 
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Next, calculate velocity 
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
@@ -785,7 +801,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -992,6 +1008,8 @@ end if
         real(wp), allocatable :: taud_acx_0(:,:)
         real(wp), allocatable :: taud_acy_0(:,:)
 
+        integer  :: BC
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -1004,12 +1022,15 @@ end if
         ! Assume grid resolution is symmetrical 
         dy = dx 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_mid)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! x-direction
             if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) then 
@@ -1053,7 +1074,7 @@ if (.FALSE.) then
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! === x-direction ===
 
@@ -1441,6 +1462,8 @@ end if
         real(wp) :: z_srf_now 
         real(wp) :: z_sl_now 
         
+        integer  :: BC
+
         nx = size(tau_bc_int_acx,1) 
         ny = size(tau_bc_int_acx,2) 
 
@@ -1448,12 +1471,15 @@ end if
         tau_bc_int_acx = 0.0 
         tau_bc_int_acy = 0.0 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,i1,j1,H_ice_now,z_srf_now,z_sl_now)
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! == acx nodes == 
 
@@ -1646,9 +1672,13 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1
+        integer :: BC
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Find partially-filled outer margins and set velocity to zero
         ! (this will also treat all other ice-free points too) 
@@ -1658,7 +1688,7 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) then 
                 ux(i,j) = 0.0_wp 

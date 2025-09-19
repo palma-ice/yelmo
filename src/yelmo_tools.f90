@@ -9,9 +9,17 @@ module yelmo_tools
     
     implicit none 
 
+    integer, parameter :: BND_ZEROS    = 0
+    integer, parameter :: BND_INFINITE = 1
+    integer, parameter :: BND_MISMIP3D = 2
+    integer, parameter :: BND_TROUGH   = 3
+    integer, parameter :: BND_PERIODIC = 4
+    integer, parameter :: BND_PERIODIC_X = 5
+    
     private 
     public :: get_region_indices
     public :: get_neighbor_indices
+    public :: get_neighbor_indices_bc_codes
     public :: calc_magnitude 
     public :: calc_magnitude_from_staggered
     public :: stagger_ac_aa
@@ -59,6 +67,10 @@ module yelmo_tools
     public :: calc_vertical_integrated_2D
     public :: calc_vertical_integrated_3D
     
+    ! Boundary constants (for converting string definitions to integers for faster computations)
+    public :: boundary_code
+    public :: BND_ZEROS, BND_INFINITE, BND_MISMIP3D, BND_TROUGH, BND_PERIODIC, BND_PERIODIC_X
+
 contains 
 
     subroutine get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
@@ -129,7 +141,7 @@ contains
                 if (jp1 .eq. ny+1) jp1 = 1 
                 
             case DEFAULT 
-                ! Periodic
+                ! periodic, periodic-x (for now treat the same way)
 
                 im1 = i-1
                 if (im1 .eq. 0)    im1 = nx 
@@ -146,6 +158,78 @@ contains
         return
 
     end subroutine get_neighbor_indices
+
+    subroutine get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
+
+        implicit none
+
+        integer, intent(OUT) :: im1 
+        integer, intent(OUT) :: ip1 
+        integer, intent(OUT) :: jm1 
+        integer, intent(OUT) :: jp1 
+        integer, intent(IN)  :: i 
+        integer, intent(IN)  :: j
+        integer, intent(IN)  :: nx 
+        integer, intent(IN)  :: ny
+        integer, intent(IN)  :: BC
+
+        select case(BC)
+
+            case(BND_INFINITE)
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1)
+                jp1 = min(j+1,ny) 
+
+            case(BND_MISMIP3D,BND_TROUGH)
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx) 
+                jm1 = j-1
+                if (jm1 .eq. 0)    jm1 = ny
+                jp1 = j+1
+                if (jp1 .eq. ny+1) jp1 = 1 
+                
+            case DEFAULT 
+                ! Periodic, periodic-x (for now treat the same way)
+
+                im1 = i-1
+                if (im1 .eq. 0)    im1 = nx 
+                ip1 = i+1
+                if (ip1 .eq. nx+1) ip1 = 1 
+
+                jm1 = j-1
+                if (jm1 .eq. 0)    jm1 = ny
+                jp1 = j+1
+                if (jp1 .eq. ny+1) jp1 = 1 
+
+        end select 
+
+        return
+
+    end subroutine get_neighbor_indices_bc_codes
+
+    function boundary_code(boundaries) result(code)
+
+        implicit none
+        
+        character(len=*), intent(in) :: boundaries
+        integer :: code
+
+        select case(trim(boundaries))
+            case("zeros");      code = BND_ZEROS
+            case("infinite");   code = BND_INFINITE
+            case("MISMIP3D");   code = BND_MISMIP3D
+            case("TROUGH");     code = BND_TROUGH
+            case("periodic");   code = BND_PERIODIC
+            case("periodic-x"); code = BND_PERIODIC_X
+            case default
+                write(io_unit_err,*) "boundary_code:: Error: Boundary string not recognized: "//trim(boundaries)
+                stop
+        end select
+
+        return
+
+    end function boundary_code
 
     elemental function calc_magnitude(u,v) result(umag)
         ! Get the vector magnitude from two components at the same grid location
@@ -177,17 +261,21 @@ contains
         integer :: im1, ip1, jm1, jp1
         real(wp) :: unow, vnow 
         real(wp) :: f1, f2, H1, H2 
-        
+        integer  :: BC
+
         nx = size(u,1)
         ny = size(u,2) 
 
         umag = 0.0_wp 
 
+        ! Get code for current BCs
+        BC = boundary_code(boundaries)
+
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if (f_ice(i,j) .eq. 1.0) then 
                 unow = 0.5*(u(im1,j)+u(i,j))

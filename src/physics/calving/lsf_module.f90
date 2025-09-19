@@ -1,7 +1,7 @@
 module lsf_module
 
     use yelmo_defs,        only : sp, dp, wp, prec, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
-    use yelmo_tools,       only : get_neighbor_indices
+    use yelmo_tools,       only : boundary_code, get_neighbor_indices_bc_codes
     use topography,        only : calc_H_eff
     use solver_advection,  only : calc_advec2D
     use mass_conservation, only : calc_G_advec_simple 
@@ -197,32 +197,36 @@ contains
         real(wp), dimension(size(LSF,1), size(LSF,2)) :: dLSF_acx, dLSF_acy ! ac-nodes
         real(wp), dimension(size(LSF,1), size(LSF,2)) :: qx_ac, qy_ac, qx_aa, qy_aa
         integer :: i, j, im1, ip1, jm1, jp1, nx, ny
-            
+        integer :: BC
+
         dlsf     = 0.0_wp
         dtdx     = dt / dx
         dLSF_acx = 0.0_wp
         dLSF_acy = 0.0_wp
         nx       = size(LSF,1)
         ny       = size(LSF,2)
-    
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         do i = 1, nx
-            do j = 1, ny
-                ! ac-nodes
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-                dLSF_acx(i,j) = (LSF(ip1,j)-LSF(i,j))
-                dLSF_acy(i,j) = (LSF(i,jp1)-LSF(i,j))
-                qx_ac(i,j) = u(i,j) * dLSF_acx(i,j)
-                qy_ac(i,j) = v(i,j) * dLSF_acy(i,j)
-            end do
+        do j = 1, ny
+            ! ac-nodes
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
+            dLSF_acx(i,j) = (LSF(ip1,j)-LSF(i,j))
+            dLSF_acy(i,j) = (LSF(i,jp1)-LSF(i,j))
+            qx_ac(i,j) = u(i,j) * dLSF_acx(i,j)
+            qy_ac(i,j) = v(i,j) * dLSF_acy(i,j)
+        end do
         end do
     
         do i = 1, nx
-            do j = 1, ny
-                ! Compute to aa-nodes
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)    
-                qx_aa(i,j) = 0.5*(qx_ac(i,j) + qx_ac(im1,j)) 
-                qy_aa(i,j) = 0.5*(qy_ac(i,j) + qy_ac(i,jm1))
-            end do
+        do j = 1, ny
+            ! Compute to aa-nodes
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)    
+            qx_aa(i,j) = 0.5*(qx_ac(i,j) + qx_ac(im1,j)) 
+            qy_aa(i,j) = 0.5*(qy_ac(i,j) + qy_ac(i,jm1))
+        end do
         end do
             
         ! Update LSF
@@ -401,12 +405,12 @@ contains
             iter = iter + 1
             
             do i = 2, size(mask_orig,1)-1
-                do j = 2, size(mask_orig,2)-1
-                    if (mask_ac(i,j) .eq. 0.0_wp) then
-                        mask_new(i,j) = 0.25_wp * (mask_fill(i+1,j) + mask_fill(i-1,j) + mask_fill(i,j+1) + mask_fill(i,j-1))
-                        error = error + abs(mask_new(i,j) - mask_fill(i,j))
-                    end if
-                end do
+            do j = 2, size(mask_orig,2)-1
+                if (mask_ac(i,j) .eq. 0.0_wp) then
+                    mask_new(i,j) = 0.25_wp * (mask_fill(i+1,j) + mask_fill(i-1,j) + mask_fill(i,j+1) + mask_fill(i,j-1))
+                    error = error + abs(mask_new(i,j) - mask_fill(i,j))
+                end if
+            end do
             end do
             mask_fill = mask_new
         end do

@@ -3,7 +3,7 @@ module velocity_ssa
     ! using the shallow-shelf approximation (SSA). 
 
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, pi
-    use yelmo_tools, only : get_neighbor_indices, & 
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
@@ -391,6 +391,8 @@ end if
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .TRUE.
 
+        integer :: BC 
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         if (use_gq3D) call gq3D_init(gq3D)
@@ -399,6 +401,9 @@ end if
         ny = size(visc,2)
         nz = size(visc,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         allocate(dudx(nx,ny,nz))
         allocate(dudy(nx,ny,nz))
         allocate(dvdx(nx,ny,nz))
@@ -435,7 +440,7 @@ end if
             if (f_ice(i,j) == 1.0) then
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
 if (.not. use_gq3D) then 
     ! 2D QUADRATURE
@@ -551,10 +556,15 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
+        integer :: BC
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen
@@ -572,7 +582,7 @@ end if
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get strain rate terms
                 dudx_aa = (ux(i,j)-ux(im1,j))/dx 

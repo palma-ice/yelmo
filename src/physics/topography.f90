@@ -1,7 +1,7 @@
 module topography 
 
     use yelmo_defs, only : wp, dp, io_unit_err, pi, TOL, is_equal
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
     use subgrid, only : calc_subgrid_array, calc_subgrid_array_cell
 
     implicit none 
@@ -145,6 +145,7 @@ contains
         integer :: i, j, q, nx, ny
         integer :: im1, ip1, jm1, jp1 
         integer :: n_unfilled 
+        integer :: BC
 
         logical, allocatable :: mask0(:,:) 
 
@@ -152,6 +153,9 @@ contains
 
         nx = size(mask,1)
         ny = size(mask,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Allocate local mask object for diagnosing points of interest
         allocate(mask0(nx,ny))
@@ -172,7 +176,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 if (mask_now(i,j)) then 
                     ! This is a point of interest
@@ -244,9 +248,13 @@ contains
         logical  :: mask(4) 
         real(wp), allocatable :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
         logical, allocatable :: mask_cf(:,:) 
-                
+        integer  :: BC
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(H_grnd(nx,ny))
         allocate(mask_cf(nx,ny)) 
@@ -280,7 +288,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
     
                 ! Determine calving front mask 
                 if (H_ice(i,j) .gt. 0.0 .and. H_grnd(i,j) .lt. 0.0) then 
@@ -306,7 +314,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 if (mask_cf(i,j)) then 
                     ! This is a calving front point 
@@ -389,11 +397,15 @@ contains
         integer  :: n_now
         integer, allocatable  :: n_ice(:,:) 
         real(wp), allocatable :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
-        
+        integer  :: BC
+
         real(wp), parameter :: H_lim        = 100.0_wp 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(n_ice(nx,ny))
         allocate(H_grnd(nx,ny))
@@ -423,7 +435,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
                 
                 ! Count how many neighbors are ice covered  
                 H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
@@ -449,7 +461,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
                 
                 if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
                     ! First, treat a special case:
@@ -538,6 +550,7 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         integer  :: n 
         real(wp) :: f_neighb(4) 
+        integer  :: BC
 
         integer, parameter :: val_ice_free  = -1 
         integer, parameter :: val_flt       = 1
@@ -547,6 +560,9 @@ contains
         nx = size(mask_frnt,1) 
         ny = size(mask_frnt,2) 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Initialize mask to zero everywhere to start 
         mask_frnt = 0
 
@@ -555,7 +571,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             f_neighb = [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
             n = count(f_neighb .lt. 1.0)
@@ -690,6 +706,7 @@ contains
         real(wp) :: H_eff 
         real(wp) :: f_grnd_neighb(4) 
         logical  :: is_grline 
+        integer  :: BC
 
         real(wp), allocatable :: z_srf_int(:,:) 
         real(wp), allocatable :: H_ice_int(:,:)
@@ -699,6 +716,9 @@ contains
         
         nx = size(z_srf,1)
         ny = size(z_srf,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Allocate the subgrid arrays 
         allocate(z_srf_int(gz_nx,gz_nx))
@@ -721,7 +741,7 @@ contains
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             f_grnd_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
 
@@ -898,11 +918,15 @@ contains
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: Hg_int(gz_nx,gz_nx)
+        integer  :: BC
 
         !integer, parameter :: nx_interp = 15
 
         nx = size(H_grnd,1)
         ny = size(H_grnd,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! First binary estimate of f_grnd based on aa-nodes
         f_grnd = 1.0
@@ -913,7 +937,7 @@ contains
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (maxval(H_grnd(im1:ip1,jm1:jp1)) .ge. 0.0 .and. minval(H_grnd(im1:ip1,jm1:jp1)) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
@@ -950,11 +974,15 @@ contains
         real(wp) :: Hg_min, Hg_max  
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: Hg_int(gz_nx,gz_nx)
+        integer  :: BC
 
         !integer, parameter :: nx_interp = 15
 
         nx = size(H_grnd,1)
         ny = size(H_grnd,2) 
+        
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialize all masks to zero (fully floating) to start
         f_grnd     = 0.0_wp 
@@ -967,7 +995,7 @@ contains
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! === f_grnd at aa-nodes ===
 
@@ -1370,6 +1398,7 @@ end if
         real(wp) :: dist_corners_min
         real(wp) :: dx_km 
         real(wp) :: dists(8) 
+        integer  :: BC
 
         real(wp), parameter :: dist_max = 1e10          ! [km]
         real(wp), parameter :: sqrt_2   = sqrt(2.0_wp) 
@@ -1379,6 +1408,9 @@ end if
 
         nx = size(dist_gl,1)
         ny = size(dist_gl,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(dist_gl_ref(nx,ny)) 
 
@@ -1396,7 +1428,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Grounded point or partially floating point with floating neighbors
             if (f_grnd(i,j) .gt. 0.0 .and. &
@@ -1428,7 +1460,7 @@ end if
                         ! Distance needs to be determined for this point 
 
                         ! Get neighbor indices
-                        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                        call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                         ! Get distances to direct and corner neighbors
                         dists = [dist_gl_ref(im1,j),dist_gl_ref(ip1,j), &       ! Direct neighbors
@@ -1658,6 +1690,7 @@ end if
         real(wp) :: area_tot
         real(wp) :: bmb_eff 
         logical  :: mask(4) 
+        integer  :: BC
 
         real(wp) :: rho_ice_sw 
         
@@ -1668,6 +1701,9 @@ end if
 
         nx = size(fmb,1)
         ny = size(fmb,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         select case(fmb_method)
 
@@ -1686,7 +1722,7 @@ end if
                 do i = 1, nx 
 
                     ! Get neighbor indices
-                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                    call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                     ! Get mask of neighbors that are ice free 
                     mask = ( [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0 )
@@ -1778,6 +1814,7 @@ end if
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
         real(wp) :: wt 
+        integer  :: BC
 
         real(wp), allocatable :: Hg_int(:,:)
         real(wp), allocatable :: bmb_int(:,:)
@@ -1797,6 +1834,9 @@ end if
         nx = size(H_grnd,1)
         ny = size(H_grnd,2) 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Allocate subgrid arrays
         allocate(Hg_int(nxi,nxi))
         allocate(bmb_int(nxi,nxi))
@@ -1806,7 +1846,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (minval(H_grnd(im1:ip1,jm1:jp1)) .ge. gz_Hg1) then 
                 ! Entire cell is grounded
@@ -1879,6 +1919,7 @@ end if
     ! Local variables
     integer :: i, j, nx, ny 
     integer :: im1, ip1, jm1, jp1
+    integer :: BC
 
     real(wp), allocatable :: f_grnd_NW(:,:)
     real(wp), allocatable :: f_grnd_NE(:,:)
@@ -1888,6 +1929,9 @@ end if
 
     nx = size(f_grnd,1)
     ny = size(f_grnd,2) 
+    
+    ! Set boundary condition code
+    BC = boundary_code(boundaries)
 
     allocate(f_grnd_NW(nx,ny))
     allocate(f_grnd_NE(nx,ny))
@@ -1912,7 +1956,7 @@ end if
     do i = 1, nx 
         
         ! Get neighbor indices
-        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+        call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
       ! aa-nodes
       f_grnd(i,j)     = 0.25_wp * (f_grnd_NW(i,j) + f_grnd_NE(i,j) + f_grnd_SW(i,j) + f_grnd_SE(i,j))
@@ -1959,9 +2003,13 @@ end if
     integer  :: im1, ip1, jm1, jp1  
     real(wp) :: f_NW, f_N, f_NE, f_W, f_m, f_E, f_SW, f_S, f_SE
     real(wp) :: fq_NW, fq_NE, fq_SW, fq_SE
-    
+    integer  :: BC
+
     nx = size(f_flt,1)
     ny = size(f_flt,2)
+    
+    ! Set boundary condition code
+    BC = boundary_code(boundaries)
 
     ! Calculate grounded fractions of all four quadrants of each a-grid cell
     !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1, f_NW,f_N,f_NE,f_W,f_m,f_E,f_SW,f_S,f_SE, fq_NW,fq_NE,fq_SW,fq_SE)
@@ -1969,7 +2017,7 @@ end if
     do i = 1, nx
         
         ! Get neighbor indices
-        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+        call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
       f_NW = 0.25_wp * (f_flt(im1,jp1) + f_flt(i,jp1)   + f_flt(im1,j)   + f_flt(i,j))
       f_N  = 0.50_wp * (f_flt(i,jp1)   + f_flt(i,j))

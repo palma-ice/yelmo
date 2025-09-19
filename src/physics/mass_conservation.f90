@@ -1,7 +1,8 @@
 module mass_conservation
 
     use yelmo_defs, only : sp, dp, wp, TOL, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err, is_equal
-    use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa, minmax
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
+                            fill_borders_2D, set_boundaries_2D_aa, minmax
 
     use solver_advection, only : calc_advec2D  
     use velocity_general, only : set_inactive_margins 
@@ -441,15 +442,19 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
+        integer :: BC
 
         nx = size(mask,1)
         ny = size(mask,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if (mask(i,j) .eq. 2) then 
                 ! This site just filled with ice, so 
@@ -538,10 +543,13 @@ contains
         logical :: kill_floating
         real(wp) :: calv_flt_now 
         real(wp) :: calv_grnd_now 
-
+        integer :: BC
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Determine whether a kill method is being applied
         kill_floating = .FALSE. 
@@ -570,7 +578,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             is_margin = H_ice(i,j) .gt. 0.0 .and. &
                 count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0) .gt. 0
@@ -628,11 +636,15 @@ contains
         logical  :: is_island 
         logical  :: is_isthmus_x 
         logical  :: is_isthmus_y 
+        integer  :: BC
 
         real(wp), parameter :: H_min_tol = 1e-6
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(H_tmp(nx,ny)) 
         allocate(H_ice_new(nx,ny)) 
@@ -660,7 +672,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             is_margin = H_tmp(i,j) .gt. 0.0 .and. &
                 count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
@@ -695,7 +707,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             ! Check for ice islands
             is_island = H_tmp(i,j) .gt. 0.0 .and. &
@@ -723,7 +735,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             is_margin = H_tmp(i,j) .gt. 0.0 .and. &
                 count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
@@ -825,15 +837,19 @@ contains
         ! Local variables 
         integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1
+        integer  :: BC
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             select case(topo_rel)
 

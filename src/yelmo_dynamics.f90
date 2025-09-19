@@ -6,7 +6,7 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D, &
-                            get_neighbor_indices
+                            boundary_code, get_neighbor_indices_bc_codes
 
     use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
                             calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
@@ -847,6 +847,8 @@ contains
 
         type(gq2D_class) :: gq2D
 
+        integer :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
 
@@ -878,6 +880,9 @@ contains
 
         nx = size(dyn%now%N_eff,1)
         ny = size(dyn%now%N_eff,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(dyn%par%boundaries)
 
         ! Set local variable: number of interpolation points in cell [nxi x nxi]
         if (dyn%par%neff_nxi .eq. 0) then
@@ -918,7 +923,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,dyn%par%boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 select case(dyn%par%neff_method)
 

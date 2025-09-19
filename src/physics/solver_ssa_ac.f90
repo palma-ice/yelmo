@@ -1,7 +1,7 @@
 module solver_ssa_ac
 
     use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL, TOL_UNDERFLOW, is_equal
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
 
     use solver_linear
     use ncio        ! For diagnostic outputting only 
@@ -1171,9 +1171,13 @@ contains
         integer :: i, j, k
         integer :: im1, ip1, jm1, jp1 
         integer :: nx, ny 
+        integer :: BC
 
         nx = size(visc,1)
         ny = size(visc,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialisation
         visc_ab = 0.0_wp 
@@ -1183,7 +1187,7 @@ contains
         do j = 1, ny 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             visc_ab(i,j) = 0.0_wp
             k=0

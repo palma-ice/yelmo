@@ -1,7 +1,7 @@
 module velocity_diva
 
     use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL, TOL_UNDERFLOW, is_equal
-    use yelmo_tools, only : get_neighbor_indices, &
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
@@ -428,14 +428,18 @@ end if
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa
-        integer :: im1, ip1, jm1, jp1
+        integer  :: i, j, k, nx, ny, nz_aa
+        integer  :: im1, ip1, jm1, jp1
         real(wp), allocatable :: F1(:,:,:) 
         real(wp) :: F1_ac
+        integer  :: BC
 
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(F1(nx,ny,nz_aa))
 
@@ -463,7 +467,7 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! === x direction (acx-nodes) ===============================================
 
@@ -503,6 +507,7 @@ end if
         integer  :: i, j, k, nx, ny, nz_aa 
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: visc_eff_ac
+        integer  :: BC
 
         ! real(wp), parameter :: visc_min = 1e5_wp 
 
@@ -510,13 +515,16 @@ end if
         ny    = size(H_ice,2)
         nz_aa = size(zeta_aa,1) 
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,visc_eff_ac)
         do k = 1, nz_aa 
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Calculate shear strain, acx-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
@@ -602,6 +610,8 @@ end if
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .TRUE.
 
+        integer :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         if (use_gq3D) call gq3D_init(gq3D)
@@ -610,6 +620,9 @@ end if
         ny = size(visc,2)
         nz = size(visc,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         allocate(dudx(nx,ny,nz))
         allocate(dudy(nx,ny,nz))
         allocate(dvdx(nx,ny,nz))
@@ -646,7 +659,7 @@ end if
             if (f_ice(i,j) == 1.0) then
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
 if (.not. use_gq3D) then 
     ! 2D QUADRATURE
@@ -776,10 +789,15 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
+        integer  :: BC
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen
@@ -797,7 +815,7 @@ end if
             if ( is_equal(f_ice(i,j),1.0_wp) ) then 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get strain rate terms
                 dudx_aa = (ux(i,j)-ux(im1,j))/dx 
@@ -992,6 +1010,7 @@ end if
         integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: F2_ac 
+        integer  :: BC
 
         nx = size(ux_b,1)
         ny = size(ux_b,2) 
@@ -1012,7 +1031,7 @@ end if
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! ==== x-direction (acx-nodes) =====
 

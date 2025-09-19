@@ -643,18 +643,23 @@ end if
         real(wp), optional, intent(IN)    :: time_now
     
         ! Local variables
-        integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1
         real(wp) :: dt_kill
         real(wp), allocatable :: mbal_now(:,:)
         !real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
-        
+        integer  :: BC
+
         ! Make sure dt is not zero
         dt_kill = dt 
         if (dt_kill .eq. 0.0) dt_kill = 1.0_wp
     
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
-       
+
+        ! Set boundary condition code
+        BC = boundary_code(tpo%par%boundaries)
+
         allocate(mbal_now(nx,ny))
 
         ! === Floating calving laws ===
@@ -747,7 +752,7 @@ end if
         
         do j=1,ny
         do i=1,nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             ! x-ac node
             if (tpo%now%f_grnd_acx(i,j) .eq. 0.0) then
                 ! Floating point
@@ -793,7 +798,7 @@ end if
         tpo%now%cmb = 0.0_wp
         do j=1,ny
         do i=1,nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             ! Compute the mean calving rate in every aa node
             tpo%now%cmb_flt(i,j) = ((0.5*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
                                     (0.5*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5

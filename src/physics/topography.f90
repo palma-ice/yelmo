@@ -58,7 +58,7 @@ module topography
     
 contains 
 
-    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
+    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grline)
         ! Generate an output mask for model conditions at bed
         ! based on input masks 
         ! 0: ocean, 1: land, 2: sia, 3: streams, grline: 4, floating: 5, islands: 6
@@ -68,9 +68,9 @@ contains
 
         integer,  intent(OUT) :: mask 
         real(wp), intent(IN)  :: f_ice, f_pmp, f_grnd
-        integer,  intent(IN)  :: mask_grz
+        logical,  intent(IN)  :: mask_grline
 
-        if (mask_grz .eq. 0) then
+        if (mask_grline) then
             ! Grounding line
 
             mask = mask_bed_grline
@@ -1331,7 +1331,7 @@ end if
 
     end subroutine remove_englacial_lakes
 
-    subroutine calc_distance_to_ice_margin(dist_mrgn,f_ice,dx,boundaries)
+    subroutine calc_distance_to_ice_margin(dist_mrgn,f_ice,dx,boundaries,calc_distances)
         ! Calculate distance to the ice margin
         
         ! Note: this subroutine is a wrapper that calls the
@@ -1344,14 +1344,15 @@ end if
         real(wp), intent(IN)  :: f_ice(:,:)     ! [1]  Fraction of grid-cell ice coverage 
         real(wp), intent(IN)  :: dx             ! [m]  Grid resolution (assume dy=dx)
         character(len=*), intent(IN) :: boundaries
-    
-        call calc_distance_to_grounding_line(dist_mrgn,f_ice,dx,boundaries)
+        logical,  intent(IN)  :: calc_distances
+
+        call calc_distance_to_grounding_line(dist_mrgn,f_ice,dx,boundaries,calc_distances)
 
         return 
 
     end subroutine calc_distance_to_ice_margin
     
-    subroutine calc_distance_to_grounding_line(dist_gl,f_grnd,dx,boundaries)
+    subroutine calc_distance_to_grounding_line(dist_gl,f_grnd,dx,boundaries,calc_distances)
         ! Calculate distance to the grounding line 
         
         implicit none 
@@ -1360,6 +1361,7 @@ end if
         real(wp), intent(IN)  :: f_grnd(:,:)    ! [1]  Grounded grid-cell fraction 
         real(wp), intent(IN)  :: dx             ! [m]  Grid resolution (assume dy=dx)
         character(len=*), intent(IN) :: boundaries
+        logical,  intent(IN)  :: calc_distances
 
         ! Local variables 
         integer  :: i, j, nx, ny, q
@@ -1411,67 +1413,71 @@ end if
 
         ! 2. Next, determine distances to grounding line ======================
         
-        do q = 1, iter_max  
-            ! Iterate distance of one neighbor at a time until grid is filled in
+        if (calc_distances) then
 
-            dist_gl_ref = dist_gl
+            do q = 1, iter_max  
+                ! Iterate distance of one neighbor at a time until grid is filled in
 
-            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dists,dist_direct_min,dist_corners_min)
-            do j = 1, ny 
-            do i = 1, nx
+                dist_gl_ref = dist_gl
 
-                if ( is_equal(dist_gl(i,j),dist_max) ) then 
-                    ! Distance needs to be determined for this point 
+                !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dists,dist_direct_min,dist_corners_min)
+                do j = 1, ny 
+                do i = 1, nx
 
-                    ! Get neighbor indices
-                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                    if ( is_equal(dist_gl(i,j),dist_max) ) then 
+                        ! Distance needs to be determined for this point 
 
-                    ! Get distances to direct and corner neighbors
-                    dists = [dist_gl_ref(im1,j),dist_gl_ref(ip1,j), &       ! Direct neighbors
-                             dist_gl_ref(i,jm1),dist_gl_ref(i,jp1), &       ! Direct neighbors
-                             dist_gl_ref(im1,jp1),dist_gl_ref(ip1,jp1), &   ! Corner neighbors
-                             dist_gl_ref(im1,jm1),dist_gl_ref(ip1,jm1)]     ! Corner neighbors
+                        ! Get neighbor indices
+                        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                    if (count(dists .lt. dist_max) .ge. 2) then 
-                        ! Some neighbors have been calculated already 
-                        ! Note: check for at least 2 neighbors already
-                        ! calculated to reduce errors in points with 
-                        ! neighbors on both sides with similar distances. This 
-                        ! Waiting for even more neighbors would reduce errors
-                        ! further but greatly increases iterations. 
+                        ! Get distances to direct and corner neighbors
+                        dists = [dist_gl_ref(im1,j),dist_gl_ref(ip1,j), &       ! Direct neighbors
+                                dist_gl_ref(i,jm1),dist_gl_ref(i,jp1), &       ! Direct neighbors
+                                dist_gl_ref(im1,jp1),dist_gl_ref(ip1,jp1), &   ! Corner neighbors
+                                dist_gl_ref(im1,jm1),dist_gl_ref(ip1,jm1)]     ! Corner neighbors
 
-                        ! Determine minimum distance to grounding line for 
-                        ! direct and diagonal neighbors, separately.
-                        dist_direct_min  = minval(dists(1:4))
-                        dist_corners_min = minval(dists(5:8))
+                        if (count(dists .lt. dist_max) .ge. 2) then 
+                            ! Some neighbors have been calculated already 
+                            ! Note: check for at least 2 neighbors already
+                            ! calculated to reduce errors in points with 
+                            ! neighbors on both sides with similar distances. This 
+                            ! Waiting for even more neighbors would reduce errors
+                            ! further but greatly increases iterations. 
 
-                        if (dist_direct_min .le. dist_corners_min) then 
-                            ! Assume nearest path to grounding line is along
-                            ! direct neighbor path - add dx to dist for this point 
+                            ! Determine minimum distance to grounding line for 
+                            ! direct and diagonal neighbors, separately.
+                            dist_direct_min  = minval(dists(1:4))
+                            dist_corners_min = minval(dists(5:8))
 
-                            dist_gl(i,j) = dist_direct_min + dx_km 
+                            if (dist_direct_min .le. dist_corners_min) then 
+                                ! Assume nearest path to grounding line is along
+                                ! direct neighbor path - add dx to dist for this point 
 
-                        else
-                            ! Assume nearest path to grounding line is via 
-                            ! a diagonal neighbor - add sqrt(2) to dist for this point
+                                dist_gl(i,j) = dist_direct_min + dx_km 
 
-                            dist_gl(i,j) = dist_corners_min + sqrt_2*dx_km
+                            else
+                                ! Assume nearest path to grounding line is via 
+                                ! a diagonal neighbor - add sqrt(2) to dist for this point
+
+                                dist_gl(i,j) = dist_corners_min + sqrt_2*dx_km
+
+                            end if 
 
                         end if 
+                    end if
 
-                    end if 
-                end if
+                end do 
+                end do
+                !!$omp end parallel do
+                
+                if (count(dist_gl .eq. dist_max) .eq. 0) then 
+                    ! No more points to check 
+                    exit 
+                end if 
 
-            end do 
             end do
-            !!$omp end parallel do
-            
-            if (count(dist_gl .eq. dist_max) .eq. 0) then 
-                ! No more points to check 
-                exit 
-            end if 
 
-        end do
+        end if 
 
         ! Set all floating-point distances to negative values 
         where (f_grnd .eq. 0.0_wp) 

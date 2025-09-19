@@ -12,8 +12,10 @@ module velocity_diva
                         picard_calc_error, picard_calc_error_angle,  &
                         picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
+                                    gq3D_to_nodes_acx, gq3D_to_nodes_acy
 
     implicit none 
 
@@ -651,24 +653,24 @@ if (.not. use_gq3D) then
 
                 ! Get horizontal strain rate terms
                 ! (same for all layers, so just get them once for all layers)
-                call gq2D_to_nodes(gq2D,dudxn,dudx(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dudyn,dudy(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudxn,dudx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudyn,dudy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 
-                call gq2D_to_nodes(gq2D,dvdxn,dvdx(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dvdyn,dvdy(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 do k = 1, nz
                     
                     ! Get vertical shear strain rate terms
-                    call gq2D_to_nodes(gq2D,dudzn,dudz(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,dvdzn,dvdz(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,dudzn,dudz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,dvdzn,dvdz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
                                                 + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq2D_to_nodes(gq2D,ATTn,ATT(:,:,k),dx,dy,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,ATTn,ATT(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
@@ -700,22 +702,22 @@ else
                     end if
                     
                     ! Get horizontal strain rate terms
-                    call gq3D_to_nodes(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
-                    call gq3D_to_nodes(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
                     ! Get vertical shear strain rate terms
-                    call gq3D_to_nodes(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
                                                 + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq3D_to_nodes(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,"aa",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_aa(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node

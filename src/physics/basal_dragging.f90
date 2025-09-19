@@ -16,7 +16,9 @@ module basal_dragging
 
     use topography, only : calc_H_eff 
 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy
+
 
     implicit none 
 
@@ -864,11 +866,11 @@ contains
                     
                     ! Get c_bed on nodes
                     
-                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j)
 
-                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
 
                 end if 
                 
@@ -965,11 +967,11 @@ contains
                 else
                     ! Get c_bed on nodes
                     
-                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j) 
 
-                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
 
                 end if 
                 

@@ -8,7 +8,8 @@ module thermodynamics
 
     use yelmo_tools, only : get_neighbor_indices, set_boundaries_3D_aa
     
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy
 
     implicit none 
 
@@ -745,11 +746,11 @@ contains
 
                 ! Get basal velocity and basal stress components on nodes
 
-                call gq2D_to_nodes(gq2D,uxbn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,uybn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,uxbn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,uybn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                 
-                call gq2D_to_nodes(gq2D,taubxn,taub_acx,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,taubyn,taub_acy,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,taubxn,taub_acx,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,taubyn,taub_acy,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                 
                 ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
                 Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )

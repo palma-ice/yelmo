@@ -16,6 +16,7 @@ module yelmo_topography
 
     use runge_kutta 
     use derivatives
+    use distances
 
     implicit none
     
@@ -121,7 +122,7 @@ end if
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
                     tpo%now%dHidt_dyn = tpo%par%dt_beta(1)*dHidt_now + tpo%par%dt_beta(2)*tpo%now%dHidt_dyn_n 
-                    
+
                     ! Apply rate and update ice thickness (predicted)
                     ! Limit dynamic rate of change for stability (typically < 100 m/yr)
                     tpo%now%H_ice = tpo%now%H_ice_n
@@ -962,18 +963,46 @@ end if
         call calc_f_grnd_pinning_points(tpo%now%f_grnd_pin,tpo%now%H_ice,tpo%now%f_ice, &
                                                 bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw)
 
+if (.FALSE.) then
+        if (tpo%par%dmb_method .gt. 0) then
+            ! Calculate the grounding-line distance
+            call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.TRUE.)
+
+            ! Define the grounding-zone mask too 
+            call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
+
+            ! Calculate distance to the ice margin
+            call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.TRUE.)
+        else
+            ! Calculate the grounding-line distance
+            call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.FALSE.)
+
+            ! Define the grounding-zone mask too 
+            call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
+
+                ! Calculate distance to the ice margin
+            call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.FALSE.)
+
+        end if
+else
         ! Calculate the grounding-line distance
-        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx,tpo%par%boundaries)
+        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx, &
+                                                    tpo%par%boundaries,calc_distances=.FALSE.)
 
         ! Define the grounding-zone mask too 
         call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
 
-        ! Calculate distance to the ice margin
-        call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries)
+        call compute_distance_to_mask(tpo%now%dist_grline, tpo%now%mask_grz)
+
+end if
 
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
-                                            tpo%now%f_grnd,tpo%now%mask_grz)
+                                            tpo%now%f_grnd,tpo%now%mask_grz.eq.0)
 
 
         ! Calculate the ice-front mask (mainly for use in dynamics)

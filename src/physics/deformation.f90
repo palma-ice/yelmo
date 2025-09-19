@@ -13,8 +13,11 @@ module deformation
                         jacobian_3D_class, strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : get_neighbor_indices, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
+                                    gq3D_to_nodes_acx, gq3D_to_nodes_acy, &
+                                    gq3D_to_nodes_acz
 
     implicit none 
     
@@ -1182,31 +1185,31 @@ if (use_gq) then
     ! Use quadrature points
 
                     ! Get dxx on aa-nodes 
-                    call gq2D_to_nodes(gq2D,ddn,jvel%dxx(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,ddn,jvel%dxx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     strn%dxx(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
                     
                     ! Get dxy and dyx on aa-nodes 
-                    call gq2D_to_nodes(gq2D,ddan,jvel%dxy(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,ddbn,jvel%dyx(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,ddan,jvel%dxy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,ddbn,jvel%dyx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddn = 0.5*(ddan+ddbn)
                     strn%dxy(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call gq2D_to_nodes(gq2D,ddan,jvel%dxz(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,ddan,jvel%dxz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dxz(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call gq2D_to_nodes(gq2D,ddan,jvel%dyz(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,ddan,jvel%dyz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dyz(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call gq2D_to_nodes(gq2D,ddn,jvel%dyy(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,ddn,jvel%dyy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     strn%dyy(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 else
     ! Unstagger directly to aa-nodes
@@ -1408,31 +1411,31 @@ end if
                     end if
                     
                     ! Get dxx on aa-nodes 
-                    call gq3D_to_nodes(gq3D,ddn,jvel%dxx,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,ddn,jvel%dxx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     strn%dxx(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dxy and dyx on aa-nodes 
-                    call gq3D_to_nodes(gq3D,ddan,jvel%dxy,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,ddbn,jvel%dyx,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,ddan,jvel%dxy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,ddbn,jvel%dyx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn = 0.5*(ddan+ddbn)
                     strn%dxy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call gq3D_to_nodes(gq3D,ddan,jvel%dxz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,ddbn,jvel%dzx,dx,dy,dz0,dz1,"acz",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,ddan,jvel%dxz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acz(gq3D,ddbn,jvel%dzx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dxz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call gq3D_to_nodes(gq3D,ddan,jvel%dyz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,ddbn,jvel%dzy,dx,dy,dz0,dz1,"acz",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,ddan,jvel%dyz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acz(gq3D,ddbn,jvel%dzy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dyz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call gq3D_to_nodes(gq3D,ddn,jvel%dyy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,ddn,jvel%dyy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     strn%dyy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! TEST - set shear strain terms to zero
@@ -1577,11 +1580,11 @@ end if
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 
-                call gq2D_to_nodes(gq2D,dudxn,dudx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dudyn,dudy,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudxn,dudx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudyn,dudy,dx,dy,i,j,im1,ip1,jm1,jp1)
 
-                call gq2D_to_nodes(gq2D,dvdxn,dvdx,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dvdyn,dvdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy,dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 ! Calculate strain rate tensor terms 
                 strn2D%dxx(i,j) = sum(dudxn*gq2D%wt)/gq2D%wt_tot

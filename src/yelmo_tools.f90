@@ -268,7 +268,7 @@ contains
 
         umag = 0.0_wp 
 
-        ! Get code for current BCs
+        ! Set boundary condition code
         BC = boundary_code(boundaries)
 
         do j = 1, ny 
@@ -739,16 +739,20 @@ contains
         integer  :: im1, ip1, jm1, jp1
         integer  :: im2, ip2, jm2, jp2
         real(wp) :: V0, V1, V2 
+        integer  :: BC
 
         nx = size(var,1)
         ny = size(var,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,ip2,V0,V1,V2)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             V0 = var(i,j) 
             V1 = var(ip1,j) 
@@ -841,17 +845,21 @@ subroutine calc_gradient_acy(dvardy,var,f_ice,dy,grad_lim,margin2nd,zero_outside
         integer  :: im1, ip1, jm1, jp1
         integer  :: im2, ip2, jm2, jp2
         real(wp) :: V0, V1, V2 
+        integer  :: BC
 
         nx = size(var,1)
         ny = size(var,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,jp2,V0,V1,V2)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-             
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
+            
             V0 = var(i,j) 
             V1 = var(i,jp1) 
 
@@ -1761,11 +1769,15 @@ end if
         real(wp), allocatable :: f_ice(:,:)
         logical,  allocatable :: mask_apply(:,:) 
         logical,  allocatable :: mask_use(:,:) 
+        integer  :: BC
 
         integer, parameter :: iter_max = 50 
 
         nx = size(z_bed,1)
         ny = size(z_bed,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         dy = dx 
 
@@ -1794,7 +1806,7 @@ end if
             do i = 3, nx-3
                 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 if (abs(dzbdx(i,j)) .ge. grad_lim) then 
                     mask_apply(i,j)   = .TRUE. 

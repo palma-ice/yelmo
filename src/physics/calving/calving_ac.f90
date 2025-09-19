@@ -218,37 +218,37 @@ contains
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
-        !$omp end parallel do
+        !!$omp end parallel do
         do j = 1, ny
-            do i = 1, nx
-                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
+        do i = 1, nx
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
-                ! Stagger ice thickness into ac-nodes                        
-                H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
-                H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
-                    
-                ! Special case for border
-                ! x-axis  
-                if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(ip1,j) .eq. 0.0_wp)) then
-                    H_acx = H_ice(i,j)
-                else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(ip1,j) .gt. 0.0_wp)) then
-                    H_acx = H_ice(ip1,j)
-                end if
+            ! Stagger ice thickness into ac-nodes                        
+            H_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
+            H_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
+                
+            ! Special case for border
+            ! x-axis  
+            if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(ip1,j) .eq. 0.0_wp)) then
+                H_acx = H_ice(i,j)
+            else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(ip1,j) .gt. 0.0_wp)) then
+                H_acx = H_ice(ip1,j)
+            end if
 
-                ! y-axis  
-                if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(i,jp1) .eq. 0.0_wp)) then
-                    H_acy = H_ice(i,j)
-                else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(i,jp1) .gt. 0.0_wp)) then
-                    H_acy = H_ice(i,jp1)
-                end if
+            ! y-axis  
+            if ((f_ice(i,j) .gt. 0.0_wp) .and. (f_ice(i,jp1) .eq. 0.0_wp)) then
+                H_acy = H_ice(i,j)
+            else if ((f_ice(i,j) .eq. 0.0_wp) .and. (f_ice(i,jp1) .gt. 0.0_wp)) then
+                H_acy = H_ice(i,jp1)
+            end if
 
-                ! Compute calving-rates on ac-nodes
-                wv_acx      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acx)/H_ice_c)
-                cr_acx(i,j) = -u_acx(i,j)*wv_acx
-                wv_acy      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acy)/H_ice_c)
-                cr_acy(i,j) = -v_acy(i,j)*wv_acy
+            ! Compute calving-rates on ac-nodes
+            wv_acx      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acx)/H_ice_c)
+            cr_acx(i,j) = -u_acx(i,j)*wv_acx
+            wv_acy      = MAX(0.0_wp,1.0_wp+(H_ice_c-H_acy)/H_ice_c)
+            cr_acy(i,j) = -v_acy(i,j)*wv_acy
 
-            end do
+        end do
         end do
     
         return
@@ -553,7 +553,7 @@ contains
 
         do j = 1, ny
         do i = 1, nx
-        
+
             call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Stagger ice thickness into ac-nodes                        

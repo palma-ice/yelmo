@@ -43,7 +43,7 @@ endif
 
 LFLAGS  = $(LIB_NC) $(LIB_FESMUTILS) $(LIB_LINEAR)
 
-DFLAGS_NODEBUG = -O2
+DFLAGS_NODEBUG = -O2 -march=native
 DFLAGS_DEBUG   = -w -g -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG
 DFLAGS_PROFILE = -O2 -p -ggdb
 

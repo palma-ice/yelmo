@@ -1401,6 +1401,7 @@ end if
         ! dyz = 0.5*(dyz+dzy)
         ! dzz = dzz  <= Not calculated, as it is not needed 
 
+        !$omp parallel do collapse(2) firstprivate(gq3D) private(i,j,im1,ip1,jm1,jp1,k,km1,kp1,dz0,dz1,ddn,ddan,ddbn,shear_squared)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1505,6 +1506,7 @@ end if
 
         end do 
         end do 
+        !$omp end parallel do
 
         ! === Also calculate vertically averaged strain rate tensor ===
         

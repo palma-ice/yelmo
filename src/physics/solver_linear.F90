@@ -20,12 +20,12 @@ module solver_linear
         
         integer,  allocatable :: a_ptr(:)
         integer,  allocatable :: a_index(:)
-        real(wp), allocatable :: a_value(:)
-        real(wp), allocatable :: b_value(:)
-        real(wp), allocatable :: x_value(:)
+        real(dp), allocatable :: a_value(:)
+        real(dp), allocatable :: b_value(:)
+        real(dp), allocatable :: x_value(:)
 
-        real(wp), allocatable :: resid(:)
-        real(wp) :: L1_norm, L2_norm, L2_rel_norm
+        real(dp), allocatable :: resid(:)
+        real(dp) :: L1_norm, L2_norm, L2_rel_norm
         real(wp) :: solver_time
         integer  :: lin_iter 
 
@@ -176,6 +176,17 @@ contains
 
         ! =========================================================
         
+        !ajr: new method
+        integer :: i, k
+        LIS_INTEGER :: nnz
+        LIS_INTEGER, allocatable :: idx(:)
+        LIS_INTEGER, allocatable :: a_ptr(:)
+        LIS_INTEGER, allocatable :: a_index(:)
+        LIS_REAL,    allocatable :: a_value(:)
+        LIS_REAL,    allocatable :: b_value(:)
+        LIS_REAL,    allocatable :: x_value(:)
+        !ajr: new method
+
         ! Store nmax in local LIS-specific variable
         nmax = lgs%nmax
 
@@ -195,7 +206,10 @@ contains
         call lis_vector_set_size(lgs_x, 0, nmax, ierr)
 
         ! === Storage order: compressed sparse row (CSR) ===
-    
+if (.FALSE.) then
+        ! Original method - assemble matrices value by value
+        ! This is slower because there are many calls to lis_matrix_set_value!
+
         do nr = 1, nmax
 
             do nc = lgs%a_ptr(nr), lgs%a_ptr(nr+1)-1
@@ -215,12 +229,56 @@ contains
             call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value_now, lgs_b, ierr)
             call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value_now, lgs_x, ierr)
 
-        end do 
-
+        end do
 
         call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
         call lis_matrix_assemble(lgs_a, ierr)
         call CHKERR(ierr)
+
+else
+        ! New method - assemble matrices directly using LIS
+        ! This method is faster because all values are passed to LIS, less overhead, parallelization possible
+
+        nnz = size(lgs%a_index)
+
+        ! allocate arrays of LIS types
+        allocate(idx(1:nmax))
+        allocate(a_ptr(1:nmax+1))
+        allocate(a_index(1:nnz))
+        allocate(a_value(1:nnz))
+        allocate(b_value(1:nmax))
+        allocate(x_value(1:nmax))
+
+        ! Store vector information
+        do k = 1, nmax
+            idx(k) = k
+            b_value(k) = lgs%b_value(k)
+            x_value(k) = lgs%x_value(k)
+        end do
+
+        ! Store matrix row pointers
+        do k = 1, nmax+1
+            a_ptr(k) = lgs%a_ptr(k)-1
+        end do
+
+        ! Store column indices and values
+        do k = 1, nnz
+            a_index(k) = lgs%a_index(k)-1
+            a_value(k) = lgs%a_value(k)
+        end do
+
+        ! Assemble matrix in LIS
+        call lis_matrix_set_csr(nnz, a_ptr, a_index, a_value, lgs_a, ierr)
+        call CHKERR(ierr)
+        call lis_matrix_assemble(lgs_a, ierr)
+        call CHKERR(ierr)
+
+        ! Define vectors in LIS
+        call lis_vector_set_values(LIS_INS_VALUE, nmax, idx, b_value, lgs_b, ierr)
+        call CHKERR(ierr)
+        call lis_vector_set_values(LIS_INS_VALUE, nmax, idx, x_value, lgs_x, ierr)
+        call CHKERR(ierr)
+end if
 
         !-------- Solution of the system of linear equations with Lis --------
 

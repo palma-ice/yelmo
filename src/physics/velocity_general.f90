@@ -160,10 +160,12 @@ contains
 
         ! Next, calculate vertical velocity at each point through the column
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1,ip1,jm1,jp1,k,kmid,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
-        !!$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
-        !!$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa,dudxn8,dvdyn8) &
-        !!$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
+        !$omp parallel do collapse(2) firstprivate(gq2D,gq3D) &
+        !$omp& private(i,j,im1,ip1,jm1,jp1) &
+        !$omp& private(dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv,dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa) &
+        !$omp& private(dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa,uz_grid,k,kmid) &
+        !$omp& private(dudxn,dudx_aa,dvdyn,dvdy_aa,km1,kp1,dz0,dudxn8,dvdyn8) &
+        !$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
         do j = 1, ny
         do i = 1, nx
 
@@ -211,7 +213,7 @@ contains
                 
                 call gq2D_to_nodes_acy(gq2D,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
-                
+
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
                 ! ajr, 2020-01-27, untested:::
@@ -238,7 +240,7 @@ contains
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
                 !uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
-                
+
                 ! Integrate upward to each point above base until just below surface is reached 
                 ! Integrate on vertical ac-nodes (ie, vertical cell borders between aa-node centers)
                 do k = 2, nz_ac 
@@ -372,7 +374,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do 
+        !$omp end parallel do 
 
         return 
 

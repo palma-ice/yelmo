@@ -936,6 +936,7 @@ contains
 
         dHdt = 0.0 
 
+        !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny
         do i = 1, nx 
 
@@ -957,6 +958,7 @@ contains
 
         end do 
         end do 
+        !$omp end parallel do
 
         return 
 

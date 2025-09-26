@@ -1,8 +1,8 @@
 #!/bin/bash
 
-fldr='tmp/yelmo-bench-2025-05-25'
+fldr='tmp/yelmo-bench-2025-07-22'
 
-runopt='-rs'
+runopt='-rs -q 12h -w 05:00:00'
 
 ### BENCHMARK TESTS ###
 
@@ -19,7 +19,7 @@ make benchmarks
 ./runme ${runopt} -q 12h -w  1:00:00 -e benchmarks -o ${fldr}/moving-diva -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva" ydyn.beta_method=0 ydyn.beta_const=1e4 ctrl.time_end=30e3 ctrl.dt2D_out=200
 
 # EISMINT1 EXPA-like domain with sloping bed and shelves possible for testing symmetry (not part of GMD suite of tests)
-# Set code sections to true: set bedrock to follow mismip-definition, set initial ice thickness via dome_init.
+# In yelmo_benchmarks, set hard-coded parameter to `sym_test_with_shelves=.TRUE.`
 # Fixed topo, fixed beta
 # Fixed topo
 # Dynamic simulation
@@ -86,6 +86,20 @@ jobrun ./runme -rs -q priority -w 5:00:00 -e trough -n par/yelmo_MISMIP+.nml -o 
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf10.0 -p ydyn.beta_u0=100 ytill.cf_ref=10.0
 ./runme -rs -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf20.0 -p ydyn.beta_u0=100 ytill.cf_ref=20.0
 
+### ISMIP-HOM ###
+
+make ismiphom
+
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expa/diva   -p ctrl.experiment="EXPA" ctrl.L=5,10,20,40,80,160 ydyn.solver="diva"
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expa/l1l2   -p ctrl.experiment="EXPA" ctrl.L=5,10,20,40,80,160 ydyn.solver="l1l2"  
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expa/hybrid -p ctrl.experiment="EXPA" ctrl.L=5,10,20,40,80,160 ydyn.solver="hybrid"
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expc/diva   -p ctrl.experiment="EXPC" ctrl.L=5,10,20,40,80,160 ydyn.solver="diva"  
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expc/l1l2   -p ctrl.experiment="EXPC" ctrl.L=5,10,20,40,80,160 ydyn.solver="l1l2"
+jobrun ./runme -rs -q short -w 1 -e ismiphom -n par/yelmo_ISMIPHOM.nml -o ${fldr}/ismiphom/expc/hybrid -p ctrl.experiment="EXPC" ctrl.L=5,10,20,40,80,160 ydyn.solver="hybrid"
+
+# One test:
+./runme -r -e ismiphom -n par/yelmo_ISMIPHOM.nml -o output/test   -p ctrl.experiment="EXPC" ctrl.L=160 ydyn.solver="diva" 
+
 
 ### SLAB-S06 ###
 
@@ -118,6 +132,17 @@ jobrun ./runme ${runopt} -e slab -n par/yelmo_slab.nml -o ${fldr}/slab/strong -p
 # Full ensemble:
 jobrun ./runme ${runopt} -e slab -n par/yelmo_slab.nml -o ${fldr}/slab-sd0.1/weak   -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=1000 ctrl.H_stdev=0.1 ydyn.visc_const=1e5 ydyn.beta_const=1e3 ydyn.solver="diva","hybrid","l1l2","ssa","sia"
 jobrun ./runme ${runopt} -e slab -n par/yelmo_slab.nml -o ${fldr}/slab-sd0.1/strong -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=500  ctrl.H_stdev=0.1 ydyn.visc_const=4e5 ydyn.beta_const=30  ydyn.solver="diva","hybrid","l1l2","ssa","sia"
+
+
+### solver-stability Robinson 2022 ###
+
+make initmip
+
+# One simulation
+./runme ${runopt} -e initmip -n par/yelmo_initmip.nml -o ${fldr}/grl-diva-test     -p ctrl.dtt=5 ctrl.time_end=1e3 ctrl.time_equil=100 ctrl.clim_nm="clim_pd_grl" yelmo.domain="Greenland" yelmo.log_timestep=True ydyn.solver="diva" yelmo.grid_name="GRL-16KM"
+
+# All resolutions
+jobrun ./runme ${runopt} -e initmip -n par/yelmo_initmip.nml -o ${fldr}/grl-diva   -p ctrl.dtt=5 ctrl.time_end=1e3 ctrl.time_equil=100 ctrl.clim_nm="clim_pd_grl" yelmo.domain="Greenland" yelmo.log_timestep=True ydyn.solver="diva" yelmo.grid_name="GRL-32KM","GRL-16KM","GRL-8KM","GRL-4KM"
 
 ### CalvingMIP ###
 #runopt='-rs  -q 12h -w 05:00:00'

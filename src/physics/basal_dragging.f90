@@ -12,11 +12,13 @@ module basal_dragging
     
     use yelmo_defs, only : sp, dp, wp, prec, pi, TOL_UNDERFLOW, io_unit_err, degrees_to_radians
 
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
 
     use topography, only : calc_H_eff 
 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy
+
 
     implicit none 
 
@@ -830,6 +832,8 @@ contains
         type(gq2D_class) :: gq2D
         real(wp) :: dx_tmp, dy_tmp
 
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         dx_tmp = 1.0
@@ -838,6 +842,9 @@ contains
         nx = size(beta,1)
         ny = size(beta,2)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
         
@@ -845,7 +852,7 @@ contains
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point
@@ -864,11 +871,11 @@ contains
                     
                     ! Get c_bed on nodes
                     
-                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j)
 
-                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
 
                 end if 
                 
@@ -931,6 +938,8 @@ contains
         type(gq2D_class) :: gq2D
         real(wp) :: dx_tmp, dy_tmp
 
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         dx_tmp = 1.0
@@ -939,6 +948,9 @@ contains
         nx = size(beta,1)
         ny = size(beta,2)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
 
@@ -947,7 +959,7 @@ contains
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point
@@ -965,11 +977,11 @@ contains
                 else
                     ! Get c_bed on nodes
                     
-                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j) 
 
-                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
 
                 end if 
                 

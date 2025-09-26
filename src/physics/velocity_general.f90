@@ -2,9 +2,12 @@ module velocity_general
     ! This module contains general routines that are used by several solvers. 
     
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, io_unit_err, jacobian_3D_class
-    use yelmo_tools, only : get_neighbor_indices, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
+                            integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
+                                    gq3D_to_nodes_acx, gq3D_to_nodes_acy
 
     use deformation, only : calc_strain_rate_horizontal_2D
 
@@ -119,13 +122,16 @@ contains
         
         logical, allocatable :: is_ice(:,:)
         
-        real(wp), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(wp), parameter :: uz_min = -10.0       ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(wp), parameter :: uz_lim =  10.0       ! [m/yr] Absolute limit allowed for vertical velocity in any direction
 
         type(gq2D_class) :: gq2D
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .TRUE.
+
+        integer  :: BC
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
@@ -149,17 +155,22 @@ contains
             f_bmb = 0.0 
         end if 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Next, calculate vertical velocity at each point through the column
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1,ip1,jm1,jp1,k,kmid,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
-        !!$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
-        !!$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa,dudxn8,dvdyn8) &
-        !!$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
+        !$omp parallel do collapse(2) firstprivate(gq2D,gq3D) &
+        !$omp& private(i,j,im1,ip1,jm1,jp1) &
+        !$omp& private(dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv,dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa) &
+        !$omp& private(dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa,uz_grid,k,kmid) &
+        !$omp& private(dudxn,dudx_aa,dvdyn,dvdy_aa,km1,kp1,dz0,dudxn8,dvdyn8) &
+        !$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
         do j = 1, ny
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -183,26 +194,26 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call gq2D_to_nodes(gq2D,dzbdxn,dzbdx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dzbdxn,dzbdx,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzbdx_aa = sum(dzbdxn*gq2D%wt)/gq2D%wt_tot
 
-                call gq2D_to_nodes(gq2D,dzbdyn,dzbdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dzbdyn,dzbdy,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzbdy_aa = sum(dzbdyn*gq2D%wt)/gq2D%wt_tot
 
                 ! Get the centered surface gradient
-                call gq2D_to_nodes(gq2D,dzsdxn,dzsdx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dzsdxn,dzsdx,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzsdx_aa = sum(dzsdxn*gq2D%wt)/gq2D%wt_tot
                 
-                call gq2D_to_nodes(gq2D,dzsdyn,dzsdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dzsdyn,dzsdy,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzsdy_aa = sum(dzsdyn*gq2D%wt)/gq2D%wt_tot
                 
                 ! Get the aa-node centered horizontal velocity at the base
-                call gq2D_to_nodes(gq2D,uxn,ux(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,uxn,ux(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
                 
-                call gq2D_to_nodes(gq2D,uyn,uy(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
-                
+
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
                 ! ajr, 2020-01-27, untested:::
@@ -218,15 +229,18 @@ contains
                 uz(i,j,1) = dzbdt_now + uz_grid + f_bmb*bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
-                ! Set stability limit on basal uz value.
+                ! Set stability limits on basal uz value.
                 ! This only gets applied in rare cases when something
                 ! is going wrong in the model. 
                 if (uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min
 
+                ! Extreme limit
+                call minmax(uz(i,j,1),uz_lim)
+
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
                 !uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
-                
+
                 ! Integrate upward to each point above base until just below surface is reached 
                 ! Integrate on vertical ac-nodes (ie, vertical cell borders between aa-node centers)
                 do k = 2, nz_ac 
@@ -240,10 +254,10 @@ contains
 if (.not. use_gq3D) then
     ! 2D QUADRATURE
 
-                    call gq2D_to_nodes(gq2D,dudxn,jvel%dxx(:,:,kmid),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,dudxn,jvel%dxx(:,:,kmid),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dudx_aa = sum(dudxn*gq2D%wt)/gq2D%wt_tot
 
-                    call gq2D_to_nodes(gq2D,dvdyn,jvel%dyy(:,:,kmid),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,dvdyn,jvel%dyy(:,:,kmid),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dvdy_aa = sum(dvdyn*gq2D%wt)/gq2D%wt_tot
 
 else 
@@ -260,10 +274,10 @@ else
                         dz0 = H_ice(i,j)*(zeta_aa(2) - zeta_aa(1))
                     end if
 
-                    call gq3D_to_nodes(gq3D,dudxn8,jvel%dxx,dx,dy,dz0,dz1,"acx",i,j,kmid,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudxn8,jvel%dxx,dx,dy,dz0,dz1,i,j,kmid,im1,ip1,jm1,jp1,km1,kp1)
                     dudx_aa = sum(dudxn8*gq3D%wt)/gq3D%wt_tot
 
-                    call gq3D_to_nodes(gq3D,dvdyn8,jvel%dyy,dx,dy,dz0,dz1,"acy",i,j,kmid,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdyn8,jvel%dyy,dx,dy,dz0,dz1,i,j,kmid,im1,ip1,jm1,jp1,km1,kp1)
                     dvdy_aa = sum(dvdyn8*gq3D%wt)/gq3D%wt_tot
 
 end if 
@@ -277,8 +291,10 @@ end if
 
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                     
-                end do 
+                    ! Apply hard-limit to vertical velocity in rare cases (usually spinup)
+                    call minmax(uz(i,j,k),uz_lim)  
 
+                end do 
 
                 ! === Also calculate adjusted vertical velocity to be used for temperature advection
                 
@@ -300,13 +316,13 @@ end if
                         kdn = k-1 
                     end if
                     
-                    call gq2D_to_nodes(gq2D,uxn_up,ux(:,:,kup),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
                     ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
                     
-                    call gq2D_to_nodes(gq2D,uyn_up,uy(:,:,kup),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
                     uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
                     
@@ -336,6 +352,9 @@ end if
 
                     if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     
+                    ! Apply hard-limit to uz_star too, in rare cases (usually spinup)
+                    call minmax(uz_star(i,j,k),uz_lim)  
+
                 end do 
                 
             else 
@@ -345,6 +364,7 @@ end if
 
                     uz(i,j,k) = dzbdt_now - max(smb(i,j),0.0)
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
+                    call minmax(uz(i,j,k),uz_lim)  
 
                     uz_star(i,j,k) = uz(i,j,k)
 
@@ -354,7 +374,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do 
+        !$omp end parallel do 
 
         return 
 
@@ -447,6 +467,8 @@ end if
         
         type(gq2D_class) :: gq2D
         
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
 
@@ -471,6 +493,9 @@ end if
             f_bmb = 0.0 
         end if 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! First calculate horizontal strain rates at each layer for later use,
         ! with no correction factor for sigma-transformation.
         ! Note: we only need dudx and dvdy, but routine also calculate cross terms, which will not be used.
@@ -491,7 +516,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -504,24 +529,24 @@ end if
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call gq2D_to_nodes(gq2D,dzbdxn,dzbdx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dzbdxn,dzbdx,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzbdx_aa = sum(dzbdxn*gq2D%wt)/gq2D%wt_tot
                 
-                call gq2D_to_nodes(gq2D,dzbdyn,dzbdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dzbdyn,dzbdy,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzbdy_aa = sum(dzbdyn*gq2D%wt)/gq2D%wt_tot
 
                 ! Get the centered surface gradient
-                call gq2D_to_nodes(gq2D,dzsdxn,dzsdx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dzsdxn,dzsdx,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzsdx_aa = sum(dzsdxn*gq2D%wt)/gq2D%wt_tot
                 
-                call gq2D_to_nodes(gq2D,dzsdyn,dzsdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dzsdyn,dzsdy,dx,dy,i,j,im1,ip1,jm1,jp1)
                 dzsdy_aa = sum(dzsdyn*gq2D%wt)/gq2D%wt_tot
                 
                 ! Get the aa-node centered horizontal velocity at the base
-                call gq2D_to_nodes(gq2D,uxn,ux(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,uxn,ux(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
                 
-                call gq2D_to_nodes(gq2D,uyn,uy(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
@@ -579,21 +604,21 @@ end if
                         kdn = k-2
                     end if
 
-                    call gq2D_to_nodes(gq2D,uxn_up,ux(:,:,kup),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dudzn = (uxn_up - uxn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
                     dudz_aa = sum(dudzn*gq2D%wt)/gq2D%wt_tot
 
-                    call gq2D_to_nodes(gq2D,uyn_up,uy(:,:,kup),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dvdzn = (uyn_up - uyn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
                     dvdz_aa = sum(dvdzn*gq2D%wt)/gq2D%wt_tot
 
                     ! Calculate sigma-corrected derivatives
-                    call gq2D_to_nodes(gq2D,dudxn,dudx(:,:,k-1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,dudxn,dudx(:,:,k-1),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dudx_aa = sum(dudxn*gq2D%wt)/gq2D%wt_tot  +  c_x*dudz_aa 
 
-                    call gq2D_to_nodes(gq2D,dvdyn,dvdy(:,:,k-1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy(:,:,k-1),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dvdy_aa = sum(dvdyn*gq2D%wt)/gq2D%wt_tot  +  c_y*dvdz_aa 
 
                     ! Calculate vertical velocity of this layer
@@ -628,13 +653,13 @@ end if
                         kdn = k-1 
                     end if
                     
-                    call gq2D_to_nodes(gq2D,uxn_up,ux(:,:,kup),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
                     ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
                     
-                    call gq2D_to_nodes(gq2D,uyn_up,uy(:,:,kup),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
                     uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
                     
@@ -748,6 +773,8 @@ end if
         real(wp), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
         real(wp), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
+        integer  :: BC
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
@@ -763,6 +790,9 @@ end if
             f_bmb = 0.0 
         end if 
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Next, calculate velocity 
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
@@ -773,7 +803,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
@@ -980,6 +1010,8 @@ end if
         real(wp), allocatable :: taud_acx_0(:,:)
         real(wp), allocatable :: taud_acy_0(:,:)
 
+        integer  :: BC
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -992,12 +1024,15 @@ end if
         ! Assume grid resolution is symmetrical 
         dy = dx 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_mid)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! x-direction
             if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) then 
@@ -1041,7 +1076,7 @@ if (.FALSE.) then
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! === x-direction ===
 
@@ -1429,6 +1464,8 @@ end if
         real(wp) :: z_srf_now 
         real(wp) :: z_sl_now 
         
+        integer  :: BC
+
         nx = size(tau_bc_int_acx,1) 
         ny = size(tau_bc_int_acx,2) 
 
@@ -1436,12 +1473,15 @@ end if
         tau_bc_int_acx = 0.0 
         tau_bc_int_acy = 0.0 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,i1,j1,H_ice_now,z_srf_now,z_sl_now)
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! == acx nodes == 
 
@@ -1634,9 +1674,13 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1
+        integer :: BC
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Find partially-filled outer margins and set velocity to zero
         ! (this will also treat all other ice-free points too) 
@@ -1646,7 +1690,7 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) then 
                 ux(i,j) = 0.0_wp 

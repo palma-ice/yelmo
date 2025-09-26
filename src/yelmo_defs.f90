@@ -116,6 +116,7 @@ module yelmo_defs
         real(wp)           :: calv_grnd_max  
         real(wp)           :: grad_lim
         real(wp)           :: grad_lim_zb
+        real(wp)           :: dHdt_dyn_lim
         real(wp)           :: dist_grz
         integer            :: gl_sep 
         integer            :: gz_nx 
@@ -256,6 +257,7 @@ module yelmo_defs
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
         
         real(wp), allocatable   :: z_base(:,:)      ! Ice-base elevation [m]
+
         real(wp), allocatable   :: dzsdx(:,:)       ! Surface elevation slope [m m-1], acx nodes
         real(wp), allocatable   :: dzsdy(:,:)       ! Surface elevation slope [m m-1], acy nodes
         real(wp), allocatable   :: dHidx(:,:)       ! Ice thickness gradient slope [m m-1], acx nodes
@@ -263,6 +265,15 @@ module yelmo_defs
         real(wp), allocatable   :: dzbdx(:,:)       ! Bedrock elevation slope [m m-1], acx nodes
         real(wp), allocatable   :: dzbdy(:,:)       ! Bedrock elevation slope [m m-1], acy nodes
         
+        ! TESTING
+        real(wp), allocatable   :: dzsdx_aa(:,:)       ! Surface elevation slope [m m-1], acx nodes
+        real(wp), allocatable   :: dzsdy_aa(:,:)       ! Surface elevation slope [m m-1], acy nodes
+        real(wp), allocatable   :: dHidx_aa(:,:)       ! Ice thickness gradient slope [m m-1], acx nodes
+        real(wp), allocatable   :: dHidy_aa(:,:)       ! Ice thickness gradient slope [m m-1], acy nodes
+        real(wp), allocatable   :: dzbdx_aa(:,:)       ! Bedrock elevation slope [m m-1], acx nodes
+        real(wp), allocatable   :: dzbdy_aa(:,:)       ! Bedrock elevation slope [m m-1], acy nodes
+        
+
         real(wp), allocatable   :: H_eff(:,:)       ! Effective ice thickness (margin-corrected) [m]
         real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
         real(wp), allocatable   :: H_calv(:,:)
@@ -1070,6 +1081,26 @@ contains
 
     end function yelmo_get_precision
 
+    pure function is_equal(value1, value2, eps) result(equal)
+        implicit none
+        real(wp), intent(IN) :: value1
+        real(wp), intent(IN) :: value2
+        real(wp), intent(IN), optional :: eps
+
+        ! Local variables
+        logical :: equal
+        real(wp) :: epsilon
+
+        ! Set default tolerance if not provided
+        if (present(eps)) then
+            epsilon = eps
+        else
+            epsilon = TOL
+        end if
+
+        equal = abs(value1 - value2) <= epsilon
+
+    end function is_equal
         
     subroutine yelmo_parse_path(path,domain,grid_name)
 

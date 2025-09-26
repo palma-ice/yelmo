@@ -3,7 +3,7 @@ module velocity_ssa
     ! using the shallow-shelf approximation (SSA). 
 
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, pi
-    use yelmo_tools, only : get_neighbor_indices, & 
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
@@ -15,8 +15,10 @@ module velocity_ssa
                         picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2
 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
+                                    gq3D_to_nodes_acx, gq3D_to_nodes_acy
 
     implicit none 
 
@@ -389,6 +391,8 @@ end if
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .TRUE.
 
+        integer :: BC 
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         if (use_gq3D) call gq3D_init(gq3D)
@@ -397,6 +401,9 @@ end if
         ny = size(visc,2)
         nz = size(visc,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         allocate(dudx(nx,ny,nz))
         allocate(dudy(nx,ny,nz))
         allocate(dvdx(nx,ny,nz))
@@ -433,7 +440,7 @@ end if
             if (f_ice(i,j) == 1.0) then
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
 if (.not. use_gq3D) then 
     ! 2D QUADRATURE
@@ -484,17 +491,17 @@ else
                     end if
                     
                     ! Get horizontal strain rate terms
-                    call gq3D_to_nodes(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
-                    call gq3D_to_nodes(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq3D_to_nodes(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,"aa",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_aa(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
@@ -549,10 +556,15 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
+        integer :: BC
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen
@@ -570,7 +582,7 @@ end if
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get strain rate terms
                 dudx_aa = (ux(i,j)-ux(im1,j))/dx 

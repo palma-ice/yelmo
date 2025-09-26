@@ -1,7 +1,7 @@
 module velocity_diva
 
-    use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices, &
+    use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL, TOL_UNDERFLOW, is_equal
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
@@ -12,8 +12,10 @@ module velocity_diva
                         picard_calc_error, picard_calc_error_angle,  &
                         picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
+                                    gq3D_to_nodes_acx, gq3D_to_nodes_acy
 
     implicit none 
 
@@ -191,7 +193,7 @@ contains
 
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
-        call set_inactive_margins(ux_bar,uy_bar,f_ice,par%boundaries)
+        !call set_inactive_margins(ux_bar,uy_bar,f_ice,par%boundaries)
 
         if (write_ssa_diagnostics) then 
             call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
@@ -426,14 +428,18 @@ end if
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa
-        integer :: im1, ip1, jm1, jp1
+        integer  :: i, j, k, nx, ny, nz_aa
+        integer  :: im1, ip1, jm1, jp1
         real(wp), allocatable :: F1(:,:,:) 
         real(wp) :: F1_ac
+        integer  :: BC
 
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(F1(nx,ny,nz_aa))
 
@@ -447,7 +453,7 @@ end if
         !!$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
-            if (f_ice(i,j) .eq. 1.0) then 
+            if ( is_equal(f_ice(i,j),1.0) ) then 
                 F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)
             end if  
         end do
@@ -461,7 +467,7 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! === x direction (acx-nodes) ===============================================
 
@@ -501,6 +507,7 @@ end if
         integer  :: i, j, k, nx, ny, nz_aa 
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: visc_eff_ac
+        integer  :: BC
 
         ! real(wp), parameter :: visc_min = 1e5_wp 
 
@@ -508,13 +515,16 @@ end if
         ny    = size(H_ice,2)
         nz_aa = size(zeta_aa,1) 
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,visc_eff_ac)
         do k = 1, nz_aa 
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Calculate shear strain, acx-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
@@ -598,7 +608,9 @@ end if
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .FALSE.
+        logical, parameter :: use_gq3D = .TRUE.
+
+        integer :: BC
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
@@ -608,6 +620,9 @@ end if
         ny = size(visc,2)
         nz = size(visc,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         allocate(dudx(nx,ny,nz))
         allocate(dudy(nx,ny,nz))
         allocate(dvdx(nx,ny,nz))
@@ -644,31 +659,31 @@ end if
             if (f_ice(i,j) == 1.0) then
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
 if (.not. use_gq3D) then 
     ! 2D QUADRATURE
 
                 ! Get horizontal strain rate terms
                 ! (same for all layers, so just get them once for all layers)
-                call gq2D_to_nodes(gq2D,dudxn,dudx(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dudyn,dudy(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudxn,dudx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudyn,dudy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 
-                call gq2D_to_nodes(gq2D,dvdxn,dvdx(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dvdyn,dvdy(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 do k = 1, nz
                     
                     ! Get vertical shear strain rate terms
-                    call gq2D_to_nodes(gq2D,dudzn,dudz(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,dvdzn,dvdz(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,dudzn,dudz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,dvdzn,dvdz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
                                                 + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq2D_to_nodes(gq2D,ATTn,ATT(:,:,k),dx,dy,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,ATTn,ATT(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
@@ -700,22 +715,22 @@ else
                     end if
                     
                     ! Get horizontal strain rate terms
-                    call gq3D_to_nodes(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
-                    call gq3D_to_nodes(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
                     ! Get vertical shear strain rate terms
-                    call gq3D_to_nodes(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
                                                 + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq3D_to_nodes(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,"aa",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_aa(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
@@ -774,10 +789,15 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
+        integer  :: BC
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen
@@ -792,10 +812,10 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            if (f_ice(i,j) .eq. 1.0_wp) then 
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get strain rate terms
                 dudx_aa = (ux(i,j)-ux(im1,j))/dx 
@@ -867,7 +887,7 @@ end if
             ! Calculate the vertically averaged viscosity for this point
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
-            if (f_ice(i,j) .eq. 1.0) then 
+            if ( is_equal(f_ice(i,j),1.0) ) then 
                 visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
                 visc_eff_int(i,j) = visc_eff_mean 
@@ -911,7 +931,7 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            if (f_ice(i,j) .eq. 1.0) then 
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then 
                 ! Viscosity should be nonzero here, perform integration 
 
                 H_eff = H_ice(i,j) / f_ice(i,j) 
@@ -990,6 +1010,7 @@ end if
         integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: F2_ac 
+        integer  :: BC
 
         nx = size(ux_b,1)
         ny = size(ux_b,2) 
@@ -1010,7 +1031,7 @@ end if
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! ==== x-direction (acx-nodes) =====
 
@@ -1106,12 +1127,12 @@ end if
         real(wp), intent(IN) :: f1
         real(wp) :: var_mid 
 
-        if (f0 .eq. 1.0_wp .and. f1 .lt. 1.0_wp) then 
+        if (is_equal(f0,1.0_wp) .and. f1 .lt. 1.0_wp) then 
             ! At the margin 
 
             var_mid = var0 
 
-        else if (f0 .lt. 1.0_wp .and. f1 .eq. 1.0_wp) then 
+        else if (f0 .lt. 1.0_wp .and. is_equal(f1,1.0_wp)) then 
             ! At the margin 
 
             var_mid = var1 

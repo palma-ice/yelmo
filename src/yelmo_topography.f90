@@ -15,7 +15,9 @@ module yelmo_topography
     use discharge
 
     use runge_kutta 
-    
+    use derivatives
+    use distances
+
     implicit none
     
     private
@@ -122,8 +124,9 @@ end if
                     tpo%now%dHidt_dyn = tpo%par%dt_beta(1)*dHidt_now + tpo%par%dt_beta(2)*tpo%now%dHidt_dyn_n 
 
                     ! Apply rate and update ice thickness (predicted)
+                    ! Limit dynamic rate of change for stability (typically < 100 m/yr)
                     tpo%now%H_ice = tpo%now%H_ice_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.FALSE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.TRUE.,mb_lim=tpo%par%dHdt_dyn_lim)
 
                 case("corrector") 
 
@@ -149,9 +152,10 @@ end if
                     tpo%now%dHidt_dyn = tpo%par%dt_beta(3)*dHidt_now + tpo%par%dt_beta(4)*tpo%now%dHidt_dyn_n 
                     
                     ! Apply rate and update ice thickness (corrected)
+                    ! Limit dynamic rate of change for stability (typically < 100 m/yr)
                     tpo%now%H_ice = tpo%now%H_ice_n
                     tpo%now%lsf   = tpo%now%lsf_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.FALSE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.TRUE.,mb_lim=tpo%par%dHdt_dyn_lim)
                     
             end select
 
@@ -445,7 +449,7 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         real(wp), allocatable :: mbal_now(:,:) 
-        real(wp), allocatable :: cmb_sd(:,:) 
+        real(wp), allocatable :: cmb_sd(:,:)
 
         nx = size(tpo%now%H_ice,1) 
         ny = size(tpo%now%H_ice,2) 
@@ -639,18 +643,23 @@ end if
         real(wp), optional, intent(IN)    :: time_now
     
         ! Local variables
-        integer  :: i,j,im1,ip1,jm1,jp1,nx,ny
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1
         real(wp) :: dt_kill
         real(wp), allocatable :: mbal_now(:,:)
         !real(wp), allocatable :: u_acx_fill(:,:), v_acy_fill(:,:)
-        
+        integer  :: BC
+
         ! Make sure dt is not zero
         dt_kill = dt 
         if (dt_kill .eq. 0.0) dt_kill = 1.0_wp
     
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
-       
+
+        ! Set boundary condition code
+        BC = boundary_code(tpo%par%boundaries)
+
         allocate(mbal_now(nx,ny))
 
         ! === Floating calving laws ===
@@ -743,7 +752,7 @@ end if
         
         do j=1,ny
         do i=1,nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             ! x-ac node
             if (tpo%now%f_grnd_acx(i,j) .eq. 0.0) then
                 ! Floating point
@@ -789,7 +798,7 @@ end if
         tpo%now%cmb = 0.0_wp
         do j=1,ny
         do i=1,nx
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,tpo%par%boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             ! Compute the mean calving rate in every aa node
             tpo%now%cmb_flt(i,j) = ((0.5*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
                                     (0.5*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
@@ -858,6 +867,9 @@ end if
         type(ytherm_class), intent(IN)    :: thrm  
         type(ybound_class), intent(IN)    :: bnd 
 
+        ! Local variables
+        character(len=256) :: bcx, bcy 
+
         ! Final update of ice fraction mask (or define it now for fixed topography)
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                 bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
@@ -885,7 +897,7 @@ end if
         ! Calculate the surface slope
         ! call calc_gradient_ac(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
 
-
+if (.TRUE.) then
         ! New routines 
         call calc_gradient_acx(tpo%now%dzsdx,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
         call calc_gradient_acy(tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
@@ -895,7 +907,34 @@ end if
         
         call calc_gradient_acx(tpo%now%dzbdx,tpo%now%z_base,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
         call calc_gradient_acy(tpo%now%dzbdy,tpo%now%z_base,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
+else
+        bcx = trim(tpo%par%boundaries)
+        if (trim(bcx) .eq. "periodic-x") bcx = "periodic"
+        bcy = trim(tpo%par%boundaries)
+        if (trim(bcy) .eq. "periodic-y") bcy = "periodic"
         
+        call calc_dvdx_2D(tpo%now%dzsdx_aa,tpo%now%z_srf,tpo%par%dx,tpo%now%f_ice .gt. 0.0_wp,bcx,tpo%par%grad_lim)
+        call calc_dvdy_2D(tpo%now%dzsdy_aa,tpo%now%z_srf,tpo%par%dy,tpo%now%f_ice .gt. 0.0_wp,bcy,tpo%par%grad_lim)
+        
+        call calc_dvdx_2D(tpo%now%dHidx_aa,tpo%now%H_ice,tpo%par%dx,tpo%now%f_ice .gt. 0.0_wp,bcx,tpo%par%grad_lim)
+        call calc_dvdy_2D(tpo%now%dHidy_aa,tpo%now%H_ice,tpo%par%dy,tpo%now%f_ice .gt. 0.0_wp,bcy,tpo%par%grad_lim)
+        
+        call calc_dvdx_2D(tpo%now%dzbdx_aa,tpo%now%z_base,tpo%par%dx,tpo%now%f_ice .gt. 0.0_wp,bcx,tpo%par%grad_lim)
+        call calc_dvdy_2D(tpo%now%dzbdy_aa,tpo%now%z_base,tpo%par%dy,tpo%now%f_ice .gt. 0.0_wp,bcy,tpo%par%grad_lim)
+        
+        ! Stagger to acx and acy nodes
+
+        tpo%now%dzsdx = stagger_aa_acx(tpo%now%dzsdx_aa)
+        tpo%now%dzsdy = stagger_aa_acy(tpo%now%dzsdy_aa)
+        
+        tpo%now%dHidx = stagger_aa_acx(tpo%now%dHidx_aa)
+        tpo%now%dHidy = stagger_aa_acy(tpo%now%dHidy_aa)
+        
+        tpo%now%dzbdx = stagger_aa_acx(tpo%now%dzbdx_aa)
+        tpo%now%dzbdy = stagger_aa_acy(tpo%now%dzbdy_aa)
+
+end if
+
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
@@ -929,18 +968,46 @@ end if
         call calc_f_grnd_pinning_points(tpo%now%f_grnd_pin,tpo%now%H_ice,tpo%now%f_ice, &
                                                 bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw)
 
+if (.FALSE.) then
+        if (tpo%par%dmb_method .gt. 0) then
+            ! Calculate the grounding-line distance
+            call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.TRUE.)
+
+            ! Define the grounding-zone mask too 
+            call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
+
+            ! Calculate distance to the ice margin
+            call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.TRUE.)
+        else
+            ! Calculate the grounding-line distance
+            call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.FALSE.)
+
+            ! Define the grounding-zone mask too 
+            call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
+
+                ! Calculate distance to the ice margin
+            call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx, &
+                                                        tpo%par%boundaries,calc_distances=.FALSE.)
+
+        end if
+else
         ! Calculate the grounding-line distance
-        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx,tpo%par%boundaries)
+        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx, &
+                                                    tpo%par%boundaries,calc_distances=.FALSE.)
 
         ! Define the grounding-zone mask too 
         call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
 
-        ! Calculate distance to the ice margin
-        call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,tpo%par%boundaries)
+        call compute_distance_to_mask(tpo%now%dist_grline, tpo%now%mask_grz)
+
+end if
 
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
-                                            tpo%now%f_grnd,tpo%now%mask_grz)
+                                            tpo%now%f_grnd,tpo%now%mask_grz.eq.0)
 
 
         ! Calculate the ice-front mask (mainly for use in dynamics)
@@ -1142,6 +1209,7 @@ end if
         call nml_read(filename,group_ytopo,"surf_gl_method",    par%surf_gl_method,   init=init_pars)
         call nml_read(filename,group_ytopo,"grad_lim",          par%grad_lim,         init=init_pars)
         call nml_read(filename,group_ytopo,"grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
+        call nml_read(filename,group_ytopo,"dHdt_dyn_lim",      par%dHdt_dyn_lim,     init=init_pars) 
         call nml_read(filename,group_ytopo,"margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,group_ytopo,"margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
         call nml_read(filename,group_ytopo,"use_bmb",           par%use_bmb,          init=init_pars)
@@ -1303,6 +1371,13 @@ end if
         allocate(now%dzbdx(nx,ny))
         allocate(now%dzbdy(nx,ny))
 
+        allocate(now%dzsdx_aa(nx,ny))
+        allocate(now%dzsdy_aa(nx,ny))
+        allocate(now%dHidx_aa(nx,ny))
+        allocate(now%dHidy_aa(nx,ny))
+        allocate(now%dzbdx_aa(nx,ny))
+        allocate(now%dzbdy_aa(nx,ny))
+
         allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
         allocate(now%H_calv(nx,ny))
@@ -1388,7 +1463,15 @@ end if
         now%dHidx       = 0.0 
         now%dHidy       = 0.0
         now%dzbdx       = 0.0 
-        now%dzbdy       = 0.0 
+        now%dzbdy       = 0.0
+
+        now%dzsdx_aa    = 0.0 
+        now%dzsdy_aa    = 0.0 
+        now%dHidx_aa    = 0.0 
+        now%dHidy_aa    = 0.0
+        now%dzbdx_aa    = 0.0 
+        now%dzbdy_aa    = 0.0
+
         now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
         now%H_calv      = 0.0  
@@ -1490,6 +1573,13 @@ end if
         if (allocated(now%dHidy))       deallocate(now%dHidy)
         if (allocated(now%dzbdx))       deallocate(now%dzbdx)
         if (allocated(now%dzbdy))       deallocate(now%dzbdy)
+        
+        if (allocated(now%dzsdx_aa))       deallocate(now%dzsdx_aa)
+        if (allocated(now%dzsdy_aa))       deallocate(now%dzsdy_aa)
+        if (allocated(now%dHidx_aa))       deallocate(now%dHidx_aa)
+        if (allocated(now%dHidy_aa))       deallocate(now%dHidy_aa)
+        if (allocated(now%dzbdx_aa))       deallocate(now%dzbdx_aa)
+        if (allocated(now%dzbdy_aa))       deallocate(now%dzbdy_aa)
         
         if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)

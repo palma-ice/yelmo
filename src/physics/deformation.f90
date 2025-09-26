@@ -11,10 +11,13 @@ module deformation
 
     use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, &
                         jacobian_3D_class, strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
-    use yelmo_tools, only : get_neighbor_indices, &
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy, &
+                                    gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
+                                    gq3D_to_nodes_acx, gq3D_to_nodes_acy, &
+                                    gq3D_to_nodes_acz
 
     implicit none 
     
@@ -548,6 +551,8 @@ contains
         real(dp) :: h1, h2 
         real(dp) :: denom
 
+        integer  :: BC
+
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
         ! getting strange results in thermodynamics, including
@@ -574,6 +579,9 @@ contains
         jvel%dzy          = 0.0_wp
         jvel%dzz          = 0.0_wp
 
+        ! Get boundary condition code
+        BC = boundary_code(boundaries)
+
         !-------- Computation --------
 
         ! Step 1: Calculate all vertical derivatives, some of which are used 
@@ -584,7 +592,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Calculate dxz, dyz on aa-nodes vertically, ac-nodes horizontally
             
@@ -701,7 +709,7 @@ end if
         do i = 1, nx 
             
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             do k = 1, nz_aa 
 
@@ -877,6 +885,8 @@ end if
         real(dp) :: c_x, c_y, c_x_acy, c_y_acx
         real(dp) :: h1, h2 
         
+        integer  :: BC
+
         ! Parameter to limit sigma-coordinate corrective factor
         ! to reasonable slope values. Maybe could help avoid
         ! getting strange results in thermodynamics, including
@@ -897,6 +907,9 @@ end if
         jvel%dzy          = 0.0_wp
         jvel%dzz          = 0.0_wp
 
+        ! Get boundary condition code
+        BC = boundary_code(boundaries)
+
         !-------- Computation --------
 
         ! Step 1: Calculate all vertical derivatives, some of which are used 
@@ -914,7 +927,7 @@ end if
                 ! are only concerned with fully ice-covered points now. 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get current ice thickness on aa-node (cell center)
                 H_now = H_ice(i,j)
@@ -985,7 +998,7 @@ end if
         do i = 1, nx 
             
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (f_ice(i,j) .eq. 1.0) then 
                 ! Ice present at this point
@@ -1141,6 +1154,8 @@ end if
         type(gq2D_class) :: gq2D
         real(wp) :: dz0, dz1 
 
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
 
@@ -1157,6 +1172,9 @@ end if
         allocate(is_ice(nx,ny))
         is_ice = (f_ice .eq. 1.0)
         
+        ! Get boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Calculate all strain rate tensor components on aa-nodes (horizontally and vertically)
         ! dxx = dxx
         ! dxy = 0.5*(dxy+dyx)
@@ -1173,7 +1191,7 @@ end if
                 ! Ice is present here, calculate the strain-rate tensor
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
@@ -1182,31 +1200,31 @@ if (use_gq) then
     ! Use quadrature points
 
                     ! Get dxx on aa-nodes 
-                    call gq2D_to_nodes(gq2D,ddn,jvel%dxx(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,ddn,jvel%dxx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     strn%dxx(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
                     
                     ! Get dxy and dyx on aa-nodes 
-                    call gq2D_to_nodes(gq2D,ddan,jvel%dxy(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,ddbn,jvel%dyx(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,ddan,jvel%dxy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,ddbn,jvel%dyx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddn = 0.5*(ddan+ddbn)
                     strn%dxy(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call gq2D_to_nodes(gq2D,ddan,jvel%dxz(:,:,k),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2D,ddan,jvel%dxz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dxz(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call gq2D_to_nodes(gq2D,ddan,jvel%dyz(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,ddan,jvel%dyz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dyz(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call gq2D_to_nodes(gq2D,ddn,jvel%dyy(:,:,k),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2D,ddn,jvel%dyy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     strn%dyy(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
 else
     ! Unstagger directly to aa-nodes
@@ -1361,6 +1379,8 @@ end if
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
 
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq3D_init(gq3D)
 
@@ -1370,6 +1390,9 @@ end if
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
         
+        ! Get boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Calculate all strain rate tensor components on aa-nodes (horizontally and vertically)
         ! dxx = dxx
         ! dxy = 0.5*(dxy+dyx)
@@ -1378,6 +1401,7 @@ end if
         ! dyz = 0.5*(dyz+dzy)
         ! dzz = dzz  <= Not calculated, as it is not needed 
 
+        !$omp parallel do collapse(2) firstprivate(gq3D) private(i,j,im1,ip1,jm1,jp1,k,km1,kp1,dz0,dz1,ddn,ddan,ddbn,shear_squared)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1385,7 +1409,7 @@ end if
                 ! Ice is present here, calculate the strain-rate tensor
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
@@ -1408,31 +1432,31 @@ end if
                     end if
                     
                     ! Get dxx on aa-nodes 
-                    call gq3D_to_nodes(gq3D,ddn,jvel%dxx,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,ddn,jvel%dxx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     strn%dxx(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dxy and dyx on aa-nodes 
-                    call gq3D_to_nodes(gq3D,ddan,jvel%dxy,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,ddbn,jvel%dyx,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,ddan,jvel%dxy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,ddbn,jvel%dyx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn = 0.5*(ddan+ddbn)
                     strn%dxy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call gq3D_to_nodes(gq3D,ddan,jvel%dxz,dx,dy,dz0,dz1,"acx",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,ddbn,jvel%dzx,dx,dy,dz0,dz1,"acz",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3D,ddan,jvel%dxz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acz(gq3D,ddbn,jvel%dzx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dxz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call gq3D_to_nodes(gq3D,ddan,jvel%dyz,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes(gq3D,ddbn,jvel%dzy,dx,dy,dz0,dz1,"acz",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,ddan,jvel%dyz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acz(gq3D,ddbn,jvel%dzy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dyz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call gq3D_to_nodes(gq3D,ddn,jvel%dyy,dx,dy,dz0,dz1,"acy",i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3D,ddn,jvel%dyy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     strn%dyy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
 
                     ! TEST - set shear strain terms to zero
@@ -1482,6 +1506,7 @@ end if
 
         end do 
         end do 
+        !$omp end parallel do
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -1541,6 +1566,8 @@ end if
         type(gq2D_class) :: gq2D
         real(wp) :: dz0, dz1
 
+        integer  :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
         
@@ -1552,6 +1579,8 @@ end if
         allocate(dvdx(nx,ny))
         allocate(dvdy(nx,ny))
 
+        ! Get boundary condition code
+        BC = boundary_code(boundaries)
 
         ! === First calculate the horizontal strain rate ===
 
@@ -1573,15 +1602,15 @@ end if
         do i=1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 
-                call gq2D_to_nodes(gq2D,dudxn,dudx,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dudyn,dudy,dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudxn,dudx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudyn,dudy,dx,dy,i,j,im1,ip1,jm1,jp1)
 
-                call gq2D_to_nodes(gq2D,dvdxn,dvdx,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dvdyn,dvdy,dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy,dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 ! Calculate strain rate tensor terms 
                 strn2D%dxx(i,j) = sum(dudxn*gq2D%wt)/gq2D%wt_tot
@@ -1641,8 +1670,13 @@ end if
         integer :: im1, ip1, jm1, jp1 
         integer :: im2, ip2, jm2, jp2 
 
+        integer :: BC
+
         nx = size(dudx,1)
         ny = size(dudx,2) 
+
+        ! Get boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Populate strain rates over the whole domain on acx- and acy-nodes
 
@@ -1655,7 +1689,7 @@ end if
         do i = 1, nx
             
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Calculate derivatives (second-order, centered)
             dudx(i,j) = (ux(ip1,j)-ux(im1,j))/(2.0*dx)

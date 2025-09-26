@@ -2,7 +2,7 @@ module velocity_sia
     
     use yelmo_defs, only : sp, dp, wp, yelmo_use_omp, TOL_UNDERFLOW 
     
-    use yelmo_tools, only : get_neighbor_indices, &
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
                     calc_vertical_integrated_2D, stagger_aa_ab
 
@@ -150,9 +150,14 @@ contains
 
         real(wp), allocatable :: fact_ab(:,:)
 
+        integer  :: BC
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         allocate(fact_ab(nx,ny))
 
@@ -176,7 +181,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
                 
                 tau_xz_n_up = 0.5_wp*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
                 tau_xz_n_dn = 0.5_wp*(tau_xz(i,j,k)+tau_xz(i,jp1,k-1))
@@ -216,7 +221,7 @@ contains
             do i = 1, nx 
             
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
                 
                 fact_ac = 0.5_wp*(fact_ab(i,j)+fact_ab(i,jm1))
                 ux(i,j,k) = ux(i,j,k-1) &

@@ -15,9 +15,11 @@ module ice_optimization
         real(wp) :: cf_min_par
         real(wp) :: tau_c 
         real(wp) :: H0
+        logical  :: scaleH
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
         character(len=56) :: fill_method 
+        logical  :: basin_fill
 
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
@@ -435,9 +437,9 @@ contains
         real(wp), intent(IN)    :: dx 
         real(wp), intent(IN)    :: sigma_err 
         real(wp), intent(IN)    :: sigma_vel
-        real(wp), intent(IN)    :: tau_c                  ! [yr]
-        real(wp), intent(IN)    :: H0                     ! [m]
-        logical,  intent(IN)    :: scaleH
+        real(wp), intent(IN)    :: tau_c                    ! [yr]
+        real(wp), intent(IN)    :: H0                       ! [m]
+        logical,  intent(IN)    :: scaleH                   ! Scale ice thickness in opt with observation.
         real(wp), intent(IN)    :: dt 
         character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
         real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
@@ -560,7 +562,7 @@ contains
                 dHdt_now  = xwt*dHdt(i1,j)  + ywt*dHdt(i,j1) 
 
                 ! Determine scaling correction with respect to target cb_ref value
-                if (present(cb_tgt)) then
+                if (present(cb_tgt) .and. (scaleH .eq. .FALSE.)) then
                     cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
                 else 
                     cb_tgt_fac = 0.0 

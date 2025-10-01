@@ -232,8 +232,6 @@ contains
         real(wp), intent(IN)  :: N_eff(:,:)         ! [Pa]
         logical,  intent(IN)  :: is_angle           ! Is cb_ref a till strength angle? 
 
-        ! Internal parameters
-        real(wp), parameter :: c_frz = 1e-4
 
         if (is_angle) then 
             ! Transform cb_ref by tangent to make 
@@ -245,7 +243,9 @@ contains
 
         else
             ! Treat cb_ref as a normal scalar field
+            
             c_bed = cb_ref*N_eff 
+
         end if 
 
         return 

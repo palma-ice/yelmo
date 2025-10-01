@@ -78,9 +78,8 @@ contains
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
-! jablasco
-!select case("nodes")
-select case("aa")
+select case("nodes")
+
     case("nodes")
         ! Calculate the basal frictional heating (from quadrature-nodes)
         call calc_basal_heating_nodes(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%f_ice, &

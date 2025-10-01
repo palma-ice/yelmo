@@ -759,7 +759,7 @@ contains
                 if (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
 
                 ! Convert to [mW m-2]
-                Qb_aa = Qb_aa !* 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
+                Qb_aa = Qb_aa * 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
 
                 ! Get weighted average of Q_b with timestepping factors
                 Q_b(i,j) = beta1*Qb_aa + beta2*Q_b(i,j)

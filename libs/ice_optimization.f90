@@ -85,9 +85,11 @@ contains
         call nml_read(path_par,group,"cf_min",      opt%cf_min_par)
         call nml_read(path_par,group,"tau_c",       opt%tau_c)
         call nml_read(path_par,group,"H0",          opt%H0)
+        call nml_read(path_par,group,"scaleH",      opt%scaleH)    
         call nml_read(path_par,group,"sigma_err",   opt%sigma_err)   
         call nml_read(path_par,group,"sigma_vel",   opt%sigma_vel)   
-        call nml_read(path_par,group,"fill_method", opt%fill_method)   
+        call nml_read(path_par,group,"fill_method", opt%fill_method)
+        call nml_read(path_par,group,"basin_fill",  opt%basin_fill)   
         
         call nml_read(path_par,group,"rel_tau1",    opt%rel_tau1)   
         call nml_read(path_par,group,"rel_tau2",    opt%rel_tau2)  
@@ -139,8 +141,8 @@ contains
 
     end subroutine optimize_set_transient_param
 
-    subroutine optimize_tf_corr(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_obs,H_grnd_lim, &
-                                    tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
+    subroutine optimize_tf_corr(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
+                                basins,basin_fill,tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
 
         implicit none 
 
@@ -149,9 +151,10 @@ contains
         real(wp), intent(IN)    :: H_grnd(:,:)
         real(wp), intent(IN)    :: dHicedt(:,:)
         real(wp), intent(IN)    :: H_obs(:,:)
-        real(wp), intent(IN)    :: basins(:,:)
         real(wp), intent(IN)    :: H_grnd_obs(:,:)
-        real(wp), intent(IN)    :: H_grnd_lim 
+        real(wp), intent(IN)    :: H_grnd_lim
+        real(wp), intent(IN)    :: basins(:,:) 
+        logical,  intent(IN)    :: basin_fill
         real(wp), intent(IN)    :: tau_m 
         real(wp), intent(IN)    :: m_temp
         real(wp), intent(IN)    :: tf_min 
@@ -222,7 +225,7 @@ contains
         end do 
         end do
 
-        if (.True.) then
+        if (basin_fill) then
                 ! Obtain the mean tf_corr value by basins and extrapolate to the basins
                 ! Determine unique basin numbers that are available
                 nb = MAXVAL(basins)
@@ -411,7 +414,7 @@ contains
     end subroutine optimize_tf_corr_basin
 
     subroutine optimize_cb_ref(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
-                                        cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist, &
+                                        cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,scaleH,dt,fill_method,fill_dist, &
                                         cb_tgt)
         ! Update method following Lipscomb et al. (2021, tc)
 
@@ -434,6 +437,7 @@ contains
         real(wp), intent(IN)    :: sigma_vel
         real(wp), intent(IN)    :: tau_c                  ! [yr]
         real(wp), intent(IN)    :: H0                     ! [m]
+        logical,  intent(IN)    :: scaleH
         real(wp), intent(IN)    :: dt 
         character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
         real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
@@ -564,11 +568,11 @@ contains
 
                 ! Get adjustment rate given error in ice thickness  =========
                 ! jablasco
-                if (.False.) then
-                        cb_ref_dot = -(cb_prev(i,j)/H0) * &
+                if (scaleH) then
+                        cb_ref_dot = -(cb_prev(i,j)/H_obs(i,j)) * &
                                 ((H_err_now / tau_c) + f_damp*dHdt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
                 else
-                        cb_ref_dot = -(cb_prev(i,j)/H_obs(i,j)) * &
+                        cb_ref_dot = -(cb_prev(i,j)/H0) * &
                                 ((H_err_now / tau_c) + f_damp*dHdt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
                 end if
                 ! Apply correction to current node =========

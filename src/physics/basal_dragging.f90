@@ -47,7 +47,6 @@ module basal_dragging
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_power_plastic
     public :: calc_beta_aa_reg_coulomb
-    public :: calc_beta_aa_reg_coulomb_kori
 
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_mean
@@ -326,10 +325,6 @@ contains
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
                 call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.TRUE.)
-           
-            case(6)
-
-                !call calc_beta_aa_cism(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.FALSE.)
 
             case DEFAULT 
                 ! Not recognized 
@@ -1001,109 +996,6 @@ contains
         return
         
     end subroutine calc_beta_aa_reg_coulomb
-
-        subroutine calc_beta_aa_reg_coulomb_kori(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,boundaries,simple_stagger)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! using a regularized Coulomb friction law following
-        ! Joughin et al (2019), GRL, Eqs. 2a/2b
-        ! Note: Calculated on aa-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-            
-        implicit none
-            
-        real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
-        real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(wp), intent(IN)  :: c_bed(:,:)       ! aa-nodes
-        real(wp), intent(IN)  :: f_ice(:,:)       ! aa-nodes
-        real(wp), intent(IN)  :: q
-        real(wp), intent(IN)  :: u_0              ! [m/a] 
-        character(len=*), intent(IN) :: boundaries 
-        logical,  intent(IN)  :: simple_stagger 
-    
-        ! Local variables
-        integer  :: i, j, nx, ny
-        integer  :: im1, ip1, jm1, jp1
-        integer  :: im1m, ip1m, jm1m, jp1m 
-        real(wp) :: uxy_b
-        real(wp) :: uxn(4) 
-        real(wp) :: uyn(4) 
-        real(wp) :: uxyn(4) 
-        real(wp) :: cbn(4)
-        real(wp) :: betan(4)
-    
-        real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
-        real(wp), parameter :: ub_sq_min = ub_min**2
-    
-        type(gq2D_class) :: gq2D
-        real(wp) :: dx_tmp, dy_tmp
-    
-        ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
-        dx_tmp = 1.0
-        dy_tmp = 1.0 
-    
-        nx = size(beta,1)
-        ny = size(beta,2)
-            
-        ! Initially set friction to zero everywhere
-        beta = 0.0_wp 
-    
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b)
-        do j = 1, ny
-        do i = 1, nx
-    
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-    
-            if (f_ice(i,j) .eq. 1.0_wp) then 
-                ! Fully ice-covered point
-    
-                if (simple_stagger) then 
-                    ! Unstagger velocity components to aa-nodes 
-    
-                    ! Use central value of c_bed
-                    cbn(1:4) = c_bed(i,j) 
-    
-                    ! Get velocity components on central node
-                    uxn = 0.5*(ux_b(i,j)+ux_b(im1,j))
-                    uyn = 0.5*(uy_b(i,j)+uy_b(i,jm1))
-                    
-                else
-                    ! Get c_bed on nodes
-                        
-                    call gq2D_to_nodes(gq2D,cbn,c_bed,dx_tmp,dy_tmp,"aa",i,j,im1,ip1,jm1,jp1)
-                    !cbn(1:4) = c_bed(i,j) 
-    
-                    call gq2D_to_nodes(gq2D,uxn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes(gq2D,uyn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
-    
-                end if 
-                    
-                ! Calculate magnitude of basal velocity on nodes
-                uxyn      = sqrt(uxn**2 + uyn**2 + ub_sq_min)
-    
-                ! Calculate basal friction
-                betan     = (cbn**-q) * ((u_0 / (uxy_b+u_0))**q) * (uxy_b**(q-1))
-                beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
-    
-            else
-                ! Assign minimum velocity value, ignore staggering for simplicity 
-    
-                uxy_b  = ub_min 
-                beta(i,j) = (c_bed(i,j)**-q) * ((u_0 / (uxy_b+u_0))**q) * (uxy_b**(q-1))
-    
-            end if 
-    
-        end do
-        end do
-        !!$omp end parallel do
-            
-        return
-            
-    end subroutine calc_beta_aa_reg_coulomb_kori
 
     ! ================================================================================
     !

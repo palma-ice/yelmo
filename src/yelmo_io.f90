@@ -641,7 +641,6 @@ contains
         n = 1 
 
         ! == time variables ===
-
         ! ajr: testing reading these variables too to improve restart file performance
         call nc_read(filename,"pc_dt",       tme%pc_dt, start=[1,n],count=[3,1],ncid=ncid)
         call nc_read(filename,"pc_eta",      tme%pc_eta,start=[1,n],count=[3,1],ncid=ncid)
@@ -667,9 +666,10 @@ contains
         call nc_read_interp(filename,"dmb",         tpo%now%dmb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb",         tpo%now%cmb,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_flt",     tpo%now%cmb_flt,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"lsf",         tpo%now%lsf,        ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"cmb_flt_x",   tpo%now%cmb_flt_x,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"cmb_flt_y",   tpo%now%cmb_flt_y,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"lsf",         tpo%now%lsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        !call nc_read_interp(filename,"dlsf",        tpo%now%dlsf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"cmb_grnd",    tpo%now%cmb_grnd,   ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"eps_eff",     tpo%now%eps_eff,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"tau_eff",     tpo%now%tau_eff,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -694,11 +694,6 @@ contains
         call nc_read_interp(filename,"z_srf_n",     tpo%now%z_srf_n,    ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"H_ice_dyn",   tpo%now%H_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"f_ice_dyn",   tpo%now%f_ice_dyn,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)  
-<<<<<<< HEAD
-        call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-=======
-        call nc_read_interp(filename,"tau_relax",   tpo%now%tau_relax,  ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
->>>>>>> 33f3f53f84eb136169df6eeb41e2275514dae09b
         
         ! = ytopo_pc variables ===
         call nc_read_interp(filename,"pc_pred_H_ice",    tpo%now%pred%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -730,20 +725,15 @@ contains
         call nc_read_interp(filename,"T_shlf",      bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"Q_geo",       bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"enh_srf",     bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        
         call nc_read_interp(filename,"basins",      bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"basin_mask",  bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"regions",     bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"region_mask", bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        
         call nc_read_interp(filename,"ice_allowed", bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"calv_mask",   bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"H_ice_ref",   bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_bed_ref",   bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"domain_mask", bnd%domain_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        !call nc_read_interp(filename,"tau_relax",   bnd%tau_relax,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        ! Not read in, because it would conflict with tpo%now%tau_relax name, and bnd%tau_relax would always be provided anyway.
+        
         ! Close the netcdf file
         call nc_close(ncid)
         

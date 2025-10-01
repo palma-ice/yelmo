@@ -1077,10 +1077,8 @@ contains
                 call smooth_gauss_2D(z_bed,dx=dom%grd%dx,f_sigma=smooth_z_bed)
             end if 
 
-
             ! Adjust bedrock topography and ice thickness for smoothness
             call adjust_topography_gradients(z_bed,H_ice,dom%tpo%par%grad_lim_zb,dom%grd%dx,dom%tpo%par%boundaries)
-            
 
             ! Additionally modify initial topographic state 
             select case(init_topo_state)
@@ -1112,16 +1110,14 @@ contains
             dom%tpo%now%H_ice = H_ice 
             dom%bnd%z_bed     = z_bed 
             dom%bnd%z_bed_sd  = z_bed_sd 
-
+                
             ! Finally, calculate and apply all additional (generally artificial) ice thickness adjustments
             ! Set minimum ice thickness to 1m for safety to start.
             call calc_G_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
                                                 dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
                                                 H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=1.0_wp)
-
             ! Apply rate and update ice thickness
             call apply_tendency(dom%tpo%now%H_ice,dom%tpo%now%mb_resid,dt=1.0_wp,label="init")
-
         end if 
 
         ! Step 2: load topo and bnd variables from a restart file if desired 
@@ -1139,7 +1135,6 @@ contains
 
             call yelmo_restart_read_topo_bnd(tpo_restart,bnd_restart,tme_restart,dom%par%restart_interpolated, &
                                              dom%grd,dom%par%domain,dom%par%grid_name,dom%par%restart,time)
-
             ! Now determine which values should be used from restart.
             ! Replace fields in restart objects that should not be used. 
 

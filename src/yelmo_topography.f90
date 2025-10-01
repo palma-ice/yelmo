@@ -303,9 +303,6 @@ end if
                     ! Add residual tendency to mb_net for proper accounting of mass change
                     tpo%now%mb_net = tpo%now%mb_net + tpo%now%mb_resid
 
-                    ! jablasco: kill ice
-                    !where(tpo%now%lsf .gt. 0.0_wp) tpo%now%H_ice = 0.0_wp
-
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                                             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
@@ -750,8 +747,8 @@ end if
                 tpo%now%cr_acx(i,j) = tpo%now%cmb_flt_x(i,j)
             else
                 if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(ip1,j)) .gt. 0.0_wp) then
-                    ! Point above sea level. Do nothing for now.
-                    tpo%now%cr_acx(i,j) = 0.0_wp
+                    ! Point above sea level. Do not allow to move here. (check)
+                    tpo%now%cr_acx(i,j) = -1*dyn%now%ux_bar(i,j)
                 else
                     ! Marine-terminating point.
                     tpo%now%cr_acx(i,j) = tpo%now%cmb_grnd_x(i,j)
@@ -765,7 +762,7 @@ end if
             else
                 if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(i,jp1)) .gt. 0.0_wp) then
                     ! Point above sea level. Do nothing for now.
-                    tpo%now%cr_acy(i,j) = 0.0_wp
+                    tpo%now%cr_acy(i,j) = -1*dyn%now%uy_bar(i,j)
                 else
                     ! Marine-terminating point.
                     tpo%now%cr_acy(i,j) = tpo%now%cmb_grnd_y(i,j)
@@ -841,6 +838,14 @@ end if
                 where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
             end if
         end if
+
+        ! if there is no ice (for example due to oceanic melt) ensure that point is now ocean in the lsf mask
+        select case(trim(tpo%par%calv_flt_method))
+            case("equil")
+                    ! Do nothing here
+            case DEFAULT
+                    where(tpo%now%H_ice .le. 0.0 .and. tpo%now%lsf .lt. 0.0 .and. bnd%z_bed .lt. 0.0) tpo%now%lsf = 1.0_wp
+        end select 
 
         return
     

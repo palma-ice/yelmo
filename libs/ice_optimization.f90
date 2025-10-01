@@ -53,6 +53,8 @@ module ice_optimization
     public :: optimize_tf_corr
     public :: optimize_tf_corr_basin
     public :: optimize_cb_ref
+    public :: optimize_cb_ref_vel
+    public :: optimize_cb_ref_pc12
     
     public :: update_mb_corr
     public :: guess_cb_ref
@@ -137,7 +139,7 @@ contains
 
     end subroutine optimize_set_transient_param
 
-    subroutine optimize_tf_corr(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
+    subroutine optimize_tf_corr(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_obs,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
 
         implicit none 
@@ -147,6 +149,7 @@ contains
         real(wp), intent(IN)    :: H_grnd(:,:)
         real(wp), intent(IN)    :: dHicedt(:,:)
         real(wp), intent(IN)    :: H_obs(:,:)
+        real(wp), intent(IN)    :: basins(:,:)
         real(wp), intent(IN)    :: H_grnd_obs(:,:)
         real(wp), intent(IN)    :: H_grnd_lim 
         real(wp), intent(IN)    :: tau_m 
@@ -158,14 +161,19 @@ contains
         real(wp), intent(IN)    :: dt 
 
         ! Local variables
-        integer  :: i, j, nx, ny 
+        integer  :: b, nb
+        integer  :: i, j, nx, ny, n 
         real(wp) :: f_damp 
         real(wp) :: tau_tgt
         real(wp) :: tf_corr_dot
-        real(wp) :: tf_corr_tgt 
+        real(wp) :: tf_corr_tgt
+        real(wp) :: tf_corr_bar 
 
         real(wp), allocatable :: H_err(:,:)
-        
+       
+        logical,  allocatable :: mask(:,:)
+        real(wp), allocatable :: basin_list(:)
+
         real(wp), parameter :: tol = 1e-5_wp
 
         ! Internal parameters 
@@ -178,6 +186,7 @@ contains
         ny = size(tf_corr,2) 
 
         allocate(H_err(nx,ny))
+        allocate(mask(nx,ny))
 
         ! Calculate ice thickness error everywhere
         H_err = H_ice - H_obs
@@ -213,17 +222,51 @@ contains
         end do 
         end do
 
-        ! ! Finally reset tf_corr to zero where no floating ice is observed
-        ! ! (ie outside the observed floating ice margin)
-        ! where (H_grnd .lt. 0.0 .and. H_obs .eq. 0.0)
-        !     tf_corr = 0.0
-        ! end where 
+        if (.True.) then
+                ! Obtain the mean tf_corr value by basins and extrapolate to the basins
+                ! Determine unique basin numbers that are available
+                nb = MAXVAL(basins)
+                allocate(basin_list(nb))
+                basin_list = [(i, i=1,nb)]
+                
+                do b = 1, nb
+                        ! Get a mask of points of interest:
+                        ! 1. Points within the current basin 
+                        ! 2. Points with overburden thickness near flotation,
+                        !    with magnitude less than H_grnd_lim
+                        ! 3. Points with observed or modeled ice thickness
+                        mask =  (abs(basins-basin_list(b)) .lt. tol) .and. &
+                                (H_grnd .lt. H_grnd_lim) .and. &
+                                (H_obs .gt. 0.0 .or. H_ice .gt. 0.0)
 
-        ! ! Also reset to zero for fully grounded ice 
-        ! where (H_grnd .gt. 0.0)
-        !     tf_corr = 0.0 
-        ! end where 
-        
+                        ! How many points available 
+                        n = count(mask)
+
+                        if (n .gt. 0) then
+                                ! Points are available for averaging 
+                                ! Calculate average observed thickness for masked region
+                                tf_corr_bar = sum(tf_corr,mask=mask)   / real(n,wp)
+                        else
+                                tf_corr_bar = 0.0_wp
+                        end if
+                        
+                        where ((H_grnd .gt. H_grnd_lim) .and. (abs(basins-basin_list(b)) .lt. tol))
+                                tf_corr = tf_corr_bar 
+                        end where
+                end do 
+        else
+                ! ! Finally reset tf_corr to zero where no floating ice is observed
+                ! ! (ie outside the observed floating ice margin)
+                ! where (H_grnd .lt. 0.0 .and. H_obs .eq. 0.0)
+                !     tf_corr = 0.0
+                ! end where 
+
+                ! ! Also reset to zero for fully grounded ice 
+                ! where (H_grnd .gt. 0.0)
+                !     tf_corr = 0.0 
+                ! end where 
+        end if
+
         return 
 
     end subroutine optimize_tf_corr
@@ -275,7 +318,6 @@ contains
         call unique(basin_list_ref,reshape(basins,[nx*ny]))
 
         ! Check if we are optimizing all basins
-        
         if (tf_basins(1) .lt. 0) then 
             ! Optimizing all basins, set 
             ! basin list to reference list
@@ -285,7 +327,6 @@ contains
             basin_list = basin_list_ref 
 
             nb = size(basin_list,1) 
-
         else
 
             nb = count(tf_basins .gt. 0)
@@ -309,13 +350,12 @@ contains
             ! 2. Points with overburden thickness near flotation,
             !    with magnitude less than H_grnd_lim
             ! 3. Points with observed or modeled ice thickness
-            mask =  abs(basins-basin_list(b)) .lt. tol .and. &
-                    abs(H_grnd) .lt. H_grnd_lim .and. & 
+            mask =  (abs(basins-basin_list(b)) .lt. tol) .and. &
+                    (H_grnd .lt. H_grnd_lim) .and. & 
                     (H_obs .gt. 0.0 .or. H_ice .gt. 0.0)
 
             ! How many points available 
             n = count(mask)
-
                 
             if (n .gt. 0) then 
                 ! Points are available for averaging 
@@ -523,10 +563,14 @@ contains
                 end if 
 
                 ! Get adjustment rate given error in ice thickness  =========
-
-                cb_ref_dot = -(cb_prev(i,j)/H0) * &
-                        ((H_err_now / tau_c) + f_damp*dHdt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
-
+                ! jablasco
+                if (.False.) then
+                        cb_ref_dot = -(cb_prev(i,j)/H0) * &
+                                ((H_err_now / tau_c) + f_damp*dHdt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
+                else
+                        cb_ref_dot = -(cb_prev(i,j)/H_obs(i,j)) * &
+                                ((H_err_now / tau_c) + f_damp*dHdt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
+                end if
                 ! Apply correction to current node =========
 
                 cb_ref(i,j) = cb_prev(i,j) + cb_ref_dot*dt 
@@ -602,6 +646,492 @@ contains
         return 
 
     end subroutine optimize_cb_ref
+
+    subroutine optimize_cb_ref_vel(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs,duxydt, &
+                                   cf_min,cf_max,f_pmp,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist,cb_tgt)
+        ! Update method following Lipscomb et al. but for ice velocity (2021, tc)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: cb_ref(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: dHdt(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        real(wp), intent(IN)    :: ux(:,:) 
+        real(wp), intent(IN)    :: uy(:,:) 
+        real(wp), intent(IN)    :: H_obs(:,:) 
+        real(wp), intent(IN)    :: uxy_obs(:,:) 
+        real(wp), intent(IN)    :: H_grnd_obs(:,:)
+        real(wp), intent(IN)    :: duxydt(:,:) 
+        real(wp), intent(IN)    :: cf_min(:,:) 
+        real(wp), intent(IN)    :: cf_max(:,:)
+        real(wp), intent(IN)    :: f_pmp(:,:) 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: sigma_err 
+        real(wp), intent(IN)    :: sigma_vel
+        real(wp), intent(IN)    :: tau_c                  ! [yr]
+        real(wp), intent(IN)    :: H0                     ! [m]
+        real(wp), intent(IN)    :: dt 
+        character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
+        real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
+        real(wp), intent(IN), optional :: cb_tgt(:,:) 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, i1, j1 
+        integer  :: im1, ip1, jm1, jp1  
+        real(wp) :: f_damp   
+        real(wp) :: ux_aa, uy_aa, uxy_aa
+        real(wp) :: H_err_now, dHdt_now, f_vel  
+        real(wp) :: uxy_err_now,duxydt_now 
+        real(wp) :: xwt, ywt, xywt
+
+        real(wp) :: f_tgt
+        real(wp) :: cb_tgt_fac
+        real(wp) :: tau_tgt 
+
+        real(wp) :: cb_ref_dot 
+
+        real(wp), allocatable   :: H_err_sm(:,:)
+        real(wp), allocatable   :: H_err(:,:)
+        real(wp), allocatable   :: uxy(:,:)
+        real(wp), allocatable   :: uxy_err(:,:)
+        real(wp), allocatable   :: cb_prev(:,:) 
+
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2)  
+
+        allocate(H_err_sm(nx,ny))
+        allocate(H_err(nx,ny))
+        allocate(uxy(nx,ny))
+        allocate(uxy_err(nx,ny))
+        allocate(cb_prev(nx,ny))
+
+        ! Internal parameters 
+        f_damp = 2.0 
+
+        f_tgt   = 0.05 * H0    ! [--] * [m] = [m]
+        tau_tgt = tau_c        ! 500 [yr] 
+
+        ! Store initial cb_ref solution 
+        cb_prev = cb_ref 
+
+        ! Calculate velocity magnitude and velocity error 
+        uxy = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
+        uxy_err = MV 
+        where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
+
+        ! Calculate ice thickness error 
+        H_err = H_ice - H_obs 
+
+        ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
+        ! Apply a weighted average between smoothed and original H_err, where 
+        ! slow regions get more smoothed, and fast regions use more local error 
+        if (sigma_err .gt. 0.0) then
+
+        H_err_sm = H_err  
+        call filter_gaussian(H_err_sm,sigma_err,dx)
+
+        do j = 1, ny 
+        do i = 1, nx 
+        f_vel = min( uxy(i,j)/sigma_vel, 1.0 )
+        H_err(i,j) = (1.0-f_vel)*H_err_sm(i,j) + f_vel*H_err(i,j)  
+        end do 
+        end do  
+
+        end if
+
+        ! Initially set cf to missing value for now where no correction possible
+        cb_ref = MV 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ux_aa = 0.5*(ux(i,j)+ux(im1,j))
+            uy_aa = 0.5*(uy(i,j)+uy(i,jm1))
+
+            uxy_aa = sqrt(ux_aa**2+uy_aa**2)
+
+            if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV .and. (H_grnd_obs(i,j) .gt. 0.0) ) then 
+                ! Update coefficient where velocity exists and 
+                ! observations are not floating.
+
+                ! Determine upstream node(s) 
+                if (ux_aa .ge. 0.0) then 
+                    i1 = im1
+                else 
+                    i1 = ip1 
+                end if 
+
+                if (uy_aa .ge. 0.0) then 
+                    j1 = jm1
+                else 
+                    j1 = jp1  
+                end if 
+
+                ! Get weighted error  =========
+                xywt  = abs(ux_aa)+abs(uy_aa)
+                if (xywt .gt. 0.0) then 
+                xwt = abs(ux_aa) / xywt 
+                ywt = abs(uy_aa) / xywt 
+                else 
+                ! Dummy weights
+                xwt   = 0.5 
+                ywt   = 0.5
+                end if 
+
+                ! Define error for ice thickness 
+                uxy_err_now = uxy_err(i,j)
+                duxydt_now  = duxydt(i,j)
+
+                ! Determine scaling correction with respect to target cb_ref value
+                if (present(cb_tgt)) then
+                   cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
+                else 
+                    cb_tgt_fac = 0.0 
+                end if 
+
+                ! Get adjustment rate given error in surface velocity =========
+                if (.False.) then
+                        cb_ref_dot = -(cb_prev(i,j)/H0) * &
+                        ((uxy_err_now / tau_c) + f_damp*duxydt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
+                else
+                        cb_ref_dot = -(cb_prev(i,j)/uxy_obs(i,j)) * &
+                        ((uxy_err_now / tau_c) + f_damp*duxydt_now)
+                end if
+
+                ! Apply correction to current node =========
+
+                cb_ref(i,j) = cb_prev(i,j) + cb_ref_dot*dt 
+
+                if (.True.) then
+                        cb_ref(i,j) = cb_ref(i,j)*f_pmp(i,j) + cf_min(i,j)*(1-f_pmp(i,j))
+                end if
+
+            end if 
+
+        end do 
+        end do 
+
+        select case(trim(fill_method))
+
+            case("analog")
+
+                write(io_unit_err,*)
+                write(io_unit_err,*) "optimize_cb_ref:: Error: &
+                &fill_method='analog' is not working right now!"
+                write(io_unit_err,*)
+                stop 
+
+                ! ajr: Need to adapt fill_cb_ref and fill_nearest for 2D fields
+                ! of cf_min and cf_max, instead of just single values. 
+
+                ! Fill in cb_ref for floating points using bed analogy method
+                !call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
+
+                ! Fill in remaining missing values with nearest neighbor or cf_min when none available
+                !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+            case("nearest")
+
+                write(io_unit_err,*)
+                write(io_unit_err,*) "optimize_cb_ref:: Error: &
+                &fill_method='nearest' is not working right now!"
+                write(io_unit_err,*)
+                stop 
+
+                ! ajr: Need to adapt fill_cb_ref and fill_nearest for 2D fields
+                ! of cf_min and cf_max, instead of just single values. 
+
+                ! Fill in remaining missing values with nearest neighbor or cf_min when none available
+                !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+            case("target")
+                ! Fill in field with cg_tgt values 
+
+                ! Ensure where obs are floating, set cb_ref = cb_tgt 
+                where(H_grnd_obs .le. 0.0) cb_ref = cb_tgt 
+
+                ! Also where no ice exists, set cb_ref = cb_tgt 
+                where(H_obs .eq. 0.0) cb_ref = cb_tgt 
+
+            case("cf_min")
+
+                ! Ensure where obs are floating, set cb_ref = cf_min 
+                where(H_grnd_obs .le. 0.0) cb_ref = cf_min 
+
+                ! Also where no ice exists, set cb_ref = cf_min 
+                where(H_obs .eq. 0.0) cb_ref = cf_min 
+
+            case DEFAULT 
+
+                write(io_unit_err,*)
+                write(io_unit_err,*) "optimize_cb_ref:: Error: fill_method not recognized."
+                write(io_unit_err,*) "fill_method = ", trim(fill_method)
+                stop 
+
+        end select
+
+        ! Ensure cb_ref is not below lower or upper limit 
+        where (cb_ref .lt. cf_min) cb_ref = cf_min 
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
+
+        return 
+
+    end subroutine optimize_cb_ref_vel
+
+    subroutine optimize_cb_ref_pc12(cb_ref,H_ice,H_ice_n,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
+            cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist, &
+            cb_tgt)
+        ! Update method following Pollard & deConto (2012, tc)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: cb_ref(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: H_ice_n(:,:) 
+        real(wp), intent(IN)    :: dHdt(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        real(wp), intent(IN)    :: ux(:,:) 
+        real(wp), intent(IN)    :: uy(:,:) 
+        real(wp), intent(IN)    :: H_obs(:,:) 
+        real(wp), intent(IN)    :: uxy_obs(:,:) 
+        real(wp), intent(IN)    :: H_grnd_obs(:,:) 
+        real(wp), intent(IN)    :: cf_min(:,:) 
+        real(wp), intent(IN)    :: cf_max(:,:) 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: sigma_err 
+        real(wp), intent(IN)    :: sigma_vel
+        real(wp), intent(IN)    :: tau_c                  ! [yr]
+        real(wp), intent(IN)    :: H0                     ! [m]
+        real(wp), intent(IN)    :: dt 
+        character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
+        real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
+        real(wp), intent(IN), optional :: cb_tgt(:,:) 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, i1, j1 
+        integer  :: im1, ip1, jm1, jp1  
+        real(wp) :: ux_aa, uy_aa, uxy_aa
+        real(wp) :: H_err_now, H_err_now_n, dHdt_now, f_vel   
+        real(wp) :: dz_now, dz_n
+        real(wp) :: xwt, ywt, xywt
+
+        real(wp) :: f_tgt
+        real(wp) :: cb_tgt_fac
+        real(wp) :: tau_tgt 
+
+        real(wp) :: cb_ref_dot 
+
+        real(wp), allocatable   :: H_err_sm(:,:),H_err_n_sm(:,:)
+        real(wp), allocatable   :: H_err(:,:),H_err_n(:,:)
+        real(wp), allocatable   :: uxy(:,:)
+        real(wp), allocatable   :: uxy_err(:,:)
+        real(wp), allocatable   :: cb_prev(:,:) 
+
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2)  
+
+        allocate(H_err_sm(nx,ny))
+        allocate(H_err_n_sm(nx,ny))
+        allocate(H_err(nx,ny))
+        allocate(H_err_n(nx,ny))
+        allocate(uxy(nx,ny))
+        allocate(uxy_err(nx,ny))
+        allocate(cb_prev(nx,ny))
+
+        ! Internal parameters 
+        f_tgt   = 0.05 * H0    ! [--] * [m] = [m]
+        tau_tgt = tau_c        ! 500 [yr] 
+
+        ! Store initial cb_ref solution 
+        cb_prev = cb_ref 
+
+        ! Calculate velocity magnitude and velocity error 
+        uxy = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
+
+        uxy_err = MV 
+        where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
+
+        ! Calculate ice thickness error 
+        H_err   = H_ice   - H_obs ! current timestep
+        H_err_n = H_ice_n - H_obs ! previous timestep
+
+        ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
+        ! Apply a weighted average between smoothed and original H_err, where 
+        ! slow regions get more smoothed, and fast regions use more local error 
+        if (sigma_err .gt. 0.0) then
+
+            H_err_sm = H_err
+            H_err_n_sm = H_err_n  
+            call filter_gaussian(H_err_sm,sigma_err,dx)
+            call filter_gaussian(H_err_n_sm,sigma_err,dx)
+
+            do j = 1, ny 
+            do i = 1, nx 
+                f_vel = min( uxy(i,j)/sigma_vel, 1.0 )
+                H_err(i,j)   = (1.0-f_vel)*H_err_sm(i,j)   + f_vel*H_err(i,j)  
+                H_err_n(i,j) = (1.0-f_vel)*H_err_n_sm(i,j) + f_vel*H_err_n(i,j)
+            end do 
+            end do  
+
+        end if
+
+        ! Initially set cf to missing value for now where no correction possible
+        cb_ref = MV 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+        ! Get neighbor indices
+        im1 = max(i-1,1) 
+        ip1 = min(i+1,nx) 
+        jm1 = max(j-1,1) 
+        jp1 = min(j+1,ny) 
+
+        ux_aa = 0.5*(ux(i,j)+ux(im1,j))
+        uy_aa = 0.5*(uy(i,j)+uy(i,jm1))
+
+        uxy_aa = sqrt(ux_aa**2+uy_aa**2)
+
+        if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV &
+            .and. (H_grnd_obs(i,j) .gt. 0.0) ) then 
+            ! Update coefficient where velocity exists and observations are not floating.
+
+            ! Determine upstream node(s) 
+            if (ux_aa .ge. 0.0) then 
+                i1 = im1
+            else 
+                i1 = ip1 
+            end if 
+
+            if (uy_aa .ge. 0.0) then 
+                j1 = jm1
+            else 
+                j1 = jp1  
+            end if 
+
+            ! Get weighted error  =========
+            xywt  = abs(ux_aa)+abs(uy_aa)
+            if (xywt .gt. 0.0) then 
+                xwt = abs(ux_aa) / xywt 
+                ywt = abs(uy_aa) / xywt 
+            else 
+                ! Dummy weights
+                xwt   = 0.5 
+                ywt   = 0.5
+            end if 
+
+            ! Define error for ice thickness 
+            H_err_now   = xwt*H_err(i1,j)   + ywt*H_err(i,j1)
+            H_err_now_n = xwt*H_err_n(i1,j) + ywt*H_err_n(i,j1) 
+            dHdt_now    = xwt*dHdt(i1,j)    + ywt*dHdt(i,j1) 
+
+            ! Determine scaling correction with respect to target cb_ref value
+            if (present(cb_tgt)) then
+                cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
+            else 
+                cb_tgt_fac = 0.0 
+            end if 
+
+            ! Get adjustment rate given error in ice thickness  =========
+            if (.False.) then
+                ! current error
+                dz_now   = MAX(-1.5,MIN(1.5,H_err_now/H0))
+                ! previous error
+                dz_n     = MAX(-1.5,MIN(1.5,H_err_now_n/H0))
+            else
+                ! current error
+                dz_now   = MAX(-1.5,MIN(1.5,H_err_now/H_obs(i,j)))
+                ! previous error
+                dz_n     = MAX(-1.5,MIN(1.5,H_err_now_n/H_obs(i,j)))
+            end if
+
+            ! Only updates if the current error is smaller
+            if (dz_now .lt. dz_n) then
+                cb_ref(i,j) = cb_prev(i,j)*(10**(-dz_now)) 
+            else
+                cb_ref(i,j) = cb_prev(i,j)
+            end if
+
+        end if 
+
+        end do 
+        end do 
+
+        select case(trim(fill_method))
+
+        case("analog")
+
+        write(io_unit_err,*)
+        write(io_unit_err,*) "optimize_cb_ref:: Error: &
+        &fill_method='analog' is not working right now!"
+        write(io_unit_err,*)
+        stop 
+
+        ! ajr: Need to adapt fill_cb_ref and fill_nearest for 2D fields
+        ! of cf_min and cf_max, instead of just single values. 
+
+        ! Fill in cb_ref for floating points using bed analogy method
+        !call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
+
+        ! Fill in remaining missing values with nearest neighbor or cf_min when none available
+        !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+        case("nearest")
+
+        write(io_unit_err,*)
+        write(io_unit_err,*) "optimize_cb_ref:: Error: &
+        &fill_method='nearest' is not working right now!"
+        write(io_unit_err,*)
+        stop 
+
+        ! ajr: Need to adapt fill_cb_ref and fill_nearest for 2D fields
+        ! of cf_min and cf_max, instead of just single values. 
+
+        ! Fill in remaining missing values with nearest neighbor or cf_min when none available
+        !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+        case("target")
+        ! Fill in field with cg_tgt values 
+
+        ! Ensure where obs are floating, set cb_ref = cb_tgt 
+        where(H_grnd_obs .le. 0.0) cb_ref = cb_tgt 
+
+        ! Also where no ice exists, set cb_ref = cb_tgt 
+        where(H_obs .eq. 0.0) cb_ref = cb_tgt 
+
+        case("cf_min")
+
+        ! Ensure where obs are floating, set cb_ref = cf_min 
+        where(H_grnd_obs .le. 0.0) cb_ref = cf_min 
+
+        ! Also where no ice exists, set cb_ref = cf_min 
+        where(H_obs .eq. 0.0) cb_ref = cf_min 
+
+        case DEFAULT 
+
+        write(io_unit_err,*)
+        write(io_unit_err,*) "optimize_cb_ref:: Error: fill_method not recognized."
+        write(io_unit_err,*) "fill_method = ", trim(fill_method)
+        stop 
+
+        end select
+
+        ! Ensure cb_ref is not below lower or upper limit 
+        where (cb_ref .lt. cf_min) cb_ref = cf_min 
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
+
+        return 
+
+    end subroutine optimize_cb_ref_pc12
 
     subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max,rho_ice,rho_sw)
         ! Fill points that cannot be optimized with 
@@ -1440,3 +1970,4 @@ end if
     end subroutine update_cb_ref_thickness_ratio
 
 end module ice_optimization
+

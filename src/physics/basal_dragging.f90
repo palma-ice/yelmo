@@ -69,7 +69,7 @@ contains
         real(wp), intent(IN)  :: z_bed(:,:) 
         real(wp), intent(IN)  :: z_bed_sd(:,:)
         real(wp), intent(IN)  :: z_sl(:,:) 
-        real(wp), intent(IN)  :: H_sed(:,:) 
+        real(wp), intent(IN)  :: H_sed(:,:)
         real(wp), intent(IN)  :: f_sed 
         real(wp), intent(IN)  :: H_sed_min
         real(wp), intent(IN)  :: H_sed_max  
@@ -231,8 +231,9 @@ contains
 
         real(wp), intent(OUT) :: c_bed(:,:)         ! [Pa]
         real(wp), intent(IN)  :: cb_ref(:,:)        ! [-] or [degrees]
-        real(wp), intent(IN)  :: N_eff(:,:)         ! [Pa] 
-        logical,  intent(IN) :: is_angle            ! Is cb_ref a till strength angle? 
+        real(wp), intent(IN)  :: N_eff(:,:)         ! [Pa]
+        logical,  intent(IN)  :: is_angle           ! Is cb_ref a till strength angle? 
+
 
         if (is_angle) then 
             ! Transform cb_ref by tangent to make 
@@ -244,7 +245,7 @@ contains
 
         else
             ! Treat cb_ref as a normal scalar field
-
+            
             c_bed = cb_ref*N_eff 
 
         end if 
@@ -326,7 +327,7 @@ contains
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
                 call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.TRUE.)
-            
+
             case DEFAULT 
                 ! Not recognized 
 

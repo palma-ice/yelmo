@@ -558,7 +558,7 @@ contains
                 dHdt_now  = xwt*dHdt(i1,j)  + ywt*dHdt(i,j1) 
 
                 ! Determine scaling correction with respect to target cb_ref value
-                if (present(cb_tgt) .and. (scaleH .eq. .FALSE.)) then
+                if (present(cb_tgt) .and. (.not. scaleH)) then
                     cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
                 else 
                     cb_tgt_fac = 0.0 

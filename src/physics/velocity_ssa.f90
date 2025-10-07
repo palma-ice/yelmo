@@ -389,7 +389,7 @@ end if
         type(gq3D_class) :: gq3D
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
-        logical, parameter :: use_gq3D = .TRUE.
+        logical, parameter :: use_gq3D = .FALSE.
 
         integer :: BC 
 
@@ -447,11 +447,11 @@ if (.not. use_gq3D) then
 
                 ! Get horizontal strain rate terms
                 ! (same for all layers, so just get them once for all layers)
-                call gq2D_to_nodes(gq2D,dudxn,dudx(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dudyn,dudy(:,:,1),dx,dy,"acx",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudxn,dudx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,dudyn,dudy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 
-                call gq2D_to_nodes(gq2D,dvdxn,dvdx(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,dvdyn,dvdy(:,:,1),dx,dy,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 ! Calculate the total effective strain rate from L19, Eq. 21 
                 eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25*(dudyn+dvdxn)**2 + eps_0_sq
@@ -459,7 +459,7 @@ if (.not. use_gq3D) then
                 do k = 1, nz
                     
                     ! Get rate factor
-                    call gq2D_to_nodes(gq2D,ATTn,ATT(:,:,k),dx,dy,"aa",i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2D,ATTn,ATT(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node

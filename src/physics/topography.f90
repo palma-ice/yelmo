@@ -1553,7 +1553,7 @@ end if
     end subroutine calc_grounding_line_zone
 
     subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_ice,H_grnd,f_grnd,gz_Hg0,gz_Hg1, &
-                                                            gz_nx,bmb_gl_method,grounded_melt,mask_pd,boundaries)
+                                                            gz_nx,bmb_gl_method,mask_pd,boundaries)
 
         implicit none 
 
@@ -1568,7 +1568,6 @@ end if
         integer,          intent(IN)  :: gz_nx
         character(len=*), intent(IN)  :: bmb_gl_method 
         ! for optimization (optional, check!)
-        logical,  intent(IN), optional  :: grounded_melt
         integer,  intent(IN), optional  :: mask_pd(:,:)
         character(len=*), intent(IN)  :: boundaries 
 
@@ -1652,7 +1651,7 @@ end if
         end select
 
         ! Melting in grounded zone for optimization
-        if (present(mask_pd) .and. grounded_melt) then
+        if (present(mask_pd)) then
             where(mask_pd .eq. mask_bed_float) bmb = bmb_shlf
             where(mask_pd .eq. mask_bed_ocean) bmb = bmb_shlf
         end if

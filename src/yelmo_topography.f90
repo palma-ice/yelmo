@@ -192,7 +192,7 @@ end if
                     ! grounded/floating fraction of grid cells 
                     call calc_bmb_total(tpo%now%bmb_ref,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice, &
                                         tpo%now%H_grnd,tpo%now%f_grnd_bmb,tpo%par%gz_Hg0,tpo%par%gz_Hg1, &
-                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%grounded_melt,dta%pd%mask_bed,tpo%par%boundaries)
+                                        tpo%par%gz_nx,tpo%par%bmb_gl_method,dta%pd%mask_bed,tpo%par%boundaries)
 
                     if (tpo%par%use_bmb) then
                         call calc_G_mbal(tpo%now%bmb,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%bmb_ref,dt)
@@ -1222,7 +1222,6 @@ end if
         call nml_read(filename,group_ytopo,"topo_rel",          par%topo_rel,         init=init_pars)
         call nml_read(filename,group_ytopo,"topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
         call nml_read(filename,group_ytopo,"topo_rel_field",    par%topo_rel_field,   init=init_pars)
-        call nml_read(filename,group_ytopo,"grounded_melt",     par%grounded_melt,    init=init_pars)
         ! Grounding line
         call nml_read(filename,group_ytopo,"bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
         call nml_read(filename,group_ytopo,"gl_sep",            par%gl_sep,           init=init_pars)

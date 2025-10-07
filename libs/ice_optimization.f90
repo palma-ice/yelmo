@@ -412,7 +412,7 @@ contains
     end subroutine optimize_tf_corr_basin
 
     subroutine optimize_cb_ref(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
-                                        cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,scaleH,dt,fill_method,fill_dist, &
+                                        cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist, &
                                         cb_tgt)
         ! Update method following Lipscomb et al. (2021, tc)
 
@@ -435,7 +435,6 @@ contains
         real(wp), intent(IN)    :: sigma_vel
         real(wp), intent(IN)    :: tau_c                    ! [yr]
         real(wp), intent(IN)    :: H0                       ! [m]
-        logical,  intent(IN)    :: scaleH                   ! Scale ice thickness in opt with observation.
         real(wp), intent(IN)    :: dt 
         character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
         real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
@@ -460,6 +459,15 @@ contains
         real(wp), allocatable   :: uxy(:,:)
         real(wp), allocatable   :: uxy_err(:,:)
         real(wp), allocatable   :: cb_prev(:,:) 
+
+        logical :: scaleH                   ! Scale ice thickness in opt with observation.
+        
+        ! Check parameters
+        if (H0 .le. 0.0) then
+            scaleH = .TRUE.         ! Scale ice thickness in opt with observation.
+        else
+            scaleH = .FALSE.        ! Use H0 value directly.
+        end if
 
         nx = size(cb_ref,1)
         ny = size(cb_ref,2)  
@@ -557,8 +565,8 @@ contains
                 H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
                 dHdt_now  = xwt*dHdt(i1,j)  + ywt*dHdt(i,j1) 
 
-                ! Determine scaling correction with respect to target cb_ref value
-                if (present(cb_tgt) .and. (.not. scaleH)) then
+                ! Determine scaling correction with respect to target cb_ref value, if desired
+                if (present(cb_tgt)) then
                     cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
                 else 
                     cb_tgt_fac = 0.0 

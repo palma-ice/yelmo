@@ -39,8 +39,6 @@ module ice_optimization
         real(wp) :: tf_max
         integer  :: tf_basins(100) 
 
-        real(wp) :: cf_ref_wais 
-
         real(wp), allocatable :: cf_min(:,:) 
         real(wp), allocatable :: cf_max(:,:) 
         
@@ -109,8 +107,6 @@ contains
         call nml_read(path_par,group,"tf_min",      opt%tf_min)
         call nml_read(path_par,group,"tf_max",      opt%tf_max)
         call nml_read(path_par,group,"tf_basins",   opt%tf_basins)
-
-        call nml_read(path_par,group,"cf_ref_wais", opt%cf_ref_wais)
         
         return
 

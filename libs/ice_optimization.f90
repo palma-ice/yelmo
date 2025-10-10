@@ -15,7 +15,6 @@ module ice_optimization
         real(wp) :: cf_min_par
         real(wp) :: tau_c 
         real(wp) :: H0
-        logical  :: scaleH
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
         character(len=56) :: fill_method 
@@ -84,8 +83,7 @@ contains
         call nml_read(path_par,group,"cf_init",     opt%cf_init)
         call nml_read(path_par,group,"cf_min",      opt%cf_min_par)
         call nml_read(path_par,group,"tau_c",       opt%tau_c)
-        call nml_read(path_par,group,"H0",          opt%H0)
-        call nml_read(path_par,group,"scaleH",      opt%scaleH)    
+        call nml_read(path_par,group,"H0",          opt%H0)   
         call nml_read(path_par,group,"sigma_err",   opt%sigma_err)   
         call nml_read(path_par,group,"sigma_vel",   opt%sigma_vel)   
         call nml_read(path_par,group,"fill_method", opt%fill_method)

@@ -165,7 +165,7 @@ contains
 
     end subroutine ydata_compare
 
-    subroutine ydata_load(dta,bnd,par_path,grad_lim_zb,dx,boundaries)
+    subroutine ydata_load(dta,bnd,par_path,grad_lim_zb,dx,boundaries,group)
 
         implicit none 
 
@@ -175,6 +175,7 @@ contains
         real(wp),           intent(IN)    :: grad_lim_zb
         real(wp),           intent(IN)    :: dx 
         character(len=*),   intent(IN)    :: boundaries 
+        character(len=*),  intent(IN), optional :: group
 
         ! Local variables 
         character(len=1028) :: filename 
@@ -182,8 +183,16 @@ contains
         real(wp)            :: z_bed_f_sd
         real(wp), allocatable :: z_bed_sd(:,:) 
         real(wp), allocatable :: tmp(:,:,:) 
+        character(len=32) :: nml_group
 
         real(wp), parameter :: z_sl_pd = 0.0_wp     ! [m] Define present day relative sea level as zero
+
+        ! Make sure we know the namelist group for the yelmo_init_topo block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "yelmo_init_topo"         ! Default parameter blcok name
+        end if
 
         ! Allocate temporary array for loading monthly data 
         allocate(z_bed_sd(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2)))
@@ -216,7 +225,7 @@ contains
                 ! parameter choice is the same for both cases. Perhaps this can
                 ! be improved though.
 
-                call nml_read(par_path,"yelmo_init_topo","z_bed_f_sd",z_bed_f_sd)
+                call nml_read(par_path,nml_group,"z_bed_f_sd",z_bed_f_sd)
 
                 ! Apply scaling to adjust z_bed depending on standard deviation
                 ! Use scaling suppied as input argument

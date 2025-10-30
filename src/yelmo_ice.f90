@@ -927,7 +927,7 @@ contains
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd,filename,dom%tpo%par%grad_lim_zb,dom%grd%dx,dom%tpo%par%boundaries)
+        call ydata_load(dom%dta,dom%bnd,filename,dom%tpo%par%grad_lim_zb,dom%grd%dx,dom%tpo%par%boundaries,group=dom%par%nml_init_topo)
 
         ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 

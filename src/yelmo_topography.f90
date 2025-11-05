@@ -781,14 +781,18 @@ end if
         end do
         end do
 
+        write(*,*) "i0 Hudson: ", 85, 85, tpo%now%H_ice(85,85), tpo%now%cmb(85,85), tpo%now%lsf(i,j)
+
         ! === LSF advection ===
         ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
                        tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
-        
+
         ! LSF should not affect points above sea level
         where(bnd%z_bed .gt. bnd%z_sl) tpo%now%lsf = -1.0_wp
+
+        write(*,*) "i1 Hudson: ", 85, 85, tpo%now%H_ice(85,85), tpo%now%cmb(85,85), tpo%now%lsf(i,j)
 
         ! === Calving ===
         ! Apply calving as a melt rate equal to ice thickness where lsf is positive
@@ -820,6 +824,8 @@ end if
         end do
         end do
 
+        write(*,*) "i2 Hudson: ", 85, 85, tpo%now%H_ice(85,85), tpo%now%cmb(85,85), tpo%now%lsf(i,j)
+        
         ! Apply rate and update ice thickness
         call apply_tendency(tpo%now%H_ice,tpo%now%cmb,dt,"calving_lsf",adjust_mb=.TRUE.)
 
@@ -827,11 +833,14 @@ end if
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
             bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
+        write(*,*) "i3 Hudson: ", 85, 85, tpo%now%H_ice(85,85), tpo%now%cmb(85,85), tpo%now%lsf(i,j)
+        
         ! Treat fractional points that are not connected to full ice-covered points
         call calc_G_remove_fractional_ice(mbal_now,tpo%now%H_ice,tpo%now%f_ice,dt)
 
         ! Apply rate and update ice thickness
-        mbal_now = 0.0_wp
+        !mbal_now = 0.0_wp  ! ajr, commented this out, as it is zeroed out above. Otherwise
+        ! the above fractional ice is not calculated and nothing should happen.
         call apply_tendency(tpo%now%H_ice,mbal_now,dt,"frac",adjust_mb=.TRUE.)
 
         ! Add this rate to calving tendency
@@ -840,6 +849,8 @@ end if
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                         bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
 
+        write(*,*) "i4 Hudson: ", 85, 85, tpo%now%H_ice(85,85), tpo%now%cmb(85,85), tpo%now%lsf(i,j)
+        
         ! reset LSF function after dt_lsf (only if dt_lsf is positive)
         if (tpo%par%dt_lsf .gt. 0.0) then
             if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
@@ -856,6 +867,8 @@ end if
                     where(tpo%now%H_ice .le. 0.0 .and. tpo%now%lsf .lt. 0.0 .and. bnd%z_bed .lt. bnd%z_sl) tpo%now%lsf = 1.0_wp
         end select 
 
+        write(*,*) "i5 Hudson: ", 85, 85, tpo%now%H_ice(85,85), tpo%now%cmb(85,85), tpo%now%lsf(i,j)
+        
         return
     
     end subroutine calc_ytopo_calving_lsf

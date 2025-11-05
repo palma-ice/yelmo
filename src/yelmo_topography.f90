@@ -853,7 +853,7 @@ end if
             case("equil")
                     ! Do nothing here
             case DEFAULT
-                    where(tpo%now%H_ice .le. 0.0 .and. tpo%now%lsf .lt. 0.0 .and. bnd%z_bed .lt. 0.0) tpo%now%lsf = 1.0_wp
+                    where(tpo%now%H_ice .le. 0.0 .and. tpo%now%lsf .lt. 0.0 .and. bnd%z_bed .lt. bnd%z_sl) tpo%now%lsf = 1.0_wp
         end select 
 
         return

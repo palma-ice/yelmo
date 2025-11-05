@@ -185,7 +185,7 @@ contains
         real(wp), allocatable :: tmp(:,:,:) 
         character(len=32) :: nml_group
 
-        real(wp), parameter :: z_sl_pd = 0.0_wp     ! [m] Define present day relative sea level as zero
+        real(wp), allocatable :: z_sl_pd(:,:)
 
         ! Make sure we know the namelist group for the yelmo_init_topo block
         if (present(group)) then
@@ -197,6 +197,9 @@ contains
         ! Allocate temporary array for loading monthly data 
         allocate(z_bed_sd(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2)))
         allocate(tmp(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2),12))
+        allocate(z_sl_pd(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2)))
+
+        z_sl_pd = 0.0_wp    ! [m] Define present day relative sea level as zero
 
         if (dta%par%pd_topo_load) then 
             ! Load present-day data from specified files and fields
@@ -266,7 +269,7 @@ contains
             dta%pd%H_grnd = dta%pd%H_ice - (bnd%c%rho_sw/bnd%c%rho_ice)*max(z_sl_pd-dta%pd%z_bed,0.0_wp)
 
             ! Calculate LSF
-            call LSFinit(dta%pd%lsf,dta%pd%H_ice,dta%pd%H_grnd,dx)
+            call LSFinit(dta%pd%lsf,dta%pd%H_ice,dta%pd%z_bed,z_sl_pd,dx)
 
             ! Define the mask to be consistent with internal mask_bed calculations
             dta%pd%mask_bed = mask_bed_ocean

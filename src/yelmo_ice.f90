@@ -1249,7 +1249,7 @@ contains
         !stop 
 
         ! Finally lets initialize the LSF mask
-        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice,dom%bnd%z_bed,dom%tpo%par%dx)
+        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice,dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%dx)
 
         return 
 

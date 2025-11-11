@@ -366,7 +366,8 @@ module yelmo_defs
     ! ydyn parameters
     type ydyn_param_class
 
-        character(len=256) :: solver 
+        character(len=256) :: solver
+        integer    :: uz_method
         integer    :: visc_method 
         real(wp)   :: visc_const 
         integer    :: beta_method

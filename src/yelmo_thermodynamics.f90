@@ -78,19 +78,18 @@ contains
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
-select case("nodes")
+        select case(thrm%par%qb_method)
+            case(1)     ! "aa" == simple stagger to aa-nodes directly
+                ! Calculate the basal frictional heating (from aa-nodes)
+                call calc_basal_heating_simplestagger(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                                    beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year)
+            case(2)   ! "nodes" == Gaussian quadrature to aa-node, default and best choice
+                ! Calculate the basal frictional heating (from quadrature-nodes)
+                call calc_basal_heating_nodes(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%f_ice, &
+                                beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year,boundaries=thrm%par%boundaries)
+            case DEFAULT
 
-    case("nodes")
-        ! Calculate the basal frictional heating (from quadrature-nodes)
-        call calc_basal_heating_nodes(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%f_ice, &
-                        beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year,boundaries=thrm%par%boundaries)
-
-    case("aa")
-        ! Calculate the basal frictional heating (from aa-nodes)
-        call calc_basal_heating_simplestagger(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                            beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year)
-
-end select
+        end select
         
         ! Calculate internal strain heating
 
@@ -643,6 +642,7 @@ end if
  
         ! Store local parameter values in output object
         call nml_read(filename,group,"method",         par%method,           init=init_pars)
+        call nml_read(filename,group,"qb_method",      par%qb_method,        init=init_pars)
         call nml_read(filename,group,"dt_method",      par%dt_method,        init=init_pars)
         call nml_read(filename,group,"solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,group,"gamma",          par%gamma,            init=init_pars)

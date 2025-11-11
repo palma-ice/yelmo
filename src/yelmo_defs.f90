@@ -634,6 +634,7 @@ module yelmo_defs
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
+        integer             :: qb_method
         character(len=256)  :: dt_method  
         character(len=256)  :: solver_advec 
         integer             :: nx, ny 

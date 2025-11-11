@@ -223,22 +223,22 @@ contains
         ! (using the Jacobian by default, most robust formulation) 
 
         select case(dyn%par%uz_method)
-        case(1)     ! "uz_aa"
-            call calc_uz_3D_aa(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-                                tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
-                                tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
-        case(2)     ! "uz_nodes" 
-            call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-                                tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
-                                tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
-        case(3)     ! "uz_jac" == this is the default method that is most stable
-            call calc_uz_3D_jac(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,dyn%now%jvel,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-                                tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
-                                tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
-        case DEFAULT
-            write(io_unit_err,*) "Error: calc_ydyn:: vertical velocity integration method not recognized."
-            write(io_unit_err,*) "ydyn.uz_method = ", dyn%par%uz_method
-            stop
+            case(1)     ! "uz_aa" == original, simplest formulation
+                call calc_uz_3D_aa(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                    tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                                    tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+            case(2)     ! "uz_nodes" == intermediate-level formulation
+                call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                    tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                                    tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+            case(3)     ! "uz_jac" == this is the default method that is most stable, most correct
+                call calc_uz_3D_jac(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,dyn%now%jvel,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                    tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                                    tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+            case DEFAULT
+                write(io_unit_err,*) "Error: calc_ydyn:: vertical velocity integration method not recognized."
+                write(io_unit_err,*) "ydyn.uz_method = ", dyn%par%uz_method
+                stop
         end select
         ! ===== Finish calculating velocity Jacobian (uz-dependent terms) ================
 

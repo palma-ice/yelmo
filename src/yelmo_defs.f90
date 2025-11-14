@@ -395,8 +395,10 @@ module yelmo_defs
         ! Till-scaling parameters
         integer    :: till_method 
         character(len=56) :: till_scale
+        integer    :: till_scale_T
         logical    :: till_is_angle
-        integer    :: till_n_sd 
+        integer    :: till_n_sd
+        real(wp)   :: till_T_min
         real(wp)   :: till_f_sed 
         real(wp)   :: till_sed_min
         real(wp)   :: till_sed_max

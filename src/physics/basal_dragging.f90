@@ -59,8 +59,8 @@ module basal_dragging
 
 contains 
     
-    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,f_sed,H_sed_min,H_sed_max, &
-                                            cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
+    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,T_prime_b,f_sed,H_sed_min,H_sed_max, &
+                                            cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method,till_scale_T,T_min)
         ! Update cb_ref [--] based on parameter choices
 
         implicit none
@@ -70,6 +70,7 @@ contains
         real(wp), intent(IN)  :: z_bed_sd(:,:)
         real(wp), intent(IN)  :: z_sl(:,:) 
         real(wp), intent(IN)  :: H_sed(:,:)
+        real(wp), intent(IN)  :: T_prime_b(:,:)
         real(wp), intent(IN)  :: f_sed 
         real(wp), intent(IN)  :: H_sed_min
         real(wp), intent(IN)  :: H_sed_max  
@@ -79,7 +80,9 @@ contains
         real(wp), intent(IN)  :: z1
         integer,  intent(IN) :: n_sd 
         character(len=*), intent(IN) :: till_scale
-        integer,  intent(IN) :: till_method
+        integer,  intent(IN)  :: till_method
+        integer,  intent(IN)  :: till_scale_T
+        real(wp), intent(IN)  :: T_min 
         
         ! Local variables
         integer :: q, i, j, nx, ny 
@@ -208,7 +211,7 @@ contains
                     if (lambda_bed .lt. 0.0) lambda_bed = 0.0
                     if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
 
-                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_min) to 1.0(H_sed=H_sed_max)
+                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_max) to 1.0(H_sed=H_sed_min)
                     lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
 
                     ! Apply scaling to cb_ref 
@@ -218,6 +221,43 @@ contains
                 end do
 
             end if 
+
+            ! Finally, apply thermodynamic scaling if desired
+            select case(till_scale_T)
+
+                case(0)
+                    ! No scaling with elevation, set reference value 
+                    ! Do nothing
+                case(1)
+                    ! Linear scaling to cf_ref as temperature approaches T_min
+                    
+                    if (T_min .ge. 0.0) then
+                        write(io_unit_err,*) "Error: calc_cb_ref:: T_min must be less than zero."
+                        write(io_unit_err,*) "ytill.T_min = ", T_min
+                    end if
+                    
+                    do j = 1, ny 
+                    do i = 1, nx 
+
+                        ! Get linear scaling as a function of distance from pressure melting point
+                        lambda_bed = (T_prime_b(i,j) - T_min) / (0.0-T_min)
+                        if (lambda_bed .lt. 0.0) lambda_bed = 0.0
+                        if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
+
+                        ! Get scaling factor ranging from f_sed(H_sed=H_sed_max) to 1.0(H_sed=H_sed_min)
+                        lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
+
+                        ! Apply scaling to cb_ref 
+                        cb_ref(i,j) = cb_ref(i,j) * lambda_bed + cf_ref * (1.0 - lambda_bed)
+
+                    end do
+                    end do
+
+                case DEFAULT
+                    write(io_unit_err,*) "Error: calc_cb_ref:: scale_T choice not recognized."
+                    write(io_unit_err,*) "ytill.scale_T = ", till_scale_T
+                    stop
+            end select
 
         end if 
 

@@ -235,7 +235,7 @@ contains
                         write(io_unit_err,*) "Error: calc_cb_ref:: T_min must be less than zero."
                         write(io_unit_err,*) "ytill.T_min = ", T_min
                     end if
-                    
+
                     do j = 1, ny 
                     do i = 1, nx 
 
@@ -243,10 +243,7 @@ contains
                         lambda_bed = (T_prime_b(i,j) - T_min) / (0.0-T_min)
                         if (lambda_bed .lt. 0.0) lambda_bed = 0.0
                         if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
-
-                        ! Get scaling factor ranging from f_sed(H_sed=H_sed_max) to 1.0(H_sed=H_sed_min)
-                        lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
-
+                        
                         ! Apply scaling to cb_ref 
                         cb_ref(i,j) = cb_ref(i,j) * lambda_bed + cf_ref * (1.0 - lambda_bed)
 

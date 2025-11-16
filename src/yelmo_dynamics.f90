@@ -119,22 +119,22 @@ contains
 
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
-
-        ! Calculate cb_tgt (cb_ref target value) - same as cb_ref, but always calculated,
-        ! even if till_method=-1
-        call calc_cb_ref(dyn%now%cb_tgt,bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%H_sed,thrm%now%T_prime_b,dyn%par%till_f_sed,dyn%par%till_sed_min, &
-                                            dyn%par%till_sed_max,dyn%par%till_cf_ref,dyn%par%till_cf_min,dyn%par%till_z0, &
-                                            dyn%par%till_z1,dyn%par%till_n_sd,dyn%par%till_scale, 1, &
-                                            dyn%par%till_scale_T,dyn%par%till_T_min)
-
+        
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
-        call calc_cb_ref(dyn%now%cb_ref,bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%H_sed,thrm%now%T_prime_b,dyn%par%till_f_sed,dyn%par%till_sed_min, &
-                                            dyn%par%till_sed_max,dyn%par%till_cf_ref,dyn%par%till_cf_min,dyn%par%till_z0, &
-                                            dyn%par%till_z1,dyn%par%till_n_sd,dyn%par%till_scale,dyn%par%till_method, &
-                                            dyn%par%till_scale_T,dyn%par%till_T_min)
+
+        ! First calculate cb_tgt, to be used for comparision or optimization purposes
+        call calc_cb_ref(dyn%now%cb_tgt,bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%H_sed,dyn%par%till_f_sed, &
+                dyn%par%till_sed_min,dyn%par%till_sed_max,dyn%par%till_cf_ref,dyn%par%till_cf_min, &
+                dyn%par%till_z0,dyn%par%till_z1,dyn%par%till_n_sd,dyn%par%till_scale_zb, dyn%par%till_scale_sed)
+
+        if (dyn%par%till_method .eq. 1) then
+            ! Calculate friction coefficient online, so set current friction equal to cb_tgt
+            dyn%now%cb_ref = dyn%now%cb_tgt
+        end if
 
         ! Finally calculate c_bed, which is simply c_bed = f(N_eff,cb_ref)
-        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,dyn%par%till_is_angle)
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,thrm%now%T_prime_b, &
+                dyn%par%till_is_angle,dyn%par%till_cf_ref,dyn%par%T_frz,dyn%par%scale_T)
 
         ! ===== Calculate the 3D horizontal velocity field and helper variables =======================
         ! The variables to be obtained from these routines are:
@@ -1047,6 +1047,8 @@ contains
         call nml_read(filename,group_ydyn,"H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
         call nml_read(filename,group_ydyn,"beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,group_ydyn,"eps_0",              par%eps_0,              init=init_pars)
+        call nml_read(filename,group_ydyn,"scale_T",            par%scale_T,            init=init_pars)
+        call nml_read(filename,group_ydyn,"T_frz",              par%T_frz,              init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
@@ -1059,11 +1061,10 @@ contains
         call nml_read(filename,group_ydyn,"cb_sia",             par%cb_sia,             init=init_pars)
         
         call nml_read(filename,group_ytill,"method",            par%till_method,        init=init_pars)
-        call nml_read(filename,group_ytill,"scale",             par%till_scale,         init=init_pars)
-        call nml_read(filename,group_ytill,"scale_T",           par%till_scale_T,       init=init_pars)
+        call nml_read(filename,group_ytill,"scale_zb",          par%till_scale_zb,      init=init_pars)
+        call nml_read(filename,group_ytill,"scale_sed",         par%till_scale_sed,     init=init_pars)
         call nml_read(filename,group_ytill,"is_angle",          par%till_is_angle,      init=init_pars)
         call nml_read(filename,group_ytill,"n_sd",              par%till_n_sd,          init=init_pars)
-        call nml_read(filename,group_ytill,"T_min",             par%till_T_min,         init=init_pars)
         call nml_read(filename,group_ytill,"f_sed",             par%till_f_sed,         init=init_pars)
         call nml_read(filename,group_ytill,"sed_min",           par%till_sed_min,       init=init_pars)
         call nml_read(filename,group_ytill,"sed_max",           par%till_sed_max,       init=init_pars)

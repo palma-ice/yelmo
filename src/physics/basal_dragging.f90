@@ -82,13 +82,13 @@ contains
         integer,  intent(IN)  :: scale_sed
         
         ! Local variables
-        integer :: q, i, j, nx, ny 
+        integer  :: q, i, j, nx, ny
         real(wp) :: f_sd_min, f_sd_max
         real(wp) :: lambda_bed
-        real(wp), allocatable :: cb_ref_samples(:) 
-        real(wp), allocatable :: f_sd(:) 
-        real(wp), allocatable :: w_sd(:) 
-        integer :: scale_sed_now
+        real(wp) :: cb_ref_now
+        real(wp), allocatable :: cb_ref_samples(:)
+        real(wp), allocatable :: f_sd(:)
+        real(wp), allocatable :: w_sd(:)
 
         nx = size(cb_ref,1)
         ny = size(cb_ref,2)
@@ -132,7 +132,7 @@ contains
 
         ! Next, scale according to sediment parameterization too.
 
-        ! == Elevation scaling == 
+        ! === Elevation scaling ===
 
         select case(scale_zb)
 
@@ -196,16 +196,9 @@ contains
                 
         end select 
         
-        ! == Sediment scaling ==
+        ! === Sediment scaling ===
 
-        ! Disable sed scaling if f_sed is actually set to 1.0, since it would do nothing
-        if (f_sed .eq. 1.0) then
-            scale_sed_now = 0
-        else
-            scale_sed_now = scale_sed
-        end if
-
-        select case(scale_sed_now)
+        select case(scale_sed)
 
             case(0)
                 ! No sediment scaling
@@ -213,6 +206,7 @@ contains
             case(1)
                 ! Sediment scaling:
                 ! Apply minimum of sed scaling and current cb_ref
+                ! sed scaling also goes from cf_ref to cf_min
 
                 do j = 1, ny 
                 do i = 1, nx 
@@ -222,13 +216,12 @@ contains
                     if (lambda_bed .lt. 0.0) lambda_bed = 0.0
                     if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
 
-                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_max) to 1.0(H_sed=H_sed_min)
-                    lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
+                    ! Convert range 0:1 => cf_min:cf_ref
+                    cb_ref_now = cf_min*lambda_bed + cf_ref*(1.0-lambda_bed)
 
-                    ! Apply minimum of sed scaling and current cb_ref, limit to cf_min
-                    cb_ref(i,j) = min(cb_ref(i,j), cf_ref*lambda_bed)
-                    if (cb_ref(i,j) .lt. cf_min) cb_ref(i,j) = cf_min
-
+                    ! Apply minimum of previous cb_ref and sed scaling, should be limited to cf_min:cf_ref
+                    cb_ref(i,j) = min(cb_ref(i,j), cb_ref_now)
+                    
                 end do
                 end do
 
@@ -246,7 +239,7 @@ contains
                     if (lambda_bed .lt. 0.0) lambda_bed = 0.0
                     if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
 
-                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_max) to 1.0(H_sed=H_sed_min)
+                    ! Get scaling factor ranging from 1.0(H_sed=H_sed_min) down to f_sed(H_sed=H_sed_max)
                     lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
 
                     ! Apply sed scaling to current cb_ref, as additional factor

@@ -119,7 +119,7 @@ contains
 
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
-        
+
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
 
         ! First calculate cb_tgt, to be used for comparision or optimization purposes

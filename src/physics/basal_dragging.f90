@@ -267,7 +267,7 @@ contains
         return 
 
     end subroutine calc_cb_ref
-
+    
     subroutine calc_c_bed(c_bed,cb_ref,N_eff,T_prime_b,is_angle,cf_ref,T_frz,scale_T)
 
         implicit none 
@@ -277,7 +277,7 @@ contains
         real(wp), intent(IN)  :: N_eff(:,:)         ! [Pa]
         real(wp), intent(IN)  :: T_prime_b(:,:)     ! [degC]
         logical,  intent(IN)  :: is_angle           ! Is cb_ref a till strength angle? 
-        real(wp), intent(IN)  :: cf_ref             ! [-- or deg] reference (maximum) friction coefficient
+        real(wp), intent(IN)  :: cf_ref             ! [-] or [degrees] reference (maximum) friction coefficient
         real(wp), intent(IN)  :: T_frz              ! [degC] Minimum temperature of temperate range
         integer,  intent(IN)  :: scale_T            ! Scale up friction for frozen ice?
         

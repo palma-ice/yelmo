@@ -5,7 +5,7 @@
     time_end        = 20e3              ! [yr] Ending time
     time_equil      = 0e3               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
-    
+
     with_ice_sheet  = True              ! Active ice-sheet component? 
     equil_method    = "opt"             ! "none", "relax", "opt"
 
@@ -242,7 +242,7 @@
     z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.1              ! [-- or deg] Minimum value of cf
-    cf_ref          =  1.0              ! [-- or deg] Reference/const/max value of cf
+    cf_ref          =  0.8              ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
@@ -268,8 +268,8 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 2.0           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 1.0
-    enh_stream              = 1.0
+    enh_shear               = 3.0
+    enh_stream              = 3.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")

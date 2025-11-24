@@ -12,7 +12,6 @@ module ice_optimization
         real(wp) :: cf_time_init
         real(wp) :: cf_time_end
         real(wp) :: cf_init
-        real(wp) :: cf_min_par
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
@@ -81,7 +80,6 @@ contains
         call nml_read(path_par,group,"cf_time_init",opt%cf_time_init)
         call nml_read(path_par,group,"cf_time_end", opt%cf_time_end)
         call nml_read(path_par,group,"cf_init",     opt%cf_init)
-        call nml_read(path_par,group,"cf_min",      opt%cf_min_par)
         call nml_read(path_par,group,"tau_c",       opt%tau_c)
         call nml_read(path_par,group,"H0",          opt%H0)   
         call nml_read(path_par,group,"sigma_err",   opt%sigma_err)   
@@ -460,6 +458,8 @@ contains
 
         logical :: scaleH                   ! Scale ice thickness in opt with observation.
         
+        real(dp), parameter :: eps = 1.0e-12_dp
+        
         ! Check parameters
         if (H0 .le. 0.0) then
             scaleH = .TRUE.         ! Scale ice thickness in opt with observation.
@@ -565,7 +565,7 @@ contains
 
                 ! Determine scaling correction with respect to target cb_ref value, if desired
                 if (present(cb_tgt)) then
-                    cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
+                    cb_tgt_fac = log( (cb_prev(i,j)+eps) / (cb_tgt(i,j)+eps) )
                 else 
                     cb_tgt_fac = 0.0 
                 end if 

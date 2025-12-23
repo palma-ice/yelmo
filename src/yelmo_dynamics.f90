@@ -6,7 +6,7 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D, &
-                            aa_to_nodes, get_neighbor_indices
+                            boundary_code, get_neighbor_indices_bc_codes
 
     use deformation, only : calc_jacobian_vel_3D_uxyterms, calc_jacobian_vel_3D_uzterms, &
                             calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
@@ -31,8 +31,7 @@ module yelmo_dynamics
     use basal_dragging  
     use grounding_line_flux 
 
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes, &
-                                    gq3D_class, gq3D_init, gq3D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
     
@@ -848,6 +847,8 @@ contains
 
         type(gq2D_class) :: gq2D
 
+        integer :: BC
+
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
 
@@ -879,6 +880,9 @@ contains
 
         nx = size(dyn%now%N_eff,1)
         ny = size(dyn%now%N_eff,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(dyn%par%boundaries)
 
         ! Set local variable: number of interpolation points in cell [nxi x nxi]
         if (dyn%par%neff_nxi .eq. 0) then
@@ -919,7 +923,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,dyn%par%boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 select case(dyn%par%neff_method)
 
@@ -952,8 +956,7 @@ contains
                         ! Subgrid interpolation using Gaussian quadrature (nxi=4 points)
 
                         ! Get H_w on Gaussian quadrature points
-                        !call aa_to_nodes(Hw_int(1,:),thrm%now%H_w,i,j,xn,yn,im1,ip1,jm1,jp1)
-                        call gq2D_to_nodes(gq2D,Hw_int(1,:),thrm%now%H_w,dyn%par%dx,dyn%par%dy,"aa",i,j,im1,ip1,jm1,jp1)
+                        call gq2D_to_nodes_aa(gq2D,Hw_int(1,:),thrm%now%H_w,dyn%par%dx,dyn%par%dy,i,j,im1,ip1,jm1,jp1)
                     
                         call calc_effective_pressure_till(Neff_int,Hw_int,H_eff,tpo%now%f_ice_dyn(i,j),tpo%now%f_grnd(i,j), &
                                                     H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc,bnd%c%rho_ice,bnd%c%g)

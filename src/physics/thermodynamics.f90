@@ -6,9 +6,10 @@ module thermodynamics
 
     use yelmo_defs, only : wp, dp, pi, TOL_UNDERFLOW 
 
-    use yelmo_tools, only : get_neighbor_indices, set_boundaries_3D_aa
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes, set_boundaries_3D_aa
     
-    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes
+    use gaussian_quadrature, only : gq2D_class, gq2D_init, gq2D_to_nodes_aa, &
+                                    gq2D_to_nodes_acx, gq2D_to_nodes_acy
 
     implicit none 
 
@@ -269,11 +270,12 @@ contains
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
-        integer :: k, nx, ny, nz_aa 
-        integer :: im1, ip1, jm1, jp1
+        integer  :: k, nx, ny, nz_aa 
+        integer  :: im1, ip1, jm1, jp1
         real(wp) :: ux_aa, uy_aa 
         real(wp) :: dx_inv, dx_inv2
         real(wp) :: advecx, advecy, advec_rev 
+        integer  :: BC
 
         ! Define some constants 
         dx_inv  = 1.0_wp / dx 
@@ -283,12 +285,15 @@ contains
         ny  = size(var_ice,2)
         nz_aa = size(var_ice,3) 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         advecx  = 0.0 
         advecy  = 0.0 
         advecxy = 0.0 
 
         ! Get neighbor indices
-        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+        call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
         ! Loop over each point in the column
         do k = 1, nz_aa 
@@ -613,7 +618,8 @@ contains
         integer  :: i, j, k, nx, ny, nz, n 
         integer  :: im1, ip1, jm1, jp1 
         real(dp) :: dQsdT_x, dQsdT_y, dQsdT_z
-        
+        integer  :: BC
+
         real(dp), allocatable :: Qs(:,:,:)
 
         real(wp), parameter :: eps = 1e-5
@@ -621,6 +627,9 @@ contains
         nx = size(Q_strn,1)
         ny = size(Q_strn,2)
         nz = size(Q_strn,3)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Get strain heating in units of K/yr
         ! [J yr-1 m-3] / ([kg m-3]*[J/kg/K]) => [K/yr]
@@ -637,7 +646,7 @@ contains
                 ! Fully ice-covered point 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 do k = 1, nz
 
@@ -725,6 +734,7 @@ contains
 
         type(gq2D_class) :: gq2D
         real(wp) :: dx_tmp, dy_tmp
+        integer  :: BC
 
         ! Initialize gaussian quadrature calculations
         call gq2D_init(gq2D)
@@ -734,6 +744,9 @@ contains
         nx = size(Q_b,1)
         ny = size(Q_b,2)
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         do j = 1, ny 
         do i = 1, nx
 
@@ -741,15 +754,15 @@ contains
                 ! Fully ice-covered point 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get basal velocity and basal stress components on nodes
 
-                call gq2D_to_nodes(gq2D,uxbn,ux_b,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,uybn,uy_b,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,uxbn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,uybn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                 
-                call gq2D_to_nodes(gq2D,taubxn,taub_acx,dx_tmp,dy_tmp,"acx",i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes(gq2D,taubyn,taub_acy,dx_tmp,dy_tmp,"acy",i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2D,taubxn,taub_acx,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2D,taubyn,taub_acy,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                 
                 ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
                 Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )

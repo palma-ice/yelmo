@@ -1,7 +1,7 @@
 module solver_ssa_ac
 
-    use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL, TOL_UNDERFLOW, is_equal
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
 
     use solver_linear
     use ncio        ! For diagnostic outputting only 
@@ -404,7 +404,7 @@ contains
             else if (ssa_mask_acx(i,j) .eq. 3) then 
                 ! Lateral boundary condition should be applied here 
 
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                if (is_equal(f_ice(i,j),1.0_wp) .and. f_ice(ip1,j) .lt. 1.0) then 
                     ! === Case 1: ice-free to the right ===
 
                     N_aa_now = N_aa(i,j)
@@ -687,7 +687,7 @@ contains
             else if (ssa_mask_acy(i,j) .eq. 3) then 
                 ! Lateral boundary condition should be applied here 
 
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                if (is_equal(f_ice(i,j),1.0) .and. f_ice(i,jp1) .lt. 1.0) then 
                     ! === Case 1: ice-free to the top ===
 
                     N_aa_now = N_aa(i,j)
@@ -992,11 +992,11 @@ contains
 
                 ! == x-direction ===
 
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then
+                if (is_equal(f_ice(i,j),1.0_wp) .or. is_equal(f_ice(ip1,j),1.0_wp)) then
                 
                     ! Current ac-node is border of an ice covered cell in x-direction
                     
-                    if (f_grnd(i,j) .gt. 0.0 .or. f_grnd(ip1,j) .gt. 0.0) then 
+                    if (f_grnd(i,j) .gt. 0.0_wp .or. f_grnd(ip1,j) .gt. 0.0_wp) then 
                         ! Grounded ice or grounding line (ie, shelfy-stream)
                         ssa_mask_acx(i,j) = 1
                     else 
@@ -1008,7 +1008,7 @@ contains
                     ! then set ssa mask to zero (ie, set velocity to zero)
                     if (ssa_mask_acx(i,j) .eq. 2) then 
 
-                        if ( f_grnd(i,j) .eq. 0.0 .and. &
+                        if ( is_equal(f_grnd(i,j),0.0_wp) .and. &
                                (f_grnd(ip1,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) ) then 
 
                             ssa_mask_acx(i,j) = 0
@@ -1044,7 +1044,7 @@ contains
 
                 ! == y-direction ===
 
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
+                if (is_equal(f_ice(i,j),1.0_wp) .or. is_equal(f_ice(i,jp1),1.0_wp)) then
                 
                     ! Current ac-node is border of an ice covered cell in x-direction
                     
@@ -1171,9 +1171,13 @@ contains
         integer :: i, j, k
         integer :: im1, ip1, jm1, jp1 
         integer :: nx, ny 
+        integer :: BC
 
         nx = size(visc,1)
         ny = size(visc,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialisation
         visc_ab = 0.0_wp 
@@ -1183,27 +1187,27 @@ contains
         do j = 1, ny 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             visc_ab(i,j) = 0.0_wp
             k=0
 
-            if (f_ice(i,j) .eq. 1.0) then
+            if (is_equal(f_ice(i,j),1.0_wp)) then
                 k = k+1                              ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(i,j)
             end if
 
-            if (f_ice(ip1,j) .eq. 1.0) then
+            if (is_equal(f_ice(ip1,j),1.0_wp)) then
                 k = k+1                                  ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(ip1,j)
             end if
 
-            if (f_ice(i,jp1) .eq. 1.0) then
+            if (is_equal(f_ice(i,jp1),1.0_wp)) then
                 k = k+1                                  ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(i,jp1)
             end if
 
-            if (f_ice(ip1,jp1) .eq. 1.0) then
+            if (is_equal(f_ice(ip1,jp1),1.0_wp)) then
                 k = k+1                                      ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(ip1,jp1)
             end if

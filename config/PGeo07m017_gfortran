@@ -29,7 +29,7 @@ ifeq ($(openmp), 1)
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
-    FFLAGS  = -I$(objdir) -J$(objdir) -ffree-line-length-none -fomit-frame-pointer -fopenmp 
+    FFLAGS  = -I$(objdir) -J$(objdir) -ffree-line-length-none -fopenmp 
 endif 
 
 # Define which linear solvers to include (LIS necessary, PETSC optional)
@@ -43,7 +43,7 @@ endif
 
 LFLAGS  = $(LIB_NC) $(LIB_FESMUTILS) $(LIB_LINEAR)
 
-DFLAGS_NODEBUG = -O2
+DFLAGS_NODEBUG = -O2 -march=native
 DFLAGS_DEBUG   = -w -g -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG
 DFLAGS_PROFILE = -O2 -p -ggdb
 

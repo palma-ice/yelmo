@@ -38,6 +38,8 @@ program yelmo_benchmarks
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
+    logical, parameter :: sym_test_with_shelves = .FALSE. 
+
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
 
@@ -172,11 +174,11 @@ program yelmo_benchmarks
         case DEFAULT 
             ! EISMINT1, EISMINT2, HALFAR, BUELER 
 
-if (.TRUE.) then
-            ! Use flat bed as expected by EISMINT experiments
+            ! By default, use flat bed as expected by EISMINT experiments
             yelmo1%bnd%z_bed     = 0.0_wp
-else
-            ! Use MISMIP-like sloping bedrock
+
+if (sym_test_with_shelves) then
+            ! Use MISMIP-like sloping bedrock for symmetry testing
             yelmo1%bnd%z_bed  = 220.0 - 778.50*(sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0
 end if
 
@@ -333,8 +335,8 @@ end if
         yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
             
     end if 
-    if (.FALSE.) then
-        ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+    if (sym_test_with_shelves) then
+        ! Set conditions similar to EISMINT2-EXPA with smaller radius and floating ice shelves
         call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_wp,H0=1000.0_wp,H0_shlf=200.0_wp,rmax_shlf=0.6_wp)
         yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
     end if 
@@ -557,7 +559,7 @@ contains
         call nc_write(filename,"dt_adv3D",ylmo%time%dt_adv3D,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
-        qtot = 19
+        qtot = 20
         allocate(vnms(qtot))
         vnms(1) = "H_ice"
         vnms(2) = "z_srf"
@@ -578,6 +580,7 @@ contains
         vnms(17) = "f_ice_dyn"
         vnms(18) = "N_eff"
         vnms(19) = "cmb"
+        vnms(20) = "mask_frnt"
 
         do q = 1, qtot
             call yelmo_write_var(filename,vnms(q),ylmo,n,ncid)

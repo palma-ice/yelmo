@@ -3,7 +3,7 @@ module calving_aa
     ! This will be used for mass balance calving 
 
     use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
     use topography, only : calc_H_eff 
 
     implicit none 
@@ -58,15 +58,20 @@ contains
         real(wp) :: H_eff 
         real(wp) :: wt 
         
+        integer  :: BC
+
         nx = size(mb_calv,1)
         ny = size(mb_calv,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,wt)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Count number of grounded ice-covered neighbors
             n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
@@ -127,16 +132,20 @@ contains
         integer  :: n_mrgn, n_grnd
         real(wp) :: H_eff 
         logical  :: embayed 
+        integer  :: BC
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,embayed)
         do j = 1, ny 
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Count number of grounded ice-covered neighbors
             n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
@@ -336,11 +345,14 @@ contains
         integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_eff
         integer  :: wt 
+        integer  :: BC
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
             
-            
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         ! Initially set calving rate to zero 
         mb_calv = 0.0 
 
@@ -349,7 +361,7 @@ contains
         do i=1,nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point
@@ -443,7 +455,8 @@ contains
         real(wp) :: calv_now
         real(wp) :: H_eff 
         real(wp) :: wt
-        
+        integer  :: BC
+
         real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
 
         nx = size(H_ice,1)
@@ -452,14 +465,17 @@ contains
         ! Assume square grid cells 
         dy = dx 
 
-        mb_calv = 0.0_wp
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
+        mb_calv = 0.0_wp
+        
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
         do j = 1, ny
         do i = 1, nx  
             
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point, calculate calving rate at the margin 
@@ -543,7 +559,8 @@ contains
         real(wp) :: eps_eig_1_now, eps_eig_2_now
         real(wp) :: eps_eff_neighb(4)
         real(wp) :: wt
-        
+        integer  :: BC
+
         real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
 
         nx = size(H_ice,1)
@@ -552,6 +569,9 @@ contains
         ! Assume square grid cells 
         dy = dx 
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         mb_calv = 0.0_wp
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
@@ -559,7 +579,7 @@ contains
         do i = 1, nx  
             
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point, calculate calving rate at the margin 
@@ -619,16 +639,20 @@ contains
         integer  :: i, j, nx, ny, n  
         integer  :: im1, jm1, ip1, jp1 
         real(wp) :: eps_eff_neighb(4)
+        integer  :: BC
 
         nx = size(eps_eff,1)
         ny = size(eps_eff,2) 
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,eps_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if (f_ice(i,j) .eq. 0.0_wp) then 
                 ! Ice-free point, no strain
@@ -685,16 +709,20 @@ contains
         integer  :: i, j, nx, ny, n  
         integer  :: im1, jm1, ip1, jp1 
         real(wp) :: tau_eff_neighb(4) 
+        integer  :: BC
 
         nx = size(tau_eff,1)
         ny = size(tau_eff,2) 
         
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,tau_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             if (f_ice(i,j) .eq. 0.0_wp) then 
                 ! Ice-free point, no stress
@@ -792,6 +820,7 @@ contains
         real(wp), parameter :: r     = 0.0                ! [--] Crevasse fraction 
         
         logical  :: mask_neighb(4) 
+        integer  :: BC
 
         rho_ice_g  = rho_ice * g 
         rho_sw_ice = rho_sw / rho_ice 
@@ -799,6 +828,9 @@ contains
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Intialize calving rate to zero 
         mb_calv = 0.0 
@@ -808,7 +840,7 @@ contains
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
             ! Check if neighbors are ice free and not at higher bedrock elevation
             mask_neighb = ([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .and. &
@@ -883,9 +915,13 @@ contains
         real(wp) :: f_scale 
         real(wp) :: H_eff
         logical  :: is_grnd_margin 
+        integer  :: BC
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Intialize calving rate to zero 
         mb_calv = 0.0 
@@ -898,7 +934,7 @@ contains
             do i = 1, nx 
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
             
                 ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
                 is_grnd_margin = (f_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &

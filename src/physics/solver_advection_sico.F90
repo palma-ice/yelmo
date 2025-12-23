@@ -1,7 +1,7 @@
 module solver_advection_sico
 
     use yelmo_defs, only : sp, dp, wp, io_unit_err 
-    use yelmo_tools, only : get_neighbor_indices
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
     use solver_linear
 
     implicit none 

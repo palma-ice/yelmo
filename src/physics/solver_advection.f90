@@ -1,7 +1,7 @@
 module solver_advection
     
     use yelmo_defs, only : sp, dp, wp, tol_underflow, io_unit_err
-    use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_nodes_aa_ab_ice
+    use yelmo_tools, only : boundary_code, get_neighbor_indices_bc_codes
     
     use solver_linear
     use solver_advection_sico, only : calc_adv2D_expl_sico, calc_adv2D_impl_sico
@@ -174,6 +174,8 @@ contains
 
         real(wp), parameter :: WOVI = 1.0     ! Weighting parameter for the over-implicit scheme 
 
+        integer :: BC
+
         nx = size(H,1)
         ny = size(H,2) 
 
@@ -247,11 +249,14 @@ contains
         Hy_1 = 0.0
         Hy_2 = 0.0
 
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
+
         do j = 1, ny
         do i = 1, nx 
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Get velocity components on each cell face 
             ux_1(i,j) = ux(im1,j)
@@ -565,8 +570,13 @@ contains
 
         real(wp), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
 
+        integer  :: BC
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+        
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialize dHdt 
         allocate(dHdt(nx,ny))
@@ -583,7 +593,7 @@ contains
         do j = 1, ny
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Get ab-node weighting based on whether ice is present 
             wt_ab = 0.0_wp 
@@ -660,7 +670,7 @@ if (.FALSE.) then
         do j = 1, ny
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             !im2 = max(i-2,1)
             !ip2 = min(i+2,nx)
@@ -731,9 +741,13 @@ end if
         real(wp), allocatable :: dHdt(:,:)                  ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
         real(wp), allocatable :: f_ice_now(:,:)
         real(wp), parameter :: dHdt_lim = 1e3               ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
+        integer  :: BC
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialize dHdt 
         allocate(dHdt(nx,ny))
@@ -746,7 +760,7 @@ end if
         do i = 1, nx
         
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Get the ice thickness on ab-nodes
             call stagger_nodes_aa_ab_ice(H_ab,H_ice,f_ice_now,i,j)
@@ -803,8 +817,13 @@ end if
 
         real(wp), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
 
+        integer  :: BC
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Initialize dHdt 
         allocate(dHdt(nx,ny))
@@ -814,7 +833,7 @@ end if
         do i = 1, nx
         
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             ! Calculate the flux across each boundary [m^2 a^-1]
             if (ux(i,j) .gt. 0.0) then 
@@ -898,6 +917,8 @@ end if
         logical,    parameter :: use_upwind = .TRUE.  ! Apply upwind advection scheme or central scheme?   
                                                       ! (now this is redundant with f_upwind parameter) 
         
+        integer  :: BC 
+
         ! Note: f_upwind=0.6 gives good agreement with EISMINT1 summit elevation
         ! for the moving and fixed margin experiments, when using the calc_shear_3D approach.
         ! (f_upwind=0.5, ie central method, works well when using the velocity_sia approach)
@@ -907,6 +928,9 @@ end if
         ! Determine array size
         nx = size(H,1)
         ny = size(H,2)
+
+        ! Set boundary condition code
+        BC = boundary_code(boundaries)
 
         ! Allocate local arrays
         allocate(crelax(nx,ny))
@@ -996,7 +1020,7 @@ end if
         do i = 1, nx
 
             ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
             !  sous diagonale en x
             ux_im1 = ux(im1,j)
@@ -1050,7 +1074,7 @@ end if
             do i = 1, nx
 
                 ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 reste = (((arelax(i,j)*H(im1,j) + drelax(i,j)*H(i,jm1)) &
                         + (brelax(i,j)*H(ip1,j) + erelax(i,j)*H(i,jp1))) &
@@ -1091,5 +1115,139 @@ end if
         return
 
     end subroutine calc_adv2D_impl_upwind
+
+    ! Routines imported from yelmo_tools as they are only used in this module now,
+    ! and should eventually be replaced! ajr, 2025-07-21
+
+    subroutine stagger_nodes_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
+        ! Stagger from aca nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab(4)
+        real(wp), intent(IN)  :: u_aa(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        logical, optional :: check_underflow
+
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(ip1,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(1) = u_ab(1) / wt 
+        end if 
+
+        ! (2) Upper-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(im1,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(2) = u_ab(2) / wt 
+        end if 
+
+        ! (3) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(im1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(3) = u_ab(3) / wt 
+        end if 
+
+        ! (4) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(ip1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(4) = u_ab(4) / wt 
+        end if 
+
+        if (present(check_underflow)) then 
+            if (check_underflow) then 
+                where (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+            end if 
+        end if 
+        
+        return 
+
+    end subroutine stagger_nodes_aa_ab_ice
 
 end module solver_advection

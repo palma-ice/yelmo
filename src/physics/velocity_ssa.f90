@@ -385,8 +385,8 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
-        type(gq2D_class) :: gq2D
-        type(gq3D_class) :: gq3D
+        type(gq2D_class) :: gq2D, gq2D_global
+        type(gq3D_class) :: gq3D, gq3D_global
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .FALSE.
@@ -394,8 +394,8 @@ end if
         integer :: BC 
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
-        if (use_gq3D) call gq3D_init(gq3D)
+        call gq2D_init(gq2D_global)
+        if (use_gq3D) call gq3D_init(gq3D_global)
 
         nx = size(visc,1)
         ny = size(visc,2)
@@ -432,8 +432,13 @@ end if
 
         visc = visc_min
 
-        !!$omp parallel do collapse(2) private(i,j,im1,jm1,ip1,jp1,k,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn) &
-        !!$omp& private(eps_sq_n,ATTn,dudxn8,dudyn8,dvdxn8,dvdyn8,dudzn8,dvdzn8,eps_sq_n8,ATTn8,viscn8)
+        !$omp parallel private(i,j,im1,jm1,ip1,jp1,k,km1,kp1,dudxn,dudyn,dvdxn,dvdyn,viscn,gq2D,gq3D) &
+        !$omp& private(eps_sq_n,ATTn,dz0,dz1,dudxn8,dudyn8,dvdxn8,dvdyn8,eps_sq_n8,ATTn8,viscn8) &
+        !$omp& shared(gq2D_global,gq3D_global)
+        gq2D = gq2D_global
+        gq3D = gq3D_global
+
+        !$omp do collapse(2)
         do i = 1, nx
         do j = 1, ny  
 
@@ -464,7 +469,7 @@ if (.not. use_gq3D) then
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
-                    visc(i,j,k) = sum(viscn*gq2D%wt)/gq2D%wt_tot
+                    visc(i,j,k) = sum(viscn*gq2d%wt)/gq2d%wt_tot
 
                 end do
 
@@ -491,22 +496,22 @@ else
                     end if
                     
                     ! Get horizontal strain rate terms
-                    call gq3D_to_nodes_acx(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acx(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
-                    call gq3D_to_nodes_acy(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acy(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq3D_to_nodes_aa(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_aa(gq3d,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
-                    visc(i,j,k) = sum(viscn8*gq3D%wt)/gq3D%wt_tot
+                    visc(i,j,k) = sum(viscn8*gq3d%wt)/gq3d%wt_tot
                 end do
 
 end if
@@ -515,7 +520,8 @@ end if
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end do
+        !$omp end parallel
 
         return
 

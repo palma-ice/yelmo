@@ -68,6 +68,7 @@ contains
 
         logical, parameter :: write_ssa_diagnostics = .FALSE.
 
+
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
         nz_aa = dyn%par%nz_aa 

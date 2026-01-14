@@ -54,7 +54,7 @@ contains
         nx = size(eps_eff,1)
         ny = size(eps_eff,2) 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,eps_eff_neighb)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,eps_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -94,7 +94,7 @@ contains
             
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -124,7 +124,7 @@ contains
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,tau_eff_neighb)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,tau_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -165,7 +165,7 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -218,7 +218,7 @@ contains
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
-        !!$omp end parallel do
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_acx,H_acy,wv_acx,wv_acy)
         do j = 1, ny
         do i = 1, nx
             call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
@@ -250,6 +250,7 @@ contains
 
         end do
         end do
+        !$omp end parallel do
     
         return
         
@@ -278,7 +279,7 @@ contains
         nx = size(u_acx,1)
         ny = size(u_acx,2) 
 
-        !!$omp end parallel do
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,tau1_acx,tau1_acy,wv_acx,wv_acy)
         do j = 1, ny
             do i = 1, nx
                 call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
@@ -309,6 +310,7 @@ contains
                 cr_acy(i,j) = -v_acy(i,j)*wv_acy
         end do
         end do
+        !$omp end parallel do
 
         return 
 
@@ -357,7 +359,7 @@ contains
 
         mb_calv = 0.0_wp
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
+        !$omp parallel do collapse(2) private(i,j,calv_ref,calv_now)
         do j = 1, ny
         do i = 1, nx  
             ! Calculate lateral calving rate 
@@ -371,7 +373,7 @@ contains
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 

@@ -152,7 +152,7 @@ contains
             nx = size(lsf,1)
             ny = size(lsf,2)
             
-            !!$omp parallel do collapse(2) private(i,j,lsf_prev,dlsfdt)
+            !$omp parallel do collapse(2) private(i,j,lsf_prev,dlsfdt)
             do j = 1, ny
             do i = 1, nx
 
@@ -172,7 +172,7 @@ contains
 
             end do
             end do
-            !!$omp end parallel do
+            !$omp end parallel do
 
         end if
 

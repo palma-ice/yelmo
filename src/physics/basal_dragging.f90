@@ -145,6 +145,7 @@ contains
                 case("lin")
                     ! Linear scaling function with bedrock elevation
 
+                    !$omp parallel do collapse(2) private(i,j,q,lambda_bed,cb_ref_samples)
                     do j = 1, ny 
                     do i = 1, nx 
 
@@ -164,9 +165,11 @@ contains
 
                     end do 
                     end do 
+                    !$omp end parallel do
 
                 case("exp") 
 
+                    !$omp parallel do collapse(2) private(i,j,q,lambda_bed,cb_ref_samples)
                     do j = 1, ny 
                     do i = 1, nx 
 
@@ -186,6 +189,7 @@ contains
 
                     end do 
                     end do 
+                    !$omp end parallel do
 
                 case DEFAULT
                     ! Scaling not recognized.
@@ -200,6 +204,7 @@ contains
             ! Sediment scaling if desired
             if (f_sed .lt. 1.0) then 
 
+                !$omp parallel do collapse(2) private(i,j,lambda_bed)
                 do j = 1, ny 
                 do i = 1, nx 
 
@@ -216,6 +221,7 @@ contains
 
                 end do
                 end do
+                !$omp end parallel do
 
             end if 
 
@@ -936,13 +942,13 @@ contains
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
-        type(gq2D_class) :: gq2D
+        type(gq2D_class) :: gq2D, gq2D_global
         real(wp) :: dx_tmp, dy_tmp
 
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
+        call gq2D_init(gq2D_global)
         dx_tmp = 1.0
         dy_tmp = 1.0 
 
@@ -955,7 +961,11 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b)
+        !$omp parallel private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b,gq2D) &
+        !$omp& shared(gq2D_global)
+        gq2D = gq2D_global
+
+        !$omp do collapse(2) 
         do j = 1, ny
         do i = 1, nx
 
@@ -978,11 +988,11 @@ contains
                 else
                     ! Get c_bed on nodes
                     
-                    call gq2D_to_nodes_aa(gq2D,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2d,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j) 
 
-                    call gq2D_to_nodes_acx(gq2D,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
 
                 end if 
                 
@@ -991,7 +1001,7 @@ contains
 
                 ! Calculate basal friction
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
+                beta(i,j) = sum(betan*gq2d%wt)/gq2d%wt_tot
 
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 
@@ -1003,7 +1013,8 @@ contains
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end do
+        !$omp end parallel
         
         return
         
@@ -1039,7 +1050,7 @@ contains
             stop 
         end if 
        
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx-1
 
@@ -1061,7 +1072,7 @@ contains
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
         

@@ -214,7 +214,7 @@ contains
 
         eps_0_sq = eps_0*eps_0
 
-        !!$omp parallel do collapse(3) private(i,j,k,de_now)
+        !$omp parallel do collapse(3) private(i,j,k,de_now)
         do k = 1, nz 
         do j = 1, ny 
         do i = 1, nx 
@@ -239,7 +239,7 @@ contains
         end do 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
         
@@ -286,7 +286,7 @@ contains
 
         eps_0_sq = eps_0*eps_0
 
-        !!$omp parallel do collapse(3) private(i,j,k,de_now)
+        !$omp parallel do collapse(3) private(i,j,k,de_now)
         do k = 1, nz 
         do j = 1, ny 
         do i = 1, nx 
@@ -311,7 +311,7 @@ contains
         end do 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
         
@@ -340,7 +340,7 @@ contains
         ny = size(visc_eff_int,2)
 
 
-        !!$omp parallel do collapse(2) private(i,j,visc_eff_mean)
+        !$omp parallel do collapse(2) private(i,j,visc_eff_mean)
         do j = 1, ny 
         do i = 1, nx
 
@@ -356,7 +356,7 @@ contains
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then
@@ -587,7 +587,7 @@ contains
         ! Step 1: Calculate all vertical derivatives, some of which are used 
         ! as correction terms for the horizontal derivatives w.r.t. sigma-coordinate transformation. 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_now_acx,H_now_acy,k,h1,h2,H_now)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_now_acx,H_now_acy,k,h1,h2)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -699,12 +699,12 @@ end if
 
         end do
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Step 2: Calculate all horizontal derivatives accounting for correction terms
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
-        !!$omp& private(c_x,c_y,dzbdx_acy,dzsdx_acy,c_x_acy,dzbdy_acx,dzsdy_acx,c_y_acx,dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa)
+        !$omp parallel do collapse(2) private(i,j,k,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
+        !$omp& private(c_x,c_y,dzbdx_acy,dzsdx_acy,c_x_acy,dzbdy_acx,dzsdy_acx,c_y_acx)
         do j = 1, ny 
         do i = 1, nx 
             
@@ -830,7 +830,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
         
         ! Step X: fill in partially filled margin points with neighbor strain-rate values
         
@@ -915,7 +915,7 @@ end if
         ! Step 1: Calculate all vertical derivatives, some of which are used 
         ! as correction terms for the horizontal derivatives w.r.t. sigma-coordinate transformation. 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_now_acx,H_now_acy,k,h1,h2,H_now)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,k,h1,h2,H_now)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -988,12 +988,12 @@ end if
 
         end do
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Step 2: Calculate all horizontal derivatives accounting for correction terms
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
-        !!$omp& private(c_x,c_y,dzbdx_acy,dzsdx_acy,c_x_acy,dzbdy_acx,dzsdy_acx,c_y_acx,dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa)
+        !$omp parallel do collapse(2) private(i,j,k,im1,ip1,jm1,jp1,im2,ip2,jm2,jp2) &
+        !$omp& private(c_x,c_y,dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa)
         do j = 1, ny 
         do i = 1, nx 
             
@@ -1094,7 +1094,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
         
         return 
 
@@ -1151,13 +1151,13 @@ end if
 
         logical, parameter :: use_gq = .TRUE.
 
-        type(gq2D_class) :: gq2D
+        type(gq2D_class) :: gq2D, gq2D_global
         real(wp) :: dz0, dz1 
 
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
+        call gq2D_init(gq2D_global)
 
         ! For simple staggering
         wtn  = [1.0,1.0,1.0,1.0]
@@ -1183,7 +1183,11 @@ end if
         ! dyz = 0.5*(dyz+dzy)
         ! dzz = dzz  <= Not calculated, as it is not needed 
 
-        !!$omp parallel do collapse(2) private(i,j,k,im1,ip1,jm1,jp1,ddn,ddan,ddbn,shear_squared)
+        !$omp parallel private(i,j,k,im1,ip1,jm1,jp1,ddn,ddan,ddbn,shear_squared,gq2D) &
+        !$omp& shared(gq2D_global)
+        gq2D = gq2D_global
+
+        !$omp do collapse(2) 
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1200,32 +1204,32 @@ if (use_gq) then
     ! Use quadrature points
 
                     ! Get dxx on aa-nodes 
-                    call gq2D_to_nodes_acx(gq2D,ddn,jvel%dxx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    strn%dxx(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
+                    call gq2D_to_nodes_acx(gq2d,ddn,jvel%dxx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    strn%dxx(i,j,k) = sum(ddn*gq2d%wt)/gq2d%wt_tot
                     
                     ! Get dxy and dyx on aa-nodes 
-                    call gq2D_to_nodes_acx(gq2D,ddan,jvel%dxy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,ddbn,jvel%dyx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,ddan,jvel%dxy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,ddbn,jvel%dyx(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddn = 0.5*(ddan+ddbn)
-                    strn%dxy(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
+                    strn%dxy(i,j,k) = sum(ddn*gq2d%wt)/gq2d%wt_tot
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call gq2D_to_nodes_acx(gq2D,ddan,jvel%dxz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,ddan,jvel%dxz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dxz(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
+                    strn%dxz(i,j,k) = sum(ddn*gq2d%wt)/gq2d%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call gq2D_to_nodes_acy(gq2D,ddan,jvel%dyz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,ddan,jvel%dyz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dyz(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
+                    strn%dyz(i,j,k) = sum(ddn*gq2d%wt)/gq2d%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call gq2D_to_nodes_acy(gq2D,ddn,jvel%dyy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    strn%dyy(i,j,k) = sum(ddn*gq2D%wt)/gq2D%wt_tot
+                    call gq2D_to_nodes_acy(gq2d,ddn,jvel%dyy(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    strn%dyy(i,j,k) = sum(ddn*gq2d%wt)/gq2d%wt_tot
 else
     ! Unstagger directly to aa-nodes
 
@@ -1311,7 +1315,8 @@ end if
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end do
+        !$omp end parallel
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -1375,14 +1380,14 @@ end if
         real(wp) :: ddan(8) 
         real(wp) :: ddbn(8) 
 
-        type(gq3D_class) :: gq3D
+        type(gq3D_class) :: gq3D, gq3D_global
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
 
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq3D_init(gq3D)
+        call gq3D_init(gq3D_global)
 
         ! Determine sizes and allocate local variables 
         nx    = size(H_ice,1)
@@ -1401,7 +1406,12 @@ end if
         ! dyz = 0.5*(dyz+dzy)
         ! dzz = dzz  <= Not calculated, as it is not needed 
 
-        !$omp parallel do collapse(2) firstprivate(gq3D) private(i,j,im1,ip1,jm1,jp1,k,km1,kp1,dz0,dz1,ddn,ddan,ddbn,shear_squared)
+        !$omp parallel private(i,j,im1,ip1,jm1,jp1,k,km1,kp1,dz0,dz1,gq3d,ddn,ddan,ddbn,shear_squared) &
+        !$omp& shared(gq3D_global)
+        ! Copy gq3D to thread-local version
+        gq3D = gq3D_global
+
+        !$omp do collapse(2)        
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1432,32 +1442,32 @@ end if
                     end if
                     
                     ! Get dxx on aa-nodes 
-                    call gq3D_to_nodes_acx(gq3D,ddn,jvel%dxx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    strn%dxx(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
+                    call gq3D_to_nodes_acx(gq3d,ddn,jvel%dxx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    strn%dxx(i,j,k) = sum(ddn*gq3d%wt)/gq3d%wt_tot
 
                     ! Get dxy and dyx on aa-nodes 
-                    call gq3D_to_nodes_acx(gq3D,ddan,jvel%dxy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acy(gq3D,ddbn,jvel%dyx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,ddan,jvel%dxy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,ddbn,jvel%dyx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn = 0.5*(ddan+ddbn)
-                    strn%dxy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
+                    strn%dxy(i,j,k) = sum(ddn*gq3d%wt)/gq3d%wt_tot
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
-                    call gq3D_to_nodes_acx(gq3D,ddan,jvel%dxz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acz(gq3D,ddbn,jvel%dzx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,ddan,jvel%dxz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acz(gq3d,ddbn,jvel%dzx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dxz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
+                    strn%dxz(i,j,k) = sum(ddn*gq3d%wt)/gq3d%wt_tot
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
-                    call gq3D_to_nodes_acy(gq3D,ddan,jvel%dyz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acz(gq3D,ddbn,jvel%dzy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,ddan,jvel%dyz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acz(gq3d,ddbn,jvel%dzy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dyz(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
+                    strn%dyz(i,j,k) = sum(ddn*gq3d%wt)/gq3d%wt_tot
 
                     ! Get dyy on aa-nodes 
-                    call gq3D_to_nodes_acy(gq3D,ddn,jvel%dyy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    strn%dyy(i,j,k) = sum(ddn*gq3D%wt)/gq3D%wt_tot
+                    call gq3D_to_nodes_acy(gq3d,ddn,jvel%dyy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    strn%dyy(i,j,k) = sum(ddn*gq3d%wt)/gq3d%wt_tot
 
                     ! TEST - set shear strain terms to zero
                     !strn%dxz(i,j,k) =  0.0 
@@ -1506,7 +1516,8 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do
+        !$omp end do
+        !$omp end parallel
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -1563,13 +1574,13 @@ end if
         real(wp), allocatable :: dvdx(:,:) 
         real(wp), allocatable :: dvdy(:,:) 
         
-        type(gq2D_class) :: gq2D
+        type(gq2D_class) :: gq2D, gq2D_global
         real(wp) :: dz0, dz1
 
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
+        call gq2D_init(gq2D_global)
         
         nx = size(ux,1)
         ny = size(ux,2)
@@ -1597,7 +1608,11 @@ end if
         strn2D%div      = 0.0 
         strn2D%f_shear  = 0.0       ! Always zero in this case
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dudxn,dudyn,dvdxn,dvdyn)
+        !$omp parallel private(i,j,im1,ip1,jm1,jp1,dudxn,dudyn,dvdxn,dvdyn,gq2D) &
+        !$omp& shared(gq2D_global)
+        gq2D = gq2D_global
+
+        !$omp do collapse(2)
         do j=1, ny
         do i=1, nx
 
@@ -1606,16 +1621,16 @@ end if
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 
-                call gq2D_to_nodes_acx(gq2D,dudxn,dudx,dx,dy,i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes_acx(gq2D,dudyn,dudy,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2d,dudxn,dudx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2d,dudyn,dudy,dx,dy,i,j,im1,ip1,jm1,jp1)
 
-                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx,dx,dy,i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2d,dvdxn,dvdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2d,dvdyn,dvdy,dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 ! Calculate strain rate tensor terms 
-                strn2D%dxx(i,j) = sum(dudxn*gq2D%wt)/gq2D%wt_tot
-                strn2D%dyy(i,j) = sum(dvdyn*gq2D%wt)/gq2D%wt_tot
-                strn2D%dxy(i,j) = sum(0.5_wp*(dudyn+dvdxn)*gq2D%wt)/gq2D%wt_tot
+                strn2D%dxx(i,j) = sum(dudxn*gq2d%wt)/gq2d%wt_tot
+                strn2D%dyy(i,j) = sum(dvdyn*gq2d%wt)/gq2d%wt_tot
+                strn2D%dxy(i,j) = sum(0.5_wp*(dudyn+dvdxn)*gq2d%wt)/gq2d%wt_tot
                 
                 ! Check tolerance limits
                 if (abs(strn2D%dxx(i,j)) .lt. TOL_UNDERFLOW) strn2D%dxx(i,j) = 0.0 
@@ -1638,7 +1653,8 @@ end if
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end do
+        !$omp end parallel
 
         ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
         call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &

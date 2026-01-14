@@ -747,7 +747,7 @@ contains
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,ip2,V0,V1,V2)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,ip2,V0,V1,V2)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -807,7 +807,7 @@ end if
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Special case for infinite boundary conditions - ensure that slope 
         ! is the same, not the variable itself.
@@ -853,7 +853,7 @@ subroutine calc_gradient_acy(dvardy,var,f_ice,dy,grad_lim,margin2nd,zero_outside
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,jp2,V0,V1,V2)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,jp2,V0,V1,V2)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -913,7 +913,7 @@ end if
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
         
         ! Special case for infinite boundary conditions - ensure that slope 
         ! is the same, not the variable itself.
@@ -1672,7 +1672,7 @@ end if
         var_old(n2+1:n2+nx,1:n2)       = var(:,n2:1:-1)
         var_old(n2+1:n2+nx,ny+1:ny+n2) = var(:,(ny-n2+1):ny)
         
-        !!$omp parallel do collapse(2) private(i,j,filter)
+        !$omp parallel do collapse(2) private(i,j,filter)
         do j = n2+1, n2+ny 
         do i = n2+1, n2+nx 
 
@@ -1693,7 +1693,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -2001,13 +2001,13 @@ end if
         nx = size(var,1)
         ny = size(var,2)
 
-        !!$omp parallel do collapse(2) private(i,j)
+        !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny
         do i = 1, nx
             var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),zeta)
         end do
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
 
@@ -2029,13 +2029,13 @@ end if
         nx = size(var,1)
         ny = size(var,2)
 
-        !!$omp parallel do collapse(2) private(i,j)
+        !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny
         do i = 1, nx
             var_int(i,j) = integrate_trapezoid1D_pt(var(i,j,:),zeta)
         end do
         end do
-        !!$omp end parallel do 
+        !$omp end parallel do 
 
         return
 

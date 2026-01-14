@@ -151,7 +151,6 @@ contains
             nx = size(H_ice,1)
             ny = size(H_ice,2)
 
-            !!$omp parallel do collapse(2) private(i,j,H_prev,dHdt)
             do j = 1, ny 
             do i = 1, nx 
 
@@ -189,7 +188,6 @@ contains
 
             end do
             end do
-            !!$omp end parallel do
 
             if (verbose .and. mb_max .ne. 0.0_wp) then
                 write(*,*) "apply_tendency: "//trim(label)//" mb_dot > mb_lim: ", &
@@ -667,7 +665,7 @@ contains
 
         H_tmp = H_ice_new 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_margin,H_eff)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_margin,H_eff)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -696,13 +694,13 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Remove ice islands =====
 
         H_tmp = H_ice_new 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_island)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_island)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -723,14 +721,14 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Reduce ice thickness for margin points that are thicker 
         ! than inland neighbors ====
 
         H_tmp = H_ice_new
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_eff,H_max)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_eff,H_max)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -758,7 +756,7 @@ contains
             
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
         
         select case(trim(boundaries))
 
@@ -952,7 +950,7 @@ contains
             else if (tau_relax(i,j) .gt. 0.0) then
                 ! Apply relaxation to reference state 
 
-                dHdt = (H_ref(i,j) - H_ice(i,j)) / tau_relax(i,j)
+                dHdt(i,j) = (H_ref(i,j) - H_ice(i,j)) / tau_relax(i,j)
 
             end if
 
@@ -1084,7 +1082,7 @@ contains
 
         H_new = H_ice 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1123,7 +1121,7 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Determine rate of mass balance related to changes applied here
 

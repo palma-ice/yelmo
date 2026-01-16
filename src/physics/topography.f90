@@ -1553,7 +1553,7 @@ end if
     end subroutine calc_grounding_line_zone
 
     subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_ice,H_grnd,f_grnd,gz_Hg0,gz_Hg1, &
-                                                            gz_nx,bmb_gl_method,mask_pd,boundaries)
+                                                            gz_nx,bmb_gl_method,boundaries)
 
         implicit none 
 
@@ -1567,8 +1567,6 @@ end if
         real(wp),         intent(IN)  :: gz_Hg1
         integer,          intent(IN)  :: gz_nx
         character(len=*), intent(IN)  :: bmb_gl_method 
-        ! for optimization (optional, check!)
-        integer,  intent(IN), optional  :: mask_pd(:,:)
         character(len=*), intent(IN)  :: boundaries 
 
         ! Local variables
@@ -1649,12 +1647,6 @@ end if
                 end where 
 
         end select
-
-        ! Melting in grounded zone for optimization
-        if (present(mask_pd)) then
-            where(mask_pd .eq. mask_bed_float) bmb = bmb_shlf
-            where(mask_pd .eq. mask_bed_ocean) bmb = bmb_shlf
-        end if
 
         ! For aesthetics, also make sure that bmb is zero on ice-free land
         where (H_grnd .gt. 0.0_wp .and. H_ice .eq. 0.0_wp) bmb = 0.0_wp 

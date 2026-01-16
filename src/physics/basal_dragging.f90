@@ -59,8 +59,8 @@ module basal_dragging
 
 contains 
     
-    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,f_sed,H_sed_min,H_sed_max, &
-                                            cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
+    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,f_sed,H_sed_min, &
+                    H_sed_max,cf_ref,cf_min,z0,z1,n_sd,scale_zb,scale_sed)
         ! Update cb_ref [--] based on parameter choices
 
         implicit none
@@ -77,17 +77,18 @@ contains
         real(wp), intent(IN)  :: cf_min
         real(wp), intent(IN)  :: z0 
         real(wp), intent(IN)  :: z1
-        integer,  intent(IN) :: n_sd 
-        character(len=*), intent(IN) :: till_scale
-        integer,  intent(IN) :: till_method
+        integer,  intent(IN)  :: n_sd
+        integer,  intent(IN)  :: scale_zb
+        integer,  intent(IN)  :: scale_sed
         
         ! Local variables
-        integer :: q, i, j, nx, ny 
+        integer  :: q, i, j, nx, ny
         real(wp) :: f_sd_min, f_sd_max
-        real(wp) :: lambda_bed  
-        real(wp), allocatable :: cb_ref_samples(:) 
-        real(wp), allocatable :: f_sd(:) 
-        real(wp), allocatable :: w_sd(:) 
+        real(wp) :: lambda_bed
+        real(wp) :: cb_ref_now
+        real(wp), allocatable :: cb_ref_samples(:)
+        real(wp), allocatable :: f_sd(:)
+        real(wp), allocatable :: w_sd(:)
 
         nx = size(cb_ref,1)
         ny = size(cb_ref,2)
@@ -123,83 +124,95 @@ contains
 
         end if 
 
-        if (till_method .eq. -1) then 
-            ! Do nothing - cb_ref defined externally
+        ! Calculate cb_ref following parameter choices 
+        ! lambda_bed: scaling as a function of bedrock elevation
 
-        else 
-            ! Calculate cb_ref following parameter choices 
-            ! lambda_bed: scaling as a function of bedrock elevation
+        ! Sample bedrock according to its standard deviation to account for uncertainty
+        ! and possible pinning points, etc. 
 
-            ! Sample bedrock according to its standard deviation to account for uncertainty
-            ! and possible pinning points, etc. 
+        ! Next, scale according to sediment parameterization too.
 
-            ! Finally, scale according to sediment parameterization too.
+        ! === Elevation scaling ===
 
-            select case(trim(till_scale))
+        select case(scale_zb)
 
-                case("none")
-                    ! No scaling with elevation, set reference value 
+            case(0) ! none
+                ! No scaling with elevation, set reference value 
 
-                    cb_ref = cf_ref
-                    
-                case("lin")
-                    ! Linear scaling function with bedrock elevation
+                cb_ref = cf_ref
+                
+            case(1) ! lin
+                ! Linear scaling function with bedrock elevation
 
-                    do j = 1, ny 
-                    do i = 1, nx 
+                !$omp parallel do collapse(2) private(i,j,q,lambda_bed,cb_ref_samples)
+                do j = 1, ny 
+                do i = 1, nx 
 
-                        do q = 1, n_sd
+                    do q = 1, n_sd
 
-                            lambda_bed = calc_lambda_bed_lin(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
-                                                                                    z_sl(i,j),z0,z1)
+                        lambda_bed = calc_lambda_bed_lin(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
+                                                                                z_sl(i,j),z0,z1)
 
-                            ! Calculate cb_ref 
-                            cb_ref_samples(q) = cf_ref * lambda_bed 
-                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
+                        ! Calculate cb_ref 
+                        cb_ref_samples(q) = cf_ref * lambda_bed 
+                        if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
 
-                        end do 
+                    end do
 
-                        ! Average samples 
-                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
+                    ! Average samples 
+                    cb_ref(i,j) = sum(cb_ref_samples*w_sd)
 
-                    end do 
-                    end do 
+                end do 
+                end do 
+                !$omp end parallel do
 
-                case("exp") 
+            case(2) ! exp
 
-                    do j = 1, ny 
-                    do i = 1, nx 
+                !$omp parallel do collapse(2) private(i,j,q,lambda_bed,cb_ref_samples)
+                do j = 1, ny 
+                do i = 1, nx 
 
-                        do q = 1, n_sd
+                    do q = 1, n_sd
 
-                            lambda_bed = calc_lambda_bed_exp(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
-                                                                                    z_sl(i,j),z0,z1)
+                        lambda_bed = calc_lambda_bed_exp(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
+                                                                                z_sl(i,j),z0,z1)
 
-                            ! Calculate cb_ref 
-                            cb_ref_samples(q) = cf_ref * lambda_bed 
-                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
+                        ! Calculate cb_ref 
+                        cb_ref_samples(q) = cf_ref * lambda_bed 
+                        if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
 
-                        end do 
+                    end do
+                
+                    ! Average samples 
+                    cb_ref(i,j) = sum(cb_ref_samples*w_sd)
 
-                        ! Average samples 
-                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
+                end do 
+                end do 
+                !$omp end parallel do
 
-                    end do 
-                    end do 
+            case DEFAULT
+                ! Scaling not recognized.
 
-                case DEFAULT
-                    ! Scaling not recognized.
-
-                    write(io_unit_err,*) "calc_cb_ref:: Error: scaling of cb_ref with &
+                write(io_unit_err,*) "calc_cb_ref:: Error: scaling method of cb_ref with &
                     &elevation not recognized."
-                    write(io_unit_err,*) "ydyn.till_scale = ", till_scale 
-                    stop 
-                    
-            end select 
-            
-            ! Sediment scaling if desired
-            if (f_sed .lt. 1.0) then 
+                write(io_unit_err,*) "ydyn.till_scale_zb = ", scale_zb 
+                stop 
+                
+        end select 
+        
+        ! === Sediment scaling ===
 
+        select case(scale_sed)
+
+            case(0)
+                ! No sediment scaling
+
+            case(1)
+                ! Sediment scaling:
+                ! Apply minimum of sed scaling and current cb_ref
+                ! sed scaling also goes from cf_ref to cf_min
+
+                !$omp parallel do collapse(2) private(i,j,lambda_bed)
                 do j = 1, ny 
                 do i = 1, nx 
 
@@ -208,32 +221,80 @@ contains
                     if (lambda_bed .lt. 0.0) lambda_bed = 0.0
                     if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
 
-                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_min) to 1.0(H_sed=H_sed_max)
+                    ! Convert range 0:1 => cf_min:cf_ref
+                    cb_ref_now = cf_min*lambda_bed + cf_ref*(1.0-lambda_bed)
+
+                    ! Apply minimum of previous cb_ref and sed scaling, should be limited to cf_min:cf_ref
+                    cb_ref(i,j) = min(cb_ref(i,j), cb_ref_now)
+                    
+                end do
+                end do
+
+            case(2,3)
+                ! Sediment scaling:
+                ! Apply sed scaling to current cb_ref, as additional factor
+                ! 2: Apply lower limit
+                ! 3: NO lower limit (akin to Schannwell et al., 2023 method)
+
+                !$omp parallel do collapse(2) private(i,j,lambda_bed)
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    ! Get linear scaling as a function of sediment thickness
+                    lambda_bed = (H_sed(i,j) - H_sed_min) / (H_sed_max - H_sed_min)
+                    if (lambda_bed .lt. 0.0) lambda_bed = 0.0
+                    if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
+
+                    ! Get scaling factor ranging from 1.0(H_sed=H_sed_min) down to f_sed(H_sed=H_sed_max)
                     lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
 
-                    ! Apply scaling to cb_ref 
-                    cb_ref(i,j) = cb_ref(i,j) * lambda_bed 
+                    ! Apply sed scaling to current cb_ref, as additional factor
+                    cb_ref(i,j) = cb_ref(i,j) * lambda_bed
+                    
+                    if (scale_sed .eq. 2) then
+                        ! Apply minimum limit to cb_ref
+                        if (cb_ref(i,j) .lt. cf_min) cb_ref(i,j) = cf_min
+                    else ! scale_sed == 3
+                        ! Pass, NO lower limit applied
+                    end if
 
                 end do
                 end do
+                !$omp end parallel do
 
-            end if 
+            case DEFAULT
 
-        end if 
+                write(io_unit_err,*) "Error: calc_cb_ref:: Error: scaling method of cb_ref with &
+                    &sediment not recognized."
+                write(io_unit_err,*) "ytill.scale_sed = ", scale_sed
+                stop
 
+        end select
+        
         return 
 
     end subroutine calc_cb_ref
-
-    subroutine calc_c_bed(c_bed,cb_ref,N_eff,is_angle)
+    
+    subroutine calc_c_bed(c_bed,cb_ref,N_eff,T_prime_b,is_angle,cf_ref,T_frz,scale_T)
 
         implicit none 
 
         real(wp), intent(OUT) :: c_bed(:,:)         ! [Pa]
         real(wp), intent(IN)  :: cb_ref(:,:)        ! [-] or [degrees]
         real(wp), intent(IN)  :: N_eff(:,:)         ! [Pa]
+        real(wp), intent(IN)  :: T_prime_b(:,:)     ! [degC]
         logical,  intent(IN)  :: is_angle           ! Is cb_ref a till strength angle? 
+        real(wp), intent(IN)  :: cf_ref             ! [-] or [degrees] reference (maximum) friction coefficient
+        real(wp), intent(IN)  :: T_frz              ! [degC] Minimum temperature of temperate range
+        integer,  intent(IN)  :: scale_T            ! Scale up friction for frozen ice?
+        
+        ! Local variables
+        integer :: i, j, nx, ny
+        real(wp) :: cf_frz, c_bed_frz
+        real(wp) :: lambda_bed
 
+        nx = size(c_bed,1)
+        ny = size(c_bed,2)
 
         if (is_angle) then 
             ! Transform cb_ref by tangent to make 
@@ -243,12 +304,50 @@ contains
 
             c_bed = tan(cb_ref*degrees_to_radians)*N_eff 
 
+            cf_frz = tan(cf_ref*degrees_to_radians)
         else
             ! Treat cb_ref as a normal scalar field
             
-            c_bed = cb_ref*N_eff 
+            c_bed = cb_ref*N_eff
+
+            cf_frz = cf_ref 
 
         end if 
+
+        ! Additionaly, apply thermodynamic scaling if desired
+        select case(scale_T)
+
+            case(0)
+                ! No scaling with elevation, set reference value 
+                ! Do nothing
+            case(1)
+                ! Linear scaling to cf_ref as temperature approaches T_frz
+                
+                if (T_frz .ge. 0.0) then
+                    write(io_unit_err,*) "Error: calc_c_bed:: T_frz must be less than zero."
+                    write(io_unit_err,*) "ydyn.T_frz = ", T_frz
+                end if
+
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    ! Get linear scaling as a function of distance from pressure melting point
+                    lambda_bed = (T_prime_b(i,j) - T_frz) / (0.0-T_frz)
+                    if (lambda_bed .lt. 0.0) lambda_bed = 0.0
+                    if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
+
+                    ! Apply scaling to c_bed
+                    c_bed_frz = cf_frz * N_eff(i,j)
+                    c_bed(i,j) = c_bed(i,j)*lambda_bed + c_bed_frz*(1.0 - lambda_bed)
+
+                end do
+                end do
+
+            case DEFAULT
+                write(io_unit_err,*) "Error: calc_cb_ref:: scale_T choice not recognized."
+                write(io_unit_err,*) "ydyn.scale_T = ", scale_T
+                stop
+        end select
 
         return 
 
@@ -936,13 +1035,13 @@ contains
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
-        type(gq2D_class) :: gq2D
+        type(gq2D_class) :: gq2D, gq2D_global
         real(wp) :: dx_tmp, dy_tmp
 
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
+        call gq2D_init(gq2D_global)
         dx_tmp = 1.0
         dy_tmp = 1.0 
 
@@ -955,7 +1054,11 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b)
+        !$omp parallel private(i,j,im1,ip1,jm1,jp1,im1m,ip1m,jm1m,jp1m,cbn,uxn,uyn,uxyn,betan,uxy_b,gq2D) &
+        !$omp& shared(gq2D_global)
+        gq2D = gq2D_global
+
+        !$omp do collapse(2) 
         do j = 1, ny
         do i = 1, nx
 
@@ -978,11 +1081,11 @@ contains
                 else
                     ! Get c_bed on nodes
                     
-                    call gq2D_to_nodes_aa(gq2D,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2d,cbn,c_bed,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
                     !cbn(1:4) = c_bed(i,j) 
 
-                    call gq2D_to_nodes_acx(gq2D,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn,ux_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn,uy_b,dx_tmp,dy_tmp,i,j,im1,ip1,jm1,jp1)
 
                 end if 
                 
@@ -991,7 +1094,7 @@ contains
 
                 ! Calculate basal friction
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(betan*gq2D%wt)/gq2D%wt_tot
+                beta(i,j) = sum(betan*gq2d%wt)/gq2d%wt_tot
 
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 
@@ -1003,7 +1106,8 @@ contains
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end do
+        !$omp end parallel
         
         return
         
@@ -1039,7 +1143,7 @@ contains
             stop 
         end if 
        
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx-1
 
@@ -1061,7 +1165,7 @@ contains
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
         

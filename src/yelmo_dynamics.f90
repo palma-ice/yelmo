@@ -68,6 +68,7 @@ contains
 
         logical, parameter :: write_ssa_diagnostics = .FALSE.
 
+
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
         nz_aa = dyn%par%nz_aa 
@@ -120,19 +121,21 @@ contains
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
-        ! Calculate cb_tgt (cb_ref target value) - same as cb_ref, but always calculated,
-        ! even if till_method=-1
-        call calc_cb_ref(dyn%now%cb_tgt,bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%H_sed,dyn%par%till_f_sed,dyn%par%till_sed_min, &
-                                            dyn%par%till_sed_max,dyn%par%till_cf_ref,dyn%par%till_cf_min,dyn%par%till_z0, &
-                                            dyn%par%till_z1,dyn%par%till_n_sd,dyn%par%till_scale,till_method=1)
-
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
-        call calc_cb_ref(dyn%now%cb_ref,bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%H_sed,dyn%par%till_f_sed,dyn%par%till_sed_min, &
-                                            dyn%par%till_sed_max,dyn%par%till_cf_ref,dyn%par%till_cf_min,dyn%par%till_z0, &
-                                            dyn%par%till_z1,dyn%par%till_n_sd,dyn%par%till_scale,dyn%par%till_method)
+
+        ! First calculate cb_tgt, to be used for comparision or optimization purposes
+        call calc_cb_ref(dyn%now%cb_tgt,bnd%z_bed,bnd%z_bed_sd,bnd%z_sl,bnd%H_sed,dyn%par%till_f_sed, &
+                dyn%par%till_sed_min,dyn%par%till_sed_max,dyn%par%till_cf_ref,dyn%par%till_cf_min, &
+                dyn%par%till_z0,dyn%par%till_z1,dyn%par%till_n_sd,dyn%par%till_scale_zb, dyn%par%till_scale_sed)
+
+        if (dyn%par%till_method .eq. 1) then
+            ! Calculate friction coefficient online, so set current friction equal to cb_tgt
+            dyn%now%cb_ref = dyn%now%cb_tgt
+        end if
 
         ! Finally calculate c_bed, which is simply c_bed = f(N_eff,cb_ref)
-        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,dyn%par%till_is_angle)
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,thrm%now%T_prime_b, &
+                dyn%par%till_is_angle,dyn%par%till_cf_ref,dyn%par%T_frz,dyn%par%scale_T)
 
         ! ===== Calculate the 3D horizontal velocity field and helper variables =======================
         ! The variables to be obtained from these routines are:
@@ -222,16 +225,24 @@ contains
         ! ===== Calculate the vertical velocity through continuity ============================
         ! (using the Jacobian by default, most robust formulation) 
 
-        call calc_uz_3D_jac(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,dyn%now%jvel,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-                            tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
-                            tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
-        ! call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-        !                     tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
-        !                     tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
-        ! call calc_uz_3D_aa(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-        !                     tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
-        !                     tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
-        
+        select case(dyn%par%uz_method)
+            case(1)     ! "uz_aa" == original, simplest formulation
+                call calc_uz_3D_aa(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                    tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                                    tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+            case(2)     ! "uz_nodes" == intermediate-level formulation
+                call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                    tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                                    tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+            case(3)     ! "uz_jac" == this is the default method that is most stable, most correct
+                call calc_uz_3D_jac(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,dyn%now%jvel,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                    tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                                    tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+            case DEFAULT
+                write(io_unit_err,*) "Error: calc_ydyn:: vertical velocity integration method not recognized."
+                write(io_unit_err,*) "ydyn.uz_method = ", dyn%par%uz_method
+                stop
+        end select
         ! ===== Finish calculating velocity Jacobian (uz-dependent terms) ================
 
         call calc_jacobian_vel_3D_uzterms(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice_dyn, tpo%now%f_ice_dyn, &
@@ -1023,6 +1034,7 @@ contains
         if (present(init)) init_pars = .TRUE. 
         
         call nml_read(filename,group_ydyn,"solver",             par%solver,             init=init_pars)
+        call nml_read(filename,group_ydyn,"uz_method",          par%uz_method,          init=init_pars)
         call nml_read(filename,group_ydyn,"visc_method",        par%visc_method,        init=init_pars)
         call nml_read(filename,group_ydyn,"visc_const",         par%visc_const,         init=init_pars)
         call nml_read(filename,group_ydyn,"beta_method",        par%beta_method,        init=init_pars)
@@ -1036,6 +1048,8 @@ contains
         call nml_read(filename,group_ydyn,"H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
         call nml_read(filename,group_ydyn,"beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,group_ydyn,"eps_0",              par%eps_0,              init=init_pars)
+        call nml_read(filename,group_ydyn,"scale_T",            par%scale_T,            init=init_pars)
+        call nml_read(filename,group_ydyn,"T_frz",              par%T_frz,              init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
@@ -1048,7 +1062,8 @@ contains
         call nml_read(filename,group_ydyn,"cb_sia",             par%cb_sia,             init=init_pars)
         
         call nml_read(filename,group_ytill,"method",            par%till_method,        init=init_pars)
-        call nml_read(filename,group_ytill,"scale",             par%till_scale,         init=init_pars)
+        call nml_read(filename,group_ytill,"scale_zb",          par%till_scale_zb,      init=init_pars)
+        call nml_read(filename,group_ytill,"scale_sed",         par%till_scale_sed,     init=init_pars)
         call nml_read(filename,group_ytill,"is_angle",          par%till_is_angle,      init=init_pars)
         call nml_read(filename,group_ytill,"n_sd",              par%till_n_sd,          init=init_pars)
         call nml_read(filename,group_ytill,"f_sed",             par%till_f_sed,         init=init_pars)

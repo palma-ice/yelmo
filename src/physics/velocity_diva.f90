@@ -17,6 +17,8 @@ module velocity_diva
                                     gq3D_class, gq3D_init, gq3D_to_nodes_aa, &
                                     gq3D_to_nodes_acx, gq3D_to_nodes_acy
 
+    !$  use omp_lib
+
     implicit none 
 
     type diva_param_class
@@ -158,7 +160,7 @@ contains
 
         type(linear_solver_class) :: lgs_prev 
         type(linear_solver_class) :: lgs_now
-        
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
@@ -450,7 +452,7 @@ end if
         ! Note: L19 define the F1 integral as purely going from the base to the surface,
         ! whereas here F1 is calculated from the base to each point in the vertical. So, 
         ! it is not technically "F1" as defined by L19, Eq. 30, except at the surface.
-        !!$omp parallel do collapse(2) private(i,j)
+        !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
             if ( is_equal(f_ice(i,j),1.0) ) then 
@@ -458,10 +460,10 @@ end if
             end if  
         end do
         end do  
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Next calculate 3D horizontal velocity components 
-        !!$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,F1_ac)
+        !$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,F1_ac)
         do k = 1, nz_aa
         do j = 1, ny 
         do i = 1, nx 
@@ -482,7 +484,7 @@ end if
         end do 
         end do  
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
         
         return 
 
@@ -518,7 +520,7 @@ end if
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,visc_eff_ac)
+        !$omp parallel do collapse(3) private(i,j,k,im1,ip1,jm1,jp1,visc_eff_ac)
         do k = 1, nz_aa 
         do j = 1, ny
         do i = 1, nx 
@@ -545,7 +547,7 @@ end if
         end do 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -604,8 +606,8 @@ end if
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
-        type(gq2D_class) :: gq2D
-        type(gq3D_class) :: gq3D
+        type(gq2D_class) :: gq2D, gq2D_global
+        type(gq3D_class) :: gq3D, gq3D_global
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .FALSE.
@@ -613,8 +615,8 @@ end if
         integer :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
-        if (use_gq3D) call gq3D_init(gq3D)
+        call gq2D_init(gq2D_global)
+        if (use_gq3D) call gq3D_init(gq3D_global)
 
         nx = size(visc,1)
         ny = size(visc,2)
@@ -651,10 +653,16 @@ end if
 
         visc = visc_min
 
-        !!$omp parallel do collapse(2) private(i,j,im1,jm1,ip1,jp1,k,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn) &
-        !!$omp& private(eps_sq_n,ATTn,dudxn8,dudyn8,dvdxn8,dvdyn8,dudzn8,dvdzn8,eps_sq_n8,ATTn8,viscn8)
-        do i = 1, nx
+        !$omp parallel private(i,j,k,im1,jm1,ip1,jp1,km1,kp1,dudxn,dudyn,dvdxn,dvdyn,dudzn,dvdzn,gq2D,gq3D) &
+        !$omp& private(eps_sq_n,ATTn,viscn,dz0,dz1,dudxn8,dudyn8,dvdxn8,dvdyn8,dudzn8,dvdzn8,eps_sq_n8,ATTn8,viscn8) &
+        !$omp& shared(gq2D_global,gq3D_global) 
+        ! Copy gq2d_global and gq3D_global to thread-local version
+        gq2D = gq2D_global
+        gq3D = gq3D_global
+
+        !$omp do collapse(2)
         do j = 1, ny  
+        do i = 1, nx
 
             if (f_ice(i,j) == 1.0) then
 
@@ -666,29 +674,29 @@ if (.not. use_gq3D) then
 
                 ! Get horizontal strain rate terms
                 ! (same for all layers, so just get them once for all layers)
-                call gq2D_to_nodes_acx(gq2D,dudxn,dudx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes_acx(gq2D,dudyn,dudy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2d,dudxn,dudx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acx(gq2d,dudyn,dudy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
                 
-                call gq2D_to_nodes_acy(gq2D,dvdxn,dvdx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2d,dvdxn,dvdx(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                call gq2D_to_nodes_acy(gq2d,dvdyn,dvdy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
 
                 do k = 1, nz
                     
                     ! Get vertical shear strain rate terms
-                    call gq2D_to_nodes_acx(gq2D,dudzn,dudz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,dvdzn,dvdz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,dudzn,dudz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,dvdzn,dvdz(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
                                                 + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq2D_to_nodes_aa(gq2D,ATTn,ATT(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_aa(gq2d,ATTn,ATT(:,:,k),dx,dy,i,j,im1,ip1,jm1,jp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
-                    visc(i,j,k) = sum(viscn*gq2D%wt)/gq2D%wt_tot
+                    visc(i,j,k) = sum(viscn*gq2d%wt)/gq2d%wt_tot
 
                 end do
 
@@ -715,27 +723,27 @@ else
                     end if
                     
                     ! Get horizontal strain rate terms
-                    call gq3D_to_nodes_acx(gq3D,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acx(gq3D,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,dudxn8,dudx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,dudyn8,dudy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
-                    call gq3D_to_nodes_acy(gq3D,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acy(gq3D,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,dvdxn8,dvdx,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,dvdyn8,dvdy,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
 
                     ! Get vertical shear strain rate terms
-                    call gq3D_to_nodes_acx(gq3D,dudzn8,dudz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
-                    call gq3D_to_nodes_acy(gq3D,dvdzn8,dvdz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acx(gq3d,dudzn8,dudz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_acy(gq3d,dvdzn8,dvdz,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
                                                 + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
 
                     ! Get rate factor
-                    call gq3D_to_nodes_aa(gq3D,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
+                    call gq3D_to_nodes_aa(gq3d,ATTn8,ATT,dx,dy,dz0,dz1,i,j,k,im1,ip1,jm1,jp1,km1,kp1)
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
                     viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
-                    visc(i,j,k) = sum(viscn8*gq3D%wt)/gq3D%wt_tot
+                    visc(i,j,k) = sum(viscn8*gq3d%wt)/gq3d%wt_tot
                 end do
 
 end if
@@ -744,7 +752,8 @@ end if
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end do
+        !$omp end parallel
 
         return
 
@@ -880,7 +889,7 @@ end if
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
 
-        !!$omp parallel do collapse(2) private(i,j,visc_eff_mean)
+        !$omp parallel do collapse(2) private(i,j,visc_eff_mean)
         do j = 1, ny 
         do i = 1, nx
 
@@ -898,7 +907,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
 
@@ -927,7 +936,7 @@ end if
         nz_aa = size(visc,3)
 
         ! Vertically integrate at each point
-        !!$omp parallel do collapse(2) private(i,j,H_eff)
+        !$omp parallel do collapse(2) private(i,j,H_eff)
         do j = 1, ny 
         do i = 1, nx
 
@@ -945,7 +954,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
 
@@ -1026,7 +1035,7 @@ end if
         else 
             ! Calculate basal velocity normally 
 
-            !!$omp parallel do collapse(2) private(i,j,F2_ac)
+            !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,F2_ac)
             do j = 1, ny 
             do i = 1, nx 
 
@@ -1045,7 +1054,7 @@ end if
 
             end do 
             end do  
-            !!$omp end parallel do
+            !$omp end parallel do
 
             ! No treatment of boundary conditions needed since ux_b/uy_b are derived.
 
@@ -1078,7 +1087,7 @@ end if
         nx = size(taub_acx,1)
         ny = size(taub_acy,2) 
 
-        !!$omp parallel do collapse(2) private(i,j)
+        !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1090,7 +1099,7 @@ end if
 
         end do 
         end do  
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 

@@ -125,8 +125,8 @@ contains
         real(wp), parameter :: uz_min = -10.0       ! [m/yr] Minimum allowed vertical velocity downwards for stability
         real(wp), parameter :: uz_lim =  10.0       ! [m/yr] Absolute limit allowed for vertical velocity in any direction
 
-        type(gq2D_class) :: gq2D
-        type(gq3D_class) :: gq3D
+        type(gq2D_class) :: gq2D, gq2D_global
+        type(gq3D_class) :: gq3D, gq3D_global
         real(wp) :: dz0, dz1
         integer  :: km1, kp1
         logical, parameter :: use_gq3D = .TRUE.
@@ -134,8 +134,8 @@ contains
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
-        if (use_gq3D) call gq3D_init(gq3D)
+        call gq2D_init(gq2D_global)
+        if (use_gq3D) call gq3D_init(gq3D_global)
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -160,12 +160,17 @@ contains
 
         ! Next, calculate vertical velocity at each point through the column
 
-        !$omp parallel do collapse(2) firstprivate(gq2D,gq3D) &
-        !$omp& private(i,j,im1,ip1,jm1,jp1) &
+        !$omp parallel &
+        !$omp& private(i,j,im1,ip1,jm1,jp1,gq2D,gq3D) &
         !$omp& private(dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv,dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa) &
         !$omp& private(dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa,uz_grid,k,kmid) &
         !$omp& private(dudxn,dudx_aa,dvdyn,dvdy_aa,km1,kp1,dz0,dudxn8,dvdyn8) &
-        !$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z)
+        !$omp& private(kup,kdn,uxn_up,uxn_dn,uyn_up,uyn_dn,zeta_now,c_x,c_y,c_t,c_z) &
+        !$omp& shared(gq2D_global,gq3D_global)
+        gq2D = gq2D_global
+        gq3D = gq3D_global
+
+        !$omp do collapse(2)
         do j = 1, ny
         do i = 1, nx
 
@@ -194,25 +199,25 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call gq2D_to_nodes_acx(gq2D,dzbdxn,dzbdx,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzbdx_aa = sum(dzbdxn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acx(gq2d,dzbdxn,dzbdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzbdx_aa = sum(dzbdxn*gq2d%wt)/gq2d%wt_tot
 
-                call gq2D_to_nodes_acy(gq2D,dzbdyn,dzbdy,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzbdy_aa = sum(dzbdyn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acy(gq2d,dzbdyn,dzbdy,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzbdy_aa = sum(dzbdyn*gq2d%wt)/gq2d%wt_tot
 
                 ! Get the centered surface gradient
-                call gq2D_to_nodes_acx(gq2D,dzsdxn,dzsdx,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzsdx_aa = sum(dzsdxn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acx(gq2d,dzsdxn,dzsdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzsdx_aa = sum(dzsdxn*gq2d%wt)/gq2d%wt_tot
                 
-                call gq2D_to_nodes_acy(gq2D,dzsdyn,dzsdy,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzsdy_aa = sum(dzsdyn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acy(gq2d,dzsdyn,dzsdy,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzsdy_aa = sum(dzsdyn*gq2d%wt)/gq2d%wt_tot
                 
                 ! Get the aa-node centered horizontal velocity at the base
-                call gq2D_to_nodes_acx(gq2D,uxn,ux(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acx(gq2d,uxn,ux(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                ux_aa = sum(uxn*gq2d%wt)/gq2d%wt_tot
                 
-                call gq2D_to_nodes_acy(gq2D,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acy(gq2d,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                uy_aa = sum(uyn*gq2d%wt)/gq2d%wt_tot
 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -254,11 +259,11 @@ contains
 if (.not. use_gq3D) then
     ! 2D QUADRATURE
 
-                    call gq2D_to_nodes_acx(gq2D,dudxn,jvel%dxx(:,:,kmid),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn*gq2D%wt)/gq2D%wt_tot
+                    call gq2D_to_nodes_acx(gq2d,dudxn,jvel%dxx(:,:,kmid),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    dudx_aa = sum(dudxn*gq2d%wt)/gq2d%wt_tot
 
-                    call gq2D_to_nodes_acy(gq2D,dvdyn,jvel%dyy(:,:,kmid),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn*gq2D%wt)/gq2D%wt_tot
+                    call gq2D_to_nodes_acy(gq2d,dvdyn,jvel%dyy(:,:,kmid),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    dvdy_aa = sum(dvdyn*gq2d%wt)/gq2d%wt_tot
 
 else 
     ! 3D QUADRATURE
@@ -316,15 +321,15 @@ end if
                         kdn = k-1 
                     end if
                     
-                    call gq2D_to_nodes_acx(gq2D,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acx(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
-                    ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
+                    ux_aa = sum(uxn*gq2d%wt)/gq2d%wt_tot
                     
-                    call gq2D_to_nodes_acy(gq2D,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
-                    uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
+                    uy_aa = sum(uyn*gq2d%wt)/gq2d%wt_tot
                     
                     ! Take zeta directly at vertical cell edge where uz is calculated
                     ! (this is also where ux_aa and uy_aa are calculated above)
@@ -374,7 +379,8 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do 
+        !$omp end do 
+        !$omp end parallel
 
         return 
 
@@ -465,12 +471,12 @@ end if
         
         real(wp), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
-        type(gq2D_class) :: gq2D
+        type(gq2D_class) :: gq2D, gq2D_global
         
         integer  :: BC
 
         ! Initialize gaussian quadrature calculations
-        call gq2D_init(gq2D)
+        call gq2D_init(gq2D_global)
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -500,18 +506,22 @@ end if
         ! with no correction factor for sigma-transformation.
         ! Note: we only need dudx and dvdy, but routine also calculate cross terms, which will not be used.
 
-        !!$omp parallel do private(k)
+        !$omp parallel do private(k,dudy,dvdx)
         do k = 1, nz_aa
             call calc_strain_rate_horizontal_2D(dudx(:,:,k),dudy,dvdx,dvdy(:,:,k),ux(:,:,k),uy(:,:,k),f_ice,dx,dy,boundaries)
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! Next, calculate vertical velocity at each point through the column
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
-        !!$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
-        !!$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa) &
-        !!$omp& private(kup,kdn,uxn_up,uxn_dn,dudzn,dudz_aa,uyn_up,uyn_dn,dvdzn,dvdz_aa,zeta_now,c_x,c_y,c_t)
+        !$omp parallel private(i,j,k,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
+        !$omp& private(dzbdxn,dzbdx_aa,dzbdyn,dzbdy_aa,dzsdxn,dzsdx_aa,dzsdyn,dzsdy_aa,uxn,ux_aa,uyn,uy_aa) &
+        !$omp& private(uz_grid,dudxn,dudx_aa,dvdyn,dvdy_aa) &
+        !$omp& private(kup,kdn,uxn_up,uxn_dn,dudzn,dudz_aa,uyn_up,uyn_dn,dvdzn,dvdz_aa,zeta_now,c_x,c_y,c_t,gq2d) &
+        !$omp& shared(gq2D_global)
+        gq2D = gq2D_global
+
+        !$omp do collapse(2)
         do j = 1, ny
         do i = 1, nx
 
@@ -529,25 +539,25 @@ end if
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call gq2D_to_nodes_acx(gq2D,dzbdxn,dzbdx,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzbdx_aa = sum(dzbdxn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acx(gq2d,dzbdxn,dzbdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzbdx_aa = sum(dzbdxn*gq2d%wt)/gq2d%wt_tot
                 
-                call gq2D_to_nodes_acy(gq2D,dzbdyn,dzbdy,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzbdy_aa = sum(dzbdyn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acy(gq2d,dzbdyn,dzbdy,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzbdy_aa = sum(dzbdyn*gq2d%wt)/gq2d%wt_tot
 
                 ! Get the centered surface gradient
-                call gq2D_to_nodes_acx(gq2D,dzsdxn,dzsdx,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzsdx_aa = sum(dzsdxn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acx(gq2d,dzsdxn,dzsdx,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzsdx_aa = sum(dzsdxn*gq2d%wt)/gq2d%wt_tot
                 
-                call gq2D_to_nodes_acy(gq2D,dzsdyn,dzsdy,dx,dy,i,j,im1,ip1,jm1,jp1)
-                dzsdy_aa = sum(dzsdyn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acy(gq2d,dzsdyn,dzsdy,dx,dy,i,j,im1,ip1,jm1,jp1)
+                dzsdy_aa = sum(dzsdyn*gq2d%wt)/gq2d%wt_tot
                 
                 ! Get the aa-node centered horizontal velocity at the base
-                call gq2D_to_nodes_acx(gq2D,uxn,ux(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acx(gq2d,uxn,ux(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                ux_aa = sum(uxn*gq2d%wt)/gq2d%wt_tot
                 
-                call gq2D_to_nodes_acy(gq2D,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
+                call gq2D_to_nodes_acy(gq2d,uyn,uy(:,:,1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                uy_aa = sum(uyn*gq2d%wt)/gq2d%wt_tot
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -604,22 +614,22 @@ end if
                         kdn = k-2
                     end if
 
-                    call gq2D_to_nodes_acx(gq2D,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acx(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dudzn = (uxn_up - uxn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    dudz_aa = sum(dudzn*gq2D%wt)/gq2D%wt_tot
+                    dudz_aa = sum(dudzn*gq2d%wt)/gq2d%wt_tot
 
-                    call gq2D_to_nodes_acy(gq2D,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     dvdzn = (uyn_up - uyn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    dvdz_aa = sum(dvdzn*gq2D%wt)/gq2D%wt_tot
+                    dvdz_aa = sum(dvdzn*gq2d%wt)/gq2d%wt_tot
 
                     ! Calculate sigma-corrected derivatives
-                    call gq2D_to_nodes_acx(gq2D,dudxn,dudx(:,:,k-1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn*gq2D%wt)/gq2D%wt_tot  +  c_x*dudz_aa 
+                    call gq2D_to_nodes_acx(gq2d,dudxn,dudx(:,:,k-1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    dudx_aa = sum(dudxn*gq2d%wt)/gq2d%wt_tot  +  c_x*dudz_aa 
 
-                    call gq2D_to_nodes_acy(gq2D,dvdyn,dvdy(:,:,k-1),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn*gq2D%wt)/gq2D%wt_tot  +  c_y*dvdz_aa 
+                    call gq2D_to_nodes_acy(gq2d,dvdyn,dvdy(:,:,k-1),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    dvdy_aa = sum(dvdyn*gq2d%wt)/gq2d%wt_tot  +  c_y*dvdz_aa 
 
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
@@ -653,15 +663,15 @@ end if
                         kdn = k-1 
                     end if
                     
-                    call gq2D_to_nodes_acx(gq2D,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acx(gq2D,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn_up,ux(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acx(gq2d,uxn_dn,ux(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
-                    ux_aa = sum(uxn*gq2D%wt)/gq2D%wt_tot
+                    ux_aa = sum(uxn*gq2d%wt)/gq2d%wt_tot
                     
-                    call gq2D_to_nodes_acy(gq2D,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
-                    call gq2D_to_nodes_acy(gq2D,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn_up,uy(:,:,kup),dx,dy,i,j,im1,ip1,jm1,jp1)
+                    call gq2D_to_nodes_acy(gq2d,uyn_dn,uy(:,:,kdn),dx,dy,i,j,im1,ip1,jm1,jp1)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
-                    uy_aa = sum(uyn*gq2D%wt)/gq2D%wt_tot
+                    uy_aa = sum(uyn*gq2d%wt)/gq2d%wt_tot
                     
                     ! Take zeta directly at vertical cell edge where uz is calculated
                     ! (this is also where ux_aa and uy_aa are calculated above)
@@ -701,7 +711,8 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do 
+        !$omp end do 
+        !$omp end parallel
 
         return 
 
@@ -795,10 +806,10 @@ end if
 
         ! Next, calculate velocity 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
-        !!$omp& private(dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa,ux_aa,uy_aa) &
-        !!$omp& private(uz_grid) &
-        !!$omp& private(zeta_now,c_x,c_y,c_t)
+        !$omp parallel do collapse(2) private(i,j,k,im1,ip1,jm1,jp1,dzsdt_now,dhdt_now,dzbdt_now,H_now,H_inv) &
+        !$omp& private(dzbdx_aa,dzbdy_aa,dzsdx_aa,dzsdy_aa,ux_aa,uy_aa) &
+        !$omp& private(uz_grid,duxdx_aa,duydy_aa,duxdz_aa,duydz_aa,duxdx_now,duydy_now) &
+        !$omp& private(zeta_now,c_x,c_y,c_t)
         do j = 1, ny
         do i = 1, nx
 
@@ -965,7 +976,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do 
+        !$omp end parallel do 
 
         return 
 
@@ -1027,7 +1038,7 @@ end if
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_mid)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,H_mid)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1064,7 +1075,7 @@ end if
             
         end do
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         ! SPECIAL CASES: edge cases for stability...
 
@@ -1251,7 +1262,6 @@ end if
                 ! floating ice (using ice thickness)
 
                 ! x-direction 
-                !!$omp parallel do collapse(2) private(i,j,H_gl,dzsdx_1,dzsdx_2,dzsdx,taud_old)
                 do j = 1, ny 
                 do i = 1, nx-1 
 
@@ -1476,7 +1486,7 @@ end if
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,i1,j1,H_ice_now,z_srf_now,z_sl_now)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,i1,j1,H_ice_now,z_srf_now,z_sl_now)
         do j = 1, ny
         do i = 1, nx 
 
@@ -1546,7 +1556,7 @@ end if
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
 
@@ -1685,7 +1695,7 @@ end if
         ! Find partially-filled outer margins and set velocity to zero
         ! (this will also treat all other ice-free points too) 
         
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1708,7 +1718,7 @@ end if
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return
 

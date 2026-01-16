@@ -235,7 +235,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 21 
+            qtot = 22
             allocate(names(qtot))
                 names(1)  = "H_ice"
                 names(2)  = "z_srf"
@@ -246,18 +246,22 @@ contains
                 names(7)  = "uxy_bar"
                 names(8)  = "ux_bar"
                 names(9)  = "uy_bar"
-                names(10) = "beta"
-                names(11) = "visc_bar"
-                names(12) = "T_prime_b"
-                names(13) = "H_w"
-                names(14) = "mb_net"
-                names(15) = "mb_resid"
-                names(16) = "mb_relax"
-                names(17) = "smb"
-                names(18) = "bmb"
-                names(19) = "cmb"
-                names(20) = "z_sl"
-                names(21) = "lsf"
+                names(10) = "cb_ref"
+                names(11) = "N_eff"
+                names(12) = "beta"
+                names(13) = "taub"
+                names(14) = "taud"
+                names(15) = "visc_bar"
+                names(16) = "T_prime_b"
+                names(17) = "H_w"
+                names(18) = "mb_net"
+                names(19) = "smb"
+                names(20) = "bmb"
+                names(21) = "cmb"
+                names(22) = "z_sl"
+                !names(23) = "lsf"
+                !names(24) = "mb_resid"
+                !names(25) = "mb_relax"
         end if 
 
         write_pd_metrics = .FALSE. 

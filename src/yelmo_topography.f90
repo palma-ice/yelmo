@@ -755,7 +755,7 @@ end if
                 ! Floating point
                 tpo%now%cr_acx(i,j) = tpo%now%cmb_flt_x(i,j)
             else
-                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(ip1,j)) .gt. 0.0_wp) then
+                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(ip1,j)) .gt. 0.5*(bnd%z_sl(i,j)+bnd%z_sl(ip1,j))) then
                     ! Point above sea level. Do not allow to move here. (check)
                     tpo%now%cr_acx(i,j) = -1*dyn%now%ux_bar(i,j)
                 else
@@ -769,7 +769,7 @@ end if
                 ! Floating point
                 tpo%now%cr_acy(i,j) = tpo%now%cmb_flt_y(i,j)
             else
-                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(i,jp1)) .gt. 0.0_wp) then
+                if(0.5*(bnd%z_bed(i,j)+bnd%z_bed(i,jp1)) .gt. 0.5*(bnd%z_sl(i,j)+bnd%z_sl(i,jp1))) then
                     ! Point above sea level. Do nothing for now.
                     tpo%now%cr_acy(i,j) = -1*dyn%now%uy_bar(i,j)
                 else
@@ -788,7 +788,7 @@ end if
                        tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
 
         ! LSF should not affect points above sea level
-        where(bnd%z_bed .gt. 0.0_wp) tpo%now%lsf = -1.0_wp
+        where(bnd%z_bed .gt. bnd%z_sl) tpo%now%lsf = -1.0_wp
 
         ! === Calving ===
         ! Apply calving as a melt rate equal to ice thickness where lsf is positive
@@ -831,7 +831,8 @@ end if
         call calc_G_remove_fractional_ice(mbal_now,tpo%now%H_ice,tpo%now%f_ice,dt)
 
         ! Apply rate and update ice thickness
-        mbal_now = 0.0_wp
+        !mbal_now = 0.0_wp  ! ajr, commented this out, as it is zeroed out above. Otherwise
+        ! the above fractional ice is not calculated and nothing should happen.
         call apply_tendency(tpo%now%H_ice,mbal_now,dt,"frac",adjust_mb=.TRUE.)
 
         ! Add this rate to calving tendency
@@ -853,7 +854,7 @@ end if
             case("equil")
                     ! Do nothing here
             case DEFAULT
-                    where(tpo%now%H_ice .le. 0.0 .and. tpo%now%lsf .lt. 0.0 .and. bnd%z_bed .lt. 0.0) tpo%now%lsf = 1.0_wp
+                    where(tpo%now%H_ice .le. 0.0 .and. tpo%now%lsf .lt. 0.0 .and. bnd%z_bed .lt. bnd%z_sl) tpo%now%lsf = 1.0_wp
         end select 
 
         return

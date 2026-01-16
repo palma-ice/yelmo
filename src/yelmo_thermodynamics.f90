@@ -78,19 +78,18 @@ contains
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
-select case("nodes")
+        select case(thrm%par%qb_method)
+            case(1)     ! "aa" == simple stagger to aa-nodes directly
+                ! Calculate the basal frictional heating (from aa-nodes)
+                call calc_basal_heating_simplestagger(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                                    beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year)
+            case(2)   ! "nodes" == Gaussian quadrature to aa-node, default and best choice
+                ! Calculate the basal frictional heating (from quadrature-nodes)
+                call calc_basal_heating_nodes(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%f_ice, &
+                                beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year,boundaries=thrm%par%boundaries)
+            case DEFAULT
 
-    case("nodes")
-        ! Calculate the basal frictional heating (from quadrature-nodes)
-        call calc_basal_heating_nodes(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%f_ice, &
-                        beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year,boundaries=thrm%par%boundaries)
-
-    case("aa")
-        ! Calculate the basal frictional heating (from aa-nodes)
-        call calc_basal_heating_simplestagger(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                            beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),sec_year=bnd%c%sec_year)
-
-end select
+        end select
         
         ! Calculate internal strain heating
 
@@ -338,8 +337,7 @@ end select
 
         ! ===================================================
 
-        ! ajr: openmp problematic here - leads to NaNs
-        !!$omp parallel do collapse(2) private(i,j,H_ice_now,T_shlf,T_base)
+        !$omp parallel do collapse(2) private(i,j,H_ice_now,T_shlf,T_base)
         do j = 2, ny-1
         do i = 2, nx-1 
             
@@ -407,7 +405,7 @@ end select
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
 ! ajr symtest: check BCs for symmetry
 if (.FALSE.) then
@@ -447,7 +445,7 @@ if (.TRUE.) then
         ! Extrapolate thermodynamics to ice-free and partially ice-covered 
         ! neighbors to the ice margin.
         ! (Helps with stability to give good values of ATT to newly advected points)
-        !!$omp parallel do collapse(2) private(i,j,wt_neighb,wt_tot)
+        !$omp parallel do collapse(2) private(i,j,k,wt_neighb,wt_tot)
         do j = 2, ny-1
         do i = 2, nx-1 
             
@@ -476,7 +474,7 @@ if (.TRUE.) then
     
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 end if 
 
         ! Fill in borders 
@@ -579,7 +577,7 @@ end if
         ! ===================================================
 
         ! ajr: openmp problematic here - leads to NaNs
-        !!$omp parallel do collapse(2) private(i,j,T_base)
+        !$omp parallel do collapse(2) private(i,j,T_base)
         do j = 1, ny
         do i = 1, nx 
 
@@ -617,7 +615,7 @@ end if
 
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -643,6 +641,7 @@ end if
  
         ! Store local parameter values in output object
         call nml_read(filename,group,"method",         par%method,           init=init_pars)
+        call nml_read(filename,group,"qb_method",      par%qb_method,        init=init_pars)
         call nml_read(filename,group,"dt_method",      par%dt_method,        init=init_pars)
         call nml_read(filename,group,"solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,group,"gamma",          par%gamma,            init=init_pars)

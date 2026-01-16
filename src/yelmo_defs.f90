@@ -366,7 +366,8 @@ module yelmo_defs
     ! ydyn parameters
     type ydyn_param_class
 
-        character(len=256) :: solver 
+        character(len=256) :: solver
+        integer    :: uz_method
         integer    :: visc_method 
         real(wp)   :: visc_const 
         integer    :: beta_method
@@ -381,6 +382,8 @@ module yelmo_defs
         real(wp)   :: H_grnd_lim  
         real(wp)   :: beta_min              ! Minimum allowed value of beta
         real(wp)   :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
+        integer    :: scale_T
+        real(wp)   :: T_frz
         character(len=256) :: ssa_lis_opt 
         character(len=56)  :: ssa_lat_bc
         real(wp)   :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
@@ -393,9 +396,10 @@ module yelmo_defs
 
         ! Till-scaling parameters
         integer    :: till_method 
-        character(len=56) :: till_scale
+        integer    :: till_scale_zb
+        integer    :: till_scale_sed
         logical    :: till_is_angle
-        integer    :: till_n_sd 
+        integer    :: till_n_sd
         real(wp)   :: till_f_sed 
         real(wp)   :: till_sed_min
         real(wp)   :: till_sed_max
@@ -633,6 +637,7 @@ module yelmo_defs
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
+        integer             :: qb_method
         character(len=256)  :: dt_method  
         character(len=256)  :: solver_advec 
         integer             :: nx, ny 

@@ -1,16 +1,14 @@
 &ctrl    
+    tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_const     = 0.0               ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 3e3               ! [yr] Ending time
+    time_end        = 20e3              ! [yr] Ending time
     time_equil      = 0e3               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
-    dtt_equil       = 0.05              ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
-    dt1D_out        = 50.0              ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
-    
-    transient_clim  = False             ! Transient forcing? (not used for now)
+
     with_ice_sheet  = True              ! Active ice-sheet component? 
-    optimize        = False             ! Optimize cf_ref initially? 
-    
+    equil_method    = "opt"             ! "none", "relax", "opt"
+
     clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
     
     load_cb_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
@@ -22,7 +20,7 @@
 /
 
 &clim_pd_grl 
-    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    bmb_shlf_const  = -1.0              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
@@ -39,23 +37,58 @@
     z_sl            = -120.0            ! [m] Sea level relative to present-day 
 /
 
-&opt_L21
-    cf_init         = 0.2               ! Initial value of cf_ref everywhere
-    cf_min          = 1e-4              ! [--] Minimum allowed cf value
-    cf_max          = 1.0               ! [--] Maximum allowed cf value
+&t1D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 1.0
+    file            = "none"
+    times           = 0
+/
+
+&t2Dsm
+    method          = "const"           ! "const", "file", "times"
+    dt              = 100.0
+    file            = "none"
+    times           = 0
+/
+
+&t2D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 1000.0
+    file            = "none"
+    times           = 0
+/
+
+&opt
+    opt_cf          = True              ! Should basal friction be optimized?
+    cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
+    cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
+    cf_init         = 0.8               ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
-    H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
-    
-    sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
-    
-    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 5e3               ! [yr] Time limit for time period 1
-    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    H0              = 0.0               ! [m]  L21: Optimization ice-thickness error scaling 
+
+    sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
+    sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
+    fill_method     = "cf_min"          ! nearest, analog, target, cf_min
+
+    rel_tau1        = 100.0  !1.0               ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 2000.0 !6000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 2000.0 !1e3               ! [yr] Time limit for time period 1
+    rel_time2       = 6000.0 !1e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
+    opt_tf          = False              ! Should thermal forcing be optimized?
+    tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
+    tf_time_end     = 20e3               ! [yr] When should optimization of thermal forcing stop?
+    H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
+    tau_m           = 10.0             ! [yr] Optimization relxation timescale 
+    m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
+    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  1.0              ! [degC] Maximum allowed tf_corr value 
+    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False    
 /
+
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-16KM"
@@ -169,6 +202,7 @@
 
 &ydyn
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    uz_method           = 3               ! 1: aa-staggering, 2: strain-rate-on-nodes, 3: jacobian
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
@@ -182,6 +216,8 @@
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
+    scale_T             = 1               ! 0: no scaling of c_bed with T, 1: linearly increase c_bed to c_bed_frozen=cf_ref*N_eff for cold ice
+    T_frz               = -3.0            ! Temperature below which ice considered fully frozen (linear increase in friction )
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_lat_bc          = "floating"      ! "all", "marine", "floating", "none", "slab"
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -196,10 +232,11 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
-    is_angle        = False             ! cb_ref is a till strength angle?
-    n_sd            = 1                 ! Number of samples over z_bed_sd field
-    f_sed           = 1.0               ! Scaling reduction for thick sediments 
+    scale_zb        = 1                 ! 0: none, 1: lin, 2: exp : scaling with elevation
+    scale_sed       = 0                 ! 0: none, 1: min(cb_zb,cb_sed), 2: cb_zb*(lambda_sed*f_sed), 3: 2 but no lower limit
+    is_angle        = False             ! cf_ref/cf_min are till strength angle?
+    n_sd            = 10                ! Number of samples over z_bed_sd field
+    f_sed           = 0.01              ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction
     z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
@@ -245,6 +282,7 @@
 
 &ytherm
     method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    qb_method       = 2                 ! 1: simple-stagger, 2: quadrature
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
@@ -278,7 +316,7 @@
 
 &yelmo_init_topo
     init_topo_load  = True 
-    init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
+    init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
     init_topo_names = "H_ice" "z_bed" "z_bed_sd" "z_srf"    ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     init_topo_state = 0                                     ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd      = -1.0                                  ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
@@ -289,18 +327,18 @@
 
 &yelmo_data 
     pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
+    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
     pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL.nc"
+    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"

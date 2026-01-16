@@ -26,21 +26,22 @@ contains
     !
     ! ===================================================================
 
-    subroutine LSFinit(LSF,H_ice,z_bed,dx)
+    subroutine LSFinit(LSF,H_ice,z_bed,z_sl,dx)
 
         implicit none
 
-        real(wp), intent(OUT) :: LSF(:,:)      ! LSF mask 
-        real(wp), intent(IN)  :: H_ice(:,:)    ! Ice thickness
-        real(wp), intent(IN)  :: z_bed(:,:)   ! bedrock elevation     
-        real(wp), intent(IN)  :: dx            ! Model resolution
+        real(wp), intent(OUT) :: LSF(:,:)       ! LSF mask 
+        real(wp), intent(IN)  :: H_ice(:,:)     ! Ice thickness
+        real(wp), intent(IN)  :: z_bed(:,:)     ! Bedrock elevation     
+        real(wp), intent(IN)  :: z_sl(:,:)      ! Sea level 
+        real(wp), intent(IN)  :: dx             ! Model resolution
 
         ! Initialize LSF value at ocean value
         LSF = 1.0_wp  
         
         ! Assign values
         where(H_ice .gt. 0.0_wp) LSF = -1.0_wp
-        where(z_bed .gt. 0.0_wp) LSF = -1.0_wp 
+        where(z_bed .gt. z_sl) LSF = -1.0_wp 
 
         return
         
@@ -152,7 +153,7 @@ contains
             nx = size(lsf,1)
             ny = size(lsf,2)
             
-            !!$omp parallel do collapse(2) private(i,j,lsf_prev,dlsfdt)
+            !$omp parallel do collapse(2) private(i,j,lsf_prev,dlsfdt)
             do j = 1, ny
             do i = 1, nx
 
@@ -172,7 +173,7 @@ contains
 
             end do
             end do
-            !!$omp end parallel do
+            !$omp end parallel do
 
         end if
 

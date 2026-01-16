@@ -66,7 +66,7 @@ contains
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,wt)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,wt)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -107,7 +107,7 @@ contains
 
         end do 
         end do  
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -140,7 +140,7 @@ contains
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,embayed)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n_grnd,n_mrgn,H_eff,embayed)
         do j = 1, ny 
         do i = 1, nx
 
@@ -237,7 +237,7 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
         
@@ -356,7 +356,7 @@ contains
         ! Initially set calving rate to zero 
         mb_calv = 0.0 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,H_eff)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,H_eff)
         do j=1,ny
         do i=1,nx
 
@@ -393,7 +393,7 @@ contains
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -470,7 +470,7 @@ contains
 
         mb_calv = 0.0_wp
         
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
         do j = 1, ny
         do i = 1, nx  
             
@@ -521,7 +521,7 @@ contains
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -574,7 +574,7 @@ contains
 
         mb_calv = 0.0_wp
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,wt,calv_ref,H_eff,calv_now)
         do j = 1, ny
         do i = 1, nx  
             
@@ -619,7 +619,7 @@ contains
 
         end do
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -647,7 +647,7 @@ contains
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,eps_eff_neighb)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,eps_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -688,7 +688,7 @@ contains
             
         end do 
         end do 
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -717,7 +717,7 @@ contains
         ! Set boundary condition code
         BC = boundary_code(boundaries)
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,tau_eff_neighb)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,n,tau_eff_neighb)
         do j = 1, ny 
         do i = 1, nx 
 
@@ -758,7 +758,7 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -835,7 +835,7 @@ contains
         ! Intialize calving rate to zero 
         mb_calv = 0.0 
 
-        !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,mask_neighb,is_grnd_margin,H_eff,H_ocn_now,tau_c,H_max)
+        !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,mask_neighb,is_grnd_margin,H_eff,H_ocn_now,tau_c,H_max)
         do j = 1, ny
         do i = 1, nx 
 
@@ -884,7 +884,7 @@ contains
 
         end do 
         end do
-        !!$omp end parallel do
+        !$omp end parallel do
 
         return 
 
@@ -929,7 +929,7 @@ contains
         if (calv_max .gt. 0.0) then 
             ! Determine grounded calving rate 
 
-            !!$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_grnd_margin,f_scale,H_eff)
+            !$omp parallel do collapse(2) private(i,j,im1,ip1,jm1,jp1,is_grnd_margin,f_scale,H_eff)
             do j = 1, ny
             do i = 1, nx 
 
@@ -958,7 +958,7 @@ contains
 
             end do 
             end do
-            !!$omp end parallel do
+            !$omp end parallel do
 
         end if 
 

@@ -1266,8 +1266,7 @@ end if
         integer,    intent(IN) :: iter_redo 
 
         ! Local variables
-        integer    :: ncid, n, nx, ny 
-        real(wp) :: time_prev 
+        integer    :: ncid, n, nx, ny
 
         logical, parameter :: write_pc_tau_field = .FALSE.  ! Signficantly increases filesize, careful!
 
@@ -1278,9 +1277,7 @@ end if
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)

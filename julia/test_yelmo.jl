@@ -10,15 +10,23 @@ include("Yelmo.jl")
 # Initialize Yelmo
 yelmo_init("../par/yelmo_initmip.nml", "file", 0.0)
 
-grd = yelmo_get_grid_info()
+# Initialize Yelmo state
+yelmo_init_state(0.0, "robin-cold")
 
+# Advance to new time!
+yelmo_step(5.0)
+
+# Get some data!
+grd = yelmo_get_grid_info()
 H = yelmo_get_var2D(grd.nx, grd.ny, "tpo_H_ice")
 zs = yelmo_get_var2D(grd.nx, grd.ny, "tpo_z_srf")
 T = yelmo_get_var3D(grd.nx, grd.ny, grd.nz_aa, "thrm_T_ice")
+uxy = yelmo_get_var3D(grd.nx, grd.ny, grd.nz_aa, "dyn_uxy")
 
-heatmap(H)
+uxy_s = yelmo_get_var2D(grd.nx, grd.ny, "dyn_uxy_s")
 
-
+# Plot some data
+heatmap(log10.(uxy_s))
 
 
 # Coupled time loop

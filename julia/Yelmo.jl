@@ -4,6 +4,29 @@ function yelmo_init(filename::String, grid_def::String, time::Float64)
     ccall((:yelmo_init, yelmolib), Cvoid,
         (Ptr{UInt8}, Ptr{UInt8}, Float64),
         filename * "\0", grid_def * "\0", time)
+    
+    # Return Yelmo object with current state
+    g = yelmo_get_grid_info()
+
+    bnd = (
+        zb = yelmo_get_var2D(g.nx, g.ny, "tpo_z_bed"),
+    )
+
+    tpo = (
+        H = yelmo_get_var2D(g.nx, g.ny, "tpo_H_ice"),
+        zs = yelmo_get_var2D(g.nx, g.ny, "tpo_z_srf")
+    )
+
+    thrm = (
+        T = yelmo_get_var3D(g.nx, g.ny, g.nz_aa, "thrm_T_ice"),
+    )
+
+    dyn = (
+        uxy = yelmo_get_var3D(g.nx, g.ny, g.nz_aa, "dyn_uxy"),
+        uxy_s = yelmo_get_var2D(g.nx, g.ny, "dyn_uxy_s")
+    )
+
+    return (g=g, tpo=tpo, thrm=thrm, dyn=dyn, bnd=bnd)
 end
 
 function yelmo_init_state(time::Float64, thrm_method::String)

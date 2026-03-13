@@ -8,11 +8,10 @@ using CairoMakie
 include("Yelmo.jl")
 
 # Initialize Yelmo
-yelmo_init("../par/yelmo_initmip.nml", "file", 0.0)
-grd = yelmo_get_grid_info()
+ylmo = yelmo_init("../par/yelmo_initmip.nml", "file", 0.0)
 
 # Populate boundary fields
-yelmo_set_var2D!("bnd_H_sed", fill(100.0,grd.nx,grd.ny) )
+yelmo_set_var2D!("bnd_H_sed", fill(100.0,ylmo.g.nx,ylmo.g.ny) )
 
 # [TO DO]
 
@@ -23,20 +22,20 @@ yelmo_init_state(0.0, "robin-cold")
 yelmo_step(5.0)
 
 # Update boundary fields
+yelmo_set_var2D!("bnd_H_sed", fill(200.0,ylmo.g.nx,ylmo.g.ny) )
 
-# [TO DO]
-
+# Advance to new time!
+yelmo_step(10.0)
 
 # Get some data!
-H = yelmo_get_var2D(grd.nx, grd.ny, "tpo_H_ice")
-zs = yelmo_get_var2D(grd.nx, grd.ny, "tpo_z_srf")
-T = yelmo_get_var3D(grd.nx, grd.ny, grd.nz_aa, "thrm_T_ice")
-uxy = yelmo_get_var3D(grd.nx, grd.ny, grd.nz_aa, "dyn_uxy")
-
-uxy_s = yelmo_get_var2D(grd.nx, grd.ny, "dyn_uxy_s")
+yelmo_get_var2D!(ylmo.tpo.H,    "tpo_H_ice")
+yelmo_get_var2D!(ylmo.tpo.zs,   "tpo_z_srf")
+yelmo_get_var3D!(ylmo.thrm.T,   "thrm_T_ice")
+yelmo_get_var3D!(ylmo.dyn.uxy,  "dyn_uxy")
+yelmo_get_var2D!(ylmo.dyn.uxy_s,"dyn_uxy_s")
 
 # Plot some data
-heatmap(log10.(uxy_s))
+heatmap(log10.(ylmo.dyn.uxy_s))
 
 
 # Coupled time loop

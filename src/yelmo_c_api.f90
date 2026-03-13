@@ -100,7 +100,7 @@ contains
     end if
 
   end subroutine yelmo_get_grid_info
-  
+
   ! =========================================================================
   ! 2D variable getter
   ! =========================================================================
@@ -432,14 +432,41 @@ contains
     H = real(ylmo%tpo%now%H_ice, c_double)
   end subroutine
 
-  ! Example: push a field in from Julia (e.g. SMB, basal melt)
-  subroutine yelmo_set_bmb(bmb, nx, ny) bind(C, name="yelmo_set_bmb")
+! =========================================================================
+  ! C-bound boundary field setter: restricted to ybound_class fields only.
+  ! =========================================================================
+  subroutine yelmo_set_var2D(v2D, nx, ny, name) bind(C, name="yelmo_set_var2D")
     use iso_c_binding
-    integer(c_int), value  :: nx, ny
-    real(c_double), intent(in) :: bmb(nx, ny)
-    ylmo%bnd%bmb_shlf = real(bmb, wp)
-  end subroutine
+    integer(c_int),    value      :: nx, ny
+    real(c_double),    intent(in) :: v2D(nx, ny)
+    character(c_char), intent(in) :: name(*)
 
+    ! Local variables
+    character(len=256) :: f_name
+
+    f_name = trim(c_to_f_string(name))
+
+    select case(trim(f_name))
+      case("bnd_z_bed");       ylmo%bnd%z_bed      = real(v2D, wp)
+      case("bnd_z_bed_sd");    ylmo%bnd%z_bed_sd   = real(v2D, wp)
+      case("bnd_z_sl");        ylmo%bnd%z_sl       = real(v2D, wp)
+      case("bnd_H_sed");       ylmo%bnd%H_sed      = real(v2D, wp)
+      case("bnd_smb");         ylmo%bnd%smb        = real(v2D, wp)
+      case("bnd_T_srf");       ylmo%bnd%T_srf      = real(v2D, wp)
+      case("bnd_bmb_shlf");    ylmo%bnd%bmb_shlf   = real(v2D, wp)
+      case("bnd_fmb_shlf");    ylmo%bnd%fmb_shlf   = real(v2D, wp)
+      case("bnd_T_shlf");      ylmo%bnd%T_shlf     = real(v2D, wp)
+      case("bnd_Q_geo");       ylmo%bnd%Q_geo      = real(v2D, wp)
+      case("bnd_enh_srf");     ylmo%bnd%enh_srf    = real(v2D, wp)
+      case("bnd_H_ice_ref");   ylmo%bnd%H_ice_ref  = real(v2D, wp)
+      case("bnd_z_bed_ref");   ylmo%bnd%z_bed_ref  = real(v2D, wp)
+      case("bnd_tau_relax");   ylmo%bnd%tau_relax  = real(v2D, wp)
+
+      case DEFAULT
+        write(*,*) "yelmo_set_var2D:: variable not found or not settable: "//trim(f_name)
+    end select
+
+  end subroutine yelmo_set_var2D
 
   function c_to_f_string(c_str) result(f_str)
     use iso_c_binding

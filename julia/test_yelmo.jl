@@ -9,6 +9,12 @@ include("Yelmo.jl")
 
 # Initialize Yelmo
 yelmo_init("../par/yelmo_initmip.nml", "file", 0.0)
+grd = yelmo_get_grid_info()
+
+# Populate boundary fields
+yelmo_set_var2D!("bnd_H_sed", fill(100.0,grd.nx,grd.ny) )
+
+# [TO DO]
 
 # Initialize Yelmo state
 yelmo_init_state(0.0, "robin-cold")
@@ -16,8 +22,12 @@ yelmo_init_state(0.0, "robin-cold")
 # Advance to new time!
 yelmo_step(5.0)
 
+# Update boundary fields
+
+# [TO DO]
+
+
 # Get some data!
-grd = yelmo_get_grid_info()
 H = yelmo_get_var2D(grd.nx, grd.ny, "tpo_H_ice")
 zs = yelmo_get_var2D(grd.nx, grd.ny, "tpo_z_srf")
 T = yelmo_get_var3D(grd.nx, grd.ny, grd.nz_aa, "thrm_T_ice")

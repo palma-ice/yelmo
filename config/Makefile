@@ -55,7 +55,7 @@ yelmo-static: $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests)
 	@echo "    $(objdir)/libyelmo.a is ready."
 	@echo " "
 
-yelmo-c:
+yelmo-c: yelmo-static
 		gfortran -shared -fPIC $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(srcdir)/yelmo_c_api.f90 -o $(objdir)/libyelmo_c_api.so \
 		-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)
 		@echo " "

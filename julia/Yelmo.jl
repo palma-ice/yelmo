@@ -80,9 +80,14 @@ function yelmo_get_var3D(nx::Int, ny::Int, nz::Int, name::String)
     return v3D
 end
 
-function yelmo_set_bmb(bmb::Matrix{Float64})
-    nx, ny = size(bmb)
-    ccall((:yelmo_set_bmb, yelmolib), Cvoid,
-        (Ptr{Float64}, Int32, Int32),
-        bmb, Int32(nx), Int32(ny))
+function yelmo_set_var2D!(name::String, v2D::Array{Float64,2})
+
+    nx, ny = size(v2D)
+
+    ccall((:yelmo_set_var2D, yelmolib), Cvoid,
+          (Ptr{Cdouble}, Cint, Cint, Cstring),
+          v2D, nx, ny, name)
+
+    return nothing
+
 end

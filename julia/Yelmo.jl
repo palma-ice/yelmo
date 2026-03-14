@@ -190,8 +190,16 @@ end
 
 function yelmo_get_var3D(nx::Int, ny::Int, nz::Int, name::String; alias::String="ylmo1")
     v3D = Array{Float64}(undef, nx, ny, nz)
-    yelmo_get_var3D!(v3D, name, alias)
+    yelmo_get_var3D!(v3D, name; alias)
     return v3D
+end
+
+function yelmo_sync(ylmo)
+    # Push values from Julia to fortran 
+    # (for now just boundary fields)
+    for k in keys(ylmo.v.bnd)
+        yelmo_set_var2D!("bnd_$(k)", ylmo.bnd[k]; ylmo.alias)
+    end
 end
 
 function yelmo_set_var2D!(name::String, v2D::Array{Float64,2}; alias::String="ylmo1")

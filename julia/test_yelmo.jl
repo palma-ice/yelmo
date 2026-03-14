@@ -9,12 +9,18 @@ include("Yelmo.jl")
 
 # Initialize Yelmo
 ylmo = Yelmo("../par/yelmo_initmip.nml", "file", 0.0);
+ylmo2 = Yelmo("../par/yelmo_initmip.nml", "file", 0.0; alias="ylmo2");
 
 # Populate boundary fields
-yelmo_set_var2D!("bnd_H_sed", fill(100.0,ylmo.g.nx,ylmo.g.ny) )
+ylmo.bnd.H_sed .= 100.0
+yelmo_sync(ylmo)
+
+ylmo2.bnd.H_sed .= 200.0
+yelmo_sync(ylmo2)
 
 # Initialize Yelmo state
 init_state!(ylmo,0.0, "robin-cold");
+init_state!(ylmo2,0.0, "robin-cold");
 
 time_init, time_end, dt = 0.0, 5.0, 1.0;
 
@@ -24,7 +30,8 @@ for t in time_init:dt:time_end
     time_step!(ylmo,dt);
 
     # Update boundary fields
-    yelmo_set_var2D!("bnd_H_sed", fill(200.0,ylmo.g.nx,ylmo.g.ny) )
+    ylmo.bnd.H_sed .= 100.0 .+ t
+    yelmo_sync(ylmo)
 
 end
 

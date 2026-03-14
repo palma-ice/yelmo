@@ -3,7 +3,7 @@ cd(@__DIR__)
 import Pkg; Pkg.activate(".")
 #########################################################
 
-#using CairoMakie
+using CairoMakie
 
 include("Yelmo.jl")
 
@@ -20,6 +20,9 @@ yelmo_init_state(0.0, "robin-cold")
 
 # Advance to new time!
 yelmo_step(5.0)
+
+# Update data in julia
+yelmo_update_variable_set!(ylmo.tpo, ylmo.v.tpo, "tpo")
 
 # Update boundary fields
 yelmo_set_var2D!("bnd_H_sed", fill(200.0,ylmo.g.nx,ylmo.g.ny) )

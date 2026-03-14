@@ -20,12 +20,12 @@ function yelmo_init(filename::String, grid_def::String, time::Float64)
         tpo = parse_variable_table("input/yelmo-variables-ytopo.md"),
     )
 
-    bnd = yelmo_get_variable_set(v.bnd,"bnd",g.nx,g.ny,g.nz_aa,g.nz_ac)
-    dta = yelmo_get_variable_set(v.dta,"dta",g.nx,g.ny,g.nz_aa,g.nz_ac)
-    dyn = yelmo_get_variable_set(v.dyn,"dyn",g.nx,g.ny,g.nz_aa,g.nz_ac)
-    mat = yelmo_get_variable_set(v.mat,"mat",g.nx,g.ny,g.nz_aa,g.nz_ac)
-    thrm = yelmo_get_variable_set(v.thrm,"thrm",g.nx,g.ny,g.nz_aa,g.nz_ac)
-    tpo = yelmo_get_variable_set(v.tpo,"tpo",g.nx,g.ny,g.nz_aa,g.nz_ac)
+    bnd = yelmo_get_variable_set(v.bnd,"bnd",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
+    dta = yelmo_get_variable_set(v.dta,"dta",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
+    dyn = yelmo_get_variable_set(v.dyn,"dyn",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
+    mat = yelmo_get_variable_set(v.mat,"mat",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
+    thrm = yelmo_get_variable_set(v.thrm,"thrm",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
+    tpo = yelmo_get_variable_set(v.tpo,"tpo",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
     
     # tpo = (
     #     H = yelmo_get_var2D(g.nx, g.ny, "tpo_H_ice"),
@@ -117,6 +117,25 @@ function _load_var(meta, prefix, k, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
         return yelmo_get_var3D(nx, ny, nzr_ac, varname)
     else
         return yelmo_get_var2D(nx, ny, varname)
+    end
+end
+
+function yelmo_update_variable_set!(dat, vlist, prefix)
+    for k in keys(vlist)
+        _update_var!(dat[k], vlist[k], prefix, k)
+    end
+    return dat
+end
+
+function _update_var!(arr, meta, prefix, k)
+    varname = "$(prefix)_$(k)"
+    dims = meta.dimensions
+    if :zeta_aa in dims
+        yelmo_get_var3D!(arr, varname)
+    elseif :zeta_ac in dims
+        yelmo_get_var3D!(arr, varname)
+    else
+        yelmo_get_var2D!(arr, varname)
     end
 end
 

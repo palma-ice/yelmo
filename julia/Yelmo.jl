@@ -1,12 +1,27 @@
 const yelmolib = "../libyelmo/include/libyelmo_c_api.so"
 
-function yelmo_init(filename::String, grid_def::String, time::Float64)
+const VERTICAL_DIMS = (:zeta, :zeta_ac, :zeta_rock, :zeta_rock_ac)
 
-    # Call yelmo_init fortran function
+mutable struct Yelmo
+    domain::String
+    time::Float64
+    g::NamedTuple
+    v::NamedTuple
+    bnd::NamedTuple
+    dta::NamedTuple
+    dyn::NamedTuple
+    mat::NamedTuple
+    thrm::NamedTuple
+    tpo::NamedTuple
+end
+
+function Yelmo(filename::String, grid_def::String, time::Float64, domain::String)
+
+    # First call yelmo init to initialize model in fortran
     ccall((:yelmo_init, yelmolib), Cvoid,
         (Ptr{UInt8}, Ptr{UInt8}, Float64),
         filename * "\0", grid_def * "\0", time)
-    
+
     # Populate Julia version of Yelmo object with info from fortran
     g = yelmo_get_grid_info()
 
@@ -27,31 +42,37 @@ function yelmo_init(filename::String, grid_def::String, time::Float64)
     thrm = yelmo_get_variable_set(v.thrm,"thrm",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
     tpo = yelmo_get_variable_set(v.tpo,"tpo",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
     
-    # tpo = (
-    #     H = yelmo_get_var2D(g.nx, g.ny, "tpo_H_ice"),
-    #     zs = yelmo_get_var2D(g.nx, g.ny, "tpo_z_srf")
-    # )
-
-    # thrm = (
-    #     T = yelmo_get_var3D(g.nx, g.ny, g.nz_aa, "thrm_T_ice"),
-    # )
-
-    # dyn = (
-    #     uxy = yelmo_get_var3D(g.nx, g.ny, g.nz_aa, "dyn_uxy"),
-    #     uxy_s = yelmo_get_var2D(g.nx, g.ny, "dyn_uxy_s")
-    # )
-
-    return (g=g, v=v, tpo=tpo, thrm=thrm, dyn=dyn, bnd=bnd)
+    return Yelmo(domain,time,g,v,bnd,dta,dyn,mat,thrm,tpo)
 end
 
-function yelmo_init_state(time::Float64, thrm_method::String)
+function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String)
+    
+    # call yelmo_init_state in fortran
     ccall((:yelmo_init_state, yelmolib), Cvoid,
         (Float64, Ptr{UInt8}),
         time, thrm_method * "\0")
+    
+    # Update yelmo in julia
+    yelmo_get_variables!(ylmo)
+
+    # Update time
+    ylmo.time = time
+
+    return ylmo
 end
 
-function yelmo_step(time::Float64)
-    ccall((:yelmo_step, yelmolib), Cvoid, (Float64,), time)
+function time_step!(ylmo::Yelmo, dt::Float64)
+
+    # Update time
+    ylmo.time += dt
+    
+    # Call yelmo_step in fortran
+    ccall((:yelmo_step, yelmolib), Cvoid, (Float64,), ylmo.time)
+
+    # Update yelmo in julia
+    yelmo_get_variables!(ylmo)
+
+    return ylmo
 end
 
 function yelmo_get_grid_info()
@@ -98,45 +119,51 @@ function yelmo_get_grid_info()
 
 end
 
-function yelmo_get_variable_set(vlist, prefix, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
-    NamedTuple{keys(vlist)}(
-        _load_var(vlist[k], prefix, k, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac) for k in keys(vlist)
-    )
+function yelmo_get_variables!(ylmo)
+
+    yelmo_get_variable_set!(ylmo.bnd, ylmo.v.bnd, "bnd")
+    yelmo_get_variable_set!(ylmo.dta, ylmo.v.dta, "dta")
+    yelmo_get_variable_set!(ylmo.dyn, ylmo.v.dyn, "dyn")
+    yelmo_get_variable_set!(ylmo.mat, ylmo.v.mat, "mat")
+    yelmo_get_variable_set!(ylmo.thrm, ylmo.v.thrm, "thrm")
+    yelmo_get_variable_set!(ylmo.tpo, ylmo.v.tpo, "tpo")
+    
+    return ylmo
 end
 
-function _load_var(meta, prefix, k, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
-    varname = "$(prefix)_$(k)"
-    dims = meta.dimensions
-    if :zeta in dims
-        return yelmo_get_var3D(nx, ny, nz_aa, varname)
-    elseif :zeta_ac in dims
-        return yelmo_get_var3D(nx, ny, nz_ac, varname)
-    elseif :zeta_rock in dims
-        return yelmo_get_var3D(nx, ny, nzr_aa, varname)
-    elseif :zeta_rock_ac in dims
-        return yelmo_get_var3D(nx, ny, nzr_ac, varname)
-    else
-        return yelmo_get_var2D(nx, ny, varname)
-    end
-end
-
-function yelmo_update_variable_set!(dat, vlist, prefix)
+function yelmo_get_variable_set!(dat, vlist, prefix)
     for k in keys(vlist)
-        _update_var!(dat[k], vlist[k], prefix, k)
+        _get_var!(dat[k], vlist[k], prefix, k)
     end
     return dat
 end
 
-function _update_var!(arr, meta, prefix, k)
+function _get_var!(arr, meta, prefix, k)
     varname = "$(prefix)_$(k)"
     dims = meta.dimensions
-    if :zeta_aa in dims
-        yelmo_get_var3D!(arr, varname)
-    elseif :zeta_ac in dims
+    is3D = any(d -> d in VERTICAL_DIMS, dims)
+    if is3D
         yelmo_get_var3D!(arr, varname)
     else
         yelmo_get_var2D!(arr, varname)
     end
+end
+
+function yelmo_get_variable_set(vlist, prefix, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
+    dat = NamedTuple{keys(vlist)}(
+        _alloc_var(vlist[k], nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac) for k in keys(vlist)
+    )
+    yelmo_get_variable_set!(dat, vlist, prefix)
+    return dat
+end
+
+function _alloc_var(meta, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
+    dims = meta.dimensions
+    nz = nothing
+    for (d, n) in ((:zeta, nz_aa), (:zeta_ac, nz_ac), (:zeta_rock, nzr_aa), (:zeta_rock_ac, nzr_ac))
+        d in dims && (nz = n; break)
+    end
+    return isnothing(nz) ? zeros(Float64, nx, ny) : zeros(Float64, nx, ny, nz)
 end
 
 function yelmo_get_var2D!(v2D::Array{Float64,2}, name::String)

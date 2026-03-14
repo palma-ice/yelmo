@@ -4,7 +4,11 @@ module yelmo_c_api
   
   implicit none
 
-  type(yelmo_class) :: ylmo   ! persistent state
+  ! type(yelmo_class), target :: ylmo1   ! persistent state
+  ! type(yelmo_class), target :: ylmo2   ! persistent state
+  ! type(yelmo_class), pointer :: ylmo    ! persistent state
+  
+  type(yelmo_class) :: ylmo    ! persistent state
 
 contains
 

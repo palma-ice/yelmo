@@ -3,7 +3,7 @@ const yelmolib = "../libyelmo/include/libyelmo_c_api.so"
 const VERTICAL_DIMS = (:zeta, :zeta_ac, :zeta_rock, :zeta_rock_ac)
 
 mutable struct Yelmo
-    domain::String
+    alias::String
     time::Float64
     g::NamedTuple
     v::NamedTuple
@@ -15,12 +15,12 @@ mutable struct Yelmo
     tpo::NamedTuple
 end
 
-function Yelmo(filename::String, grid_def::String, time::Float64, domain::String)
+function Yelmo(filename::String, grid_def::String, time::Float64; alias::String="ylmo1")
 
     # First call yelmo init to initialize model in fortran
     ccall((:yelmo_init, yelmolib), Cvoid,
-        (Ptr{UInt8}, Ptr{UInt8}, Float64),
-        filename * "\0", grid_def * "\0", time)
+        (Ptr{UInt8}, Ptr{UInt8}, Float64, Ptr{UInt8}),
+        filename * "\0", grid_def * "\0", time, alias * "\0")
 
     # Populate Julia version of Yelmo object with info from fortran
     g = yelmo_get_grid_info()
@@ -42,15 +42,15 @@ function Yelmo(filename::String, grid_def::String, time::Float64, domain::String
     thrm = yelmo_get_variable_set(v.thrm,"thrm",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
     tpo = yelmo_get_variable_set(v.tpo,"tpo",g.nx,g.ny,g.nz_aa,g.nz_ac,g.nzr_aa,g.nzr_ac)
     
-    return Yelmo(domain,time,g,v,bnd,dta,dyn,mat,thrm,tpo)
+    return Yelmo(alias,time,g,v,bnd,dta,dyn,mat,thrm,tpo)
 end
 
-function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String)
+function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String; alias::String="ylmo1")
     
     # call yelmo_init_state in fortran
     ccall((:yelmo_init_state, yelmolib), Cvoid,
-        (Float64, Ptr{UInt8}),
-        time, thrm_method * "\0")
+        (Float64, Ptr{UInt8}, Ptr{UInt8}),
+        time, thrm_method * "\0", alias * "\0")
     
     # Update yelmo in julia
     yelmo_get_variables!(ylmo)
@@ -61,13 +61,13 @@ function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String)
     return ylmo
 end
 
-function time_step!(ylmo::Yelmo, dt::Float64)
+function time_step!(ylmo::Yelmo, dt::Float64; alias::String="ylmo1")
 
     # Update time
     ylmo.time += dt
     
     # Call yelmo_step in fortran
-    ccall((:yelmo_step, yelmolib), Cvoid, (Float64,), ylmo.time)
+    ccall((:yelmo_step, yelmolib), Cvoid, (Float64, Ptr{UInt8}), ylmo.time, alias * "\0")
 
     # Update yelmo in julia
     yelmo_get_variables!(ylmo)
@@ -75,7 +75,7 @@ function time_step!(ylmo::Yelmo, dt::Float64)
     return ylmo
 end
 
-function yelmo_get_grid_info()
+function yelmo_get_grid_info(; alias::String="ylmo1")
 
     # Step 1: get sizes
     nx    = Ref{Cint}(0)
@@ -86,8 +86,8 @@ function yelmo_get_grid_info()
     nzr_ac = Ref{Cint}(0)
 
     ccall((:yelmo_get_grid_sizes, yelmolib), Cvoid,
-          (Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint}),
-          nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
+          (Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ref{Cint}, Ptr{UInt8}),
+          nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac, alias * "\0")
 
     # Step 2: allocate buffers
     xc      = Vector{Cdouble}(undef, nx[])
@@ -99,8 +99,8 @@ function yelmo_get_grid_info()
 
     # Step 3: fill buffers
     ccall((:yelmo_get_grid_info, yelmolib), Cvoid,
-          (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}),
-          xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac)
+          (Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{Cdouble}, Ptr{UInt8}),
+          xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac, alias * "\0")
 
     return (
         nx    = Int(nx[]),
@@ -166,41 +166,41 @@ function _alloc_var(meta, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
     return isnothing(nz) ? zeros(Float64, nx, ny) : zeros(Float64, nx, ny, nz)
 end
 
-function yelmo_get_var2D!(v2D::Array{Float64,2}, name::String)
+function yelmo_get_var2D!(v2D::Array{Float64,2}, name::String; alias::String="ylmo1")
     nx, ny = size(v2D)
     ccall((:yelmo_get_var2D, yelmolib), Cvoid,
-        (Ptr{Float64}, Int32, Int32, Ptr{UInt8}),
-        v2D, Int32(nx), Int32(ny), name * "\0")
+        (Ptr{Float64}, Int32, Int32, Ptr{UInt8}, Ptr{UInt8}),
+        v2D, Int32(nx), Int32(ny), name * "\0", alias * "\0")
     return v2D
 end
 
-function yelmo_get_var2D(nx::Int, ny::Int, name::String)
+function yelmo_get_var2D(nx::Int, ny::Int, name::String; alias::String="ylmo1")
     v2D = Matrix{Float64}(undef, nx, ny)
-    yelmo_get_var2D!(v2D, name)
+    yelmo_get_var2D!(v2D, name; alias)
     return v2D
 end
 
-function yelmo_get_var3D!(v3D::Array{Float64,3}, name::String)
+function yelmo_get_var3D!(v3D::Array{Float64,3}, name::String; alias::String="ylmo1")
     nx, ny, nz = size(v3D)
     ccall((:yelmo_get_var3D, yelmolib), Cvoid,
-        (Ptr{Float64}, Int32, Int32, Int32, Ptr{UInt8}),
-        v3D, Int32(nx), Int32(ny), Int32(nz), name * "\0")
+        (Ptr{Float64}, Int32, Int32, Int32, Ptr{UInt8}, Ptr{UInt8}),
+        v3D, Int32(nx), Int32(ny), Int32(nz), name * "\0", alias * "\0")
     return v3D
 end
 
-function yelmo_get_var3D(nx::Int, ny::Int, nz::Int, name::String)
+function yelmo_get_var3D(nx::Int, ny::Int, nz::Int, name::String; alias::String="ylmo1")
     v3D = Array{Float64}(undef, nx, ny, nz)
-    yelmo_get_var3D!(v3D, name)
+    yelmo_get_var3D!(v3D, name, alias)
     return v3D
 end
 
-function yelmo_set_var2D!(name::String, v2D::Array{Float64,2})
+function yelmo_set_var2D!(name::String, v2D::Array{Float64,2}; alias::String="ylmo1")
 
     nx, ny = size(v2D)
 
     ccall((:yelmo_set_var2D, yelmolib), Cvoid,
-          (Ptr{Cdouble}, Cint, Cint, Cstring),
-          v2D, nx, ny, name)
+          (Ptr{Cdouble}, Cint, Cint, Cstring, Ptr{UInt8}),
+          v2D, nx, ny, name, alias)
 
     return nothing
 

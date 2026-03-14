@@ -1,22 +1,40 @@
 module yelmo_c_api
   
   use yelmo
-  
+
   implicit none
 
-  ! type(yelmo_class), target :: ylmo1   ! persistent state
-  ! type(yelmo_class), target :: ylmo2   ! persistent state
-  ! type(yelmo_class), pointer :: ylmo    ! persistent state
+  type(yelmo_class), target :: ylmo1   ! persistent state
+  type(yelmo_class), target :: ylmo2   ! persistent state
+  type(yelmo_class), pointer :: ylmo    ! persistent state
   
-  type(yelmo_class) :: ylmo    ! persistent state
+  ! type(yelmo_class) :: ylmo    ! persistent state
 
 contains
 
-  subroutine yelmo_init_wrapper(filename, grid_def, time) bind(C, name="yelmo_init")
+  subroutine yelmo_set_alias(alias) bind(C, name="yelmo_set_alias")
+    use iso_c_binding
+    character(c_char), intent(in) :: alias(*)
+
+    character(len=56)             :: f_alias
+
+    f_alias = trim(c_to_f_string(alias))
+
+    if (trim(f_alias) .eq. "ylmo2") then
+      ylmo => ylmo2
+    else
+      ylmo => ylmo1
+    end if
+
+    return
+  end subroutine yelmo_set_alias
+
+  subroutine yelmo_init_wrapper(filename, grid_def, time, alias) bind(C, name="yelmo_init")
     use iso_c_binding
     character(c_char), intent(in) :: filename(*)
     character(c_char), intent(in) :: grid_def(*)
     real(c_double), value         :: time
+    character(c_char), intent(in) :: alias(*)
 
     ! Local variables
     character(len=1028)           :: f_filename
@@ -25,39 +43,60 @@ contains
     ! Convert C string to Fortran string (null-terminated scan)
     f_filename    = trim(c_to_f_string(filename))
     f_grid_def    = trim(c_to_f_string(grid_def))
+    
+    call yelmo_set_alias(alias)
 
     call yelmo_init(ylmo, filename=trim(f_filename), grid_def=trim(f_grid_def), time=real(time, wp))
+
+    nullify(ylmo)
+
   end subroutine
 
 
-  subroutine yelmo_init_state_wrapper(time, thrm_method) bind(C, name="yelmo_init_state")
+  subroutine yelmo_init_state_wrapper(time, thrm_method, alias) bind(C, name="yelmo_init_state")
     use iso_c_binding
     real(c_double), value         :: time
     character(c_char), intent(in) :: thrm_method(*) ! e.g., "robin-cold"
+    character(c_char), intent(in) :: alias(*)
 
     ! Local variables
     character(len=56) :: f_thrm_method
 
     ! Convert C string to Fortran string (null-terminated scan)
-    f_thrm_method    = trim(c_to_f_string(thrm_method))
+    f_thrm_method = trim(c_to_f_string(thrm_method))
+
+    call yelmo_set_alias(alias)
 
     call yelmo_init_state(ylmo, time=real(time, wp), thrm_method=trim(f_thrm_method))
+
+    nullify(ylmo)
+
   end subroutine
 
-  subroutine yelmo_step_wrapper(time) bind(C, name="yelmo_step")
+  subroutine yelmo_step_wrapper(time,alias) bind(C, name="yelmo_step")
     use iso_c_binding
     real(c_double), value :: time
+    character(c_char), intent(in) :: alias(*)
+
+    call yelmo_set_alias(alias)
+
     call yelmo_update(ylmo, real(time, wp))
+
+    nullify(ylmo)
+
   end subroutine
 
   ! =========================================================================
   ! C-bound grid sizes getter: returns nx, ny, nz_aa, nz_ac only.
   ! Call this first to learn buffer sizes before calling yelmo_get_grid_info.
   ! =========================================================================
-  subroutine yelmo_get_grid_sizes(nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac) &
+  subroutine yelmo_get_grid_sizes(nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac, alias) &
                                   bind(C, name="yelmo_get_grid_sizes")
     use iso_c_binding
     integer(c_int), intent(out) :: nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac
+    character(c_char), intent(in) :: alias(*)
+    
+    call yelmo_set_alias(alias)
 
     nx    = ylmo%grd%nx
     ny    = ylmo%grd%ny
@@ -65,6 +104,8 @@ contains
     nz_ac = ylmo%par%nz_ac
     nzr_aa = ylmo%thrm%par%nzr_aa
     nzr_ac = ylmo%thrm%par%nzr_ac
+
+    nullify(ylmo)
 
   end subroutine yelmo_get_grid_sizes
 
@@ -74,10 +115,11 @@ contains
   ! Caller must have already called yelmo_get_grid_sizes and allocated:
   !   xc[nx], yc[ny], zeta_aa[nz_aa], zeta_ac[nz_ac]
   ! =========================================================================
-  subroutine yelmo_get_grid_info(xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac) &
+  subroutine yelmo_get_grid_info(xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac, alias) &
                                  bind(C, name="yelmo_get_grid_info")
     use iso_c_binding
     type(c_ptr), value :: xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac
+    character(c_char), intent(in) :: alias(*)
 
     ! Local variables
     real(c_double), pointer :: xc_f(:)      => null()
@@ -86,6 +128,8 @@ contains
     real(c_double), pointer :: zeta_ac_f(:) => null()
     real(c_double), pointer :: zeta_r_aa_f(:) => null()
     real(c_double), pointer :: zeta_r_ac_f(:) => null()
+
+    call yelmo_set_alias(alias)
 
     if (c_associated(xc)) then
       call c_f_pointer(xc,      xc_f,      [ylmo%grd%nx])
@@ -117,20 +161,27 @@ contains
       zeta_r_ac_f = real(ylmo%thrm%par%zr%zeta_ac, c_double)
     end if
 
+    nullify(ylmo)
+
   end subroutine yelmo_get_grid_info
 
   ! =========================================================================
   ! 2D variable getter
   ! =========================================================================
-  subroutine yelmo_get_var2D(v2D, nx, ny, name) bind(C, name="yelmo_get_var2D")
+  subroutine yelmo_get_var2D(v2D, nx, ny, name, alias) bind(C, name="yelmo_get_var2D")
     use iso_c_binding
     integer(c_int), value       :: nx, ny
     character(c_char), intent(in) :: name(*)
     real(c_double), intent(out)   :: v2D(nx, ny)
+    character(c_char), intent(in) :: alias(*)
+    
+    ! Local variables
+    character(len=56) :: f_name
 
-    character(len=256) :: f_name
-
+    ! Convert C string to Fortran string (null-terminated scan)
     f_name = trim(c_to_f_string(name))
+
+    call yelmo_set_alias(alias)
 
     select case(trim(f_name))
 
@@ -340,21 +391,28 @@ contains
         v2D = real(MISSING_VALUE_DEFAULT, c_double)
     end select
 
+    nullify(ylmo)
+
   end subroutine yelmo_get_var2D
 
 
   ! =========================================================================
   ! 3D variable getter  (nx, ny, nz — caller must know the correct nz)
   ! =========================================================================
-  subroutine yelmo_get_var3D(v3D, nx, ny, nz, name) bind(C, name="yelmo_get_var3D")
+  subroutine yelmo_get_var3D(v3D, nx, ny, nz, name, alias) bind(C, name="yelmo_get_var3D")
     use iso_c_binding
     integer(c_int), value         :: nx, ny, nz
     character(c_char), intent(in) :: name(*)
     real(c_double), intent(out)   :: v3D(nx, ny, nz)
+    character(c_char), intent(in) :: alias(*)
 
-    character(len=256) :: f_name
+    ! Local variables
+    character(len=56) :: f_name
 
+    ! Convert C string to Fortran string (null-terminated scan)
     f_name = trim(c_to_f_string(name))
+
+    call yelmo_set_alias(alias)
 
     select case(trim(f_name))
 
@@ -440,30 +498,27 @@ contains
         v3D = real(MISSING_VALUE_DEFAULT, c_double)
     end select
 
-  end subroutine yelmo_get_var3D
+    nullify(ylmo)
 
-  ! Example: pull ice thickness out to Julia
-  subroutine yelmo_get_H_ice(H, nx, ny) bind(C, name="yelmo_get_H_ice")
-    use iso_c_binding
-    integer(c_int), value   :: nx, ny
-    real(c_double), intent(out) :: H(nx, ny)
-    H = real(ylmo%tpo%now%H_ice, c_double)
-  end subroutine
+  end subroutine yelmo_get_var3D
 
 ! =========================================================================
   ! C-bound boundary field setter: restricted to ybound_class fields only.
   ! =========================================================================
-  subroutine yelmo_set_var2D(v2D, nx, ny, name) bind(C, name="yelmo_set_var2D")
+  subroutine yelmo_set_var2D(v2D, nx, ny, name, alias) bind(C, name="yelmo_set_var2D")
     use iso_c_binding
     integer(c_int),    value      :: nx, ny
     real(c_double),    intent(in) :: v2D(nx, ny)
     character(c_char), intent(in) :: name(*)
+    character(c_char), intent(in) :: alias(*)
 
     ! Local variables
     character(len=256) :: f_name
 
     f_name = trim(c_to_f_string(name))
 
+    call yelmo_set_alias(alias)
+    
     select case(trim(f_name))
       case("bnd_z_bed");       ylmo%bnd%z_bed      = real(v2D, wp)
       case("bnd_z_bed_sd");    ylmo%bnd%z_bed_sd   = real(v2D, wp)
@@ -483,6 +538,8 @@ contains
       case DEFAULT
         write(*,*) "yelmo_set_var2D:: variable not found or not settable: "//trim(f_name)
     end select
+
+    nullify(ylmo)
 
   end subroutine yelmo_set_var2D
 

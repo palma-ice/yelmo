@@ -23,7 +23,7 @@ function Yelmo(filename::String, grid_def::String, time::Float64; alias::String=
         filename * "\0", grid_def * "\0", time, alias * "\0")
 
     # Populate Julia version of Yelmo object with info from fortran
-    g = yelmo_get_grid_info()
+    g = yelmo_get_grid_info(alias=alias)
 
     # Load variable meta information
     v = (
@@ -45,12 +45,12 @@ function Yelmo(filename::String, grid_def::String, time::Float64; alias::String=
     return Yelmo(alias,time,g,v,bnd,dta,dyn,mat,thrm,tpo)
 end
 
-function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String; alias::String="ylmo1")
+function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String)
     
     # call yelmo_init_state in fortran
     ccall((:yelmo_init_state, yelmolib), Cvoid,
         (Float64, Ptr{UInt8}, Ptr{UInt8}),
-        time, thrm_method * "\0", alias * "\0")
+        time, thrm_method * "\0", ylmo.alias * "\0")
     
     # Update yelmo in julia
     yelmo_get_variables!(ylmo)
@@ -61,13 +61,13 @@ function init_state!(ylmo::Yelmo, time::Float64, thrm_method::String; alias::Str
     return ylmo
 end
 
-function time_step!(ylmo::Yelmo, dt::Float64; alias::String="ylmo1")
+function time_step!(ylmo::Yelmo, dt::Float64)
 
     # Update time
     ylmo.time += dt
     
     # Call yelmo_step in fortran
-    ccall((:yelmo_step, yelmolib), Cvoid, (Float64, Ptr{UInt8}), ylmo.time, alias * "\0")
+    ccall((:yelmo_step, yelmolib), Cvoid, (Float64, Ptr{UInt8}), ylmo.time, ylmo.alias * "\0")
 
     # Update yelmo in julia
     yelmo_get_variables!(ylmo)
@@ -121,39 +121,39 @@ end
 
 function yelmo_get_variables!(ylmo)
 
-    yelmo_get_variable_set!(ylmo.bnd, ylmo.v.bnd, "bnd")
-    yelmo_get_variable_set!(ylmo.dta, ylmo.v.dta, "dta")
-    yelmo_get_variable_set!(ylmo.dyn, ylmo.v.dyn, "dyn")
-    yelmo_get_variable_set!(ylmo.mat, ylmo.v.mat, "mat")
-    yelmo_get_variable_set!(ylmo.thrm, ylmo.v.thrm, "thrm")
-    yelmo_get_variable_set!(ylmo.tpo, ylmo.v.tpo, "tpo")
+    yelmo_get_variable_set!(ylmo.bnd, ylmo.v.bnd, "bnd"; ylmo.alias)
+    yelmo_get_variable_set!(ylmo.dta, ylmo.v.dta, "dta"; ylmo.alias)
+    yelmo_get_variable_set!(ylmo.dyn, ylmo.v.dyn, "dyn"; ylmo.alias)
+    yelmo_get_variable_set!(ylmo.mat, ylmo.v.mat, "mat"; ylmo.alias)
+    yelmo_get_variable_set!(ylmo.thrm, ylmo.v.thrm, "thrm"; ylmo.alias)
+    yelmo_get_variable_set!(ylmo.tpo, ylmo.v.tpo, "tpo"; ylmo.alias)
     
     return ylmo
 end
 
-function yelmo_get_variable_set!(dat, vlist, prefix)
+function yelmo_get_variable_set!(dat, vlist, prefix; alias="ylmo1")
     for k in keys(vlist)
-        _get_var!(dat[k], vlist[k], prefix, k)
+        _get_var!(dat[k], vlist[k], prefix, k; alias)
     end
     return dat
 end
 
-function _get_var!(arr, meta, prefix, k)
+function _get_var!(arr, meta, prefix, k; alias="ylmo1")
     varname = "$(prefix)_$(k)"
     dims = meta.dimensions
     is3D = any(d -> d in VERTICAL_DIMS, dims)
     if is3D
-        yelmo_get_var3D!(arr, varname)
+        yelmo_get_var3D!(arr, varname; alias)
     else
-        yelmo_get_var2D!(arr, varname)
+        yelmo_get_var2D!(arr, varname; alias)
     end
 end
 
-function yelmo_get_variable_set(vlist, prefix, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac)
+function yelmo_get_variable_set(vlist, prefix, nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac; alias="ylmo1")
     dat = NamedTuple{keys(vlist)}(
         _alloc_var(vlist[k], nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac) for k in keys(vlist)
     )
-    yelmo_get_variable_set!(dat, vlist, prefix)
+    yelmo_get_variable_set!(dat, vlist, prefix; alias)
     return dat
 end
 

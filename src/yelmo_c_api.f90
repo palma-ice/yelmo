@@ -10,6 +10,8 @@ module yelmo_c_api
   
   ! type(yelmo_class) :: ylmo    ! persistent state
 
+  logical, parameter :: VERBOSE = .FALSE.
+
 contains
 
   subroutine yelmo_set_alias(alias) bind(C, name="yelmo_set_alias")
@@ -386,8 +388,10 @@ contains
       case("thrm_Q_rock");       v2D = real(ylmo%thrm%now%Q_rock,       c_double)
 
       case DEFAULT
-        write(*,*) "yelmo_get_var2D:: variable not found: "//trim(f_name)// &
-                 " — returning MISSING_VALUE"
+        if (VERBOSE) then
+          write(*,*) "yelmo_get_var2D:: variable not found: "//trim(f_name)// &
+                  " — returning MISSING_VALUE"
+        end if
         v2D = real(MISSING_VALUE_DEFAULT, c_double)
     end select
 
@@ -493,8 +497,10 @@ contains
       case("thrm_T_rock");       v3D = real(ylmo%thrm%now%T_rock,       c_double)
 
       case DEFAULT
-        write(*,*) "yelmo_get_var3D:: variable not found: "//trim(f_name)// &
-                 " — returning MISSING_VALUE"
+        if (VERBOSE) then
+          write(*,*) "yelmo_get_var3D:: variable not found: "//trim(f_name)// &
+                  " — returning MISSING_VALUE"
+        end if
         v3D = real(MISSING_VALUE_DEFAULT, c_double)
     end select
 

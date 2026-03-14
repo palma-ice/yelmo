@@ -13,16 +13,20 @@ ylmo = Yelmo("../par/yelmo_initmip.nml", "file", 0.0);
 # Populate boundary fields
 yelmo_set_var2D!("bnd_H_sed", fill(100.0,ylmo.g.nx,ylmo.g.ny) )
 
-# [TO DO]
-
 # Initialize Yelmo state
-init_state!(ylmo,0.0, "robin-cold")
+init_state!(ylmo,0.0, "robin-cold");
 
-# Advance by dt
-time_step!(ylmo,1.0);
+time_init, time_end, dt = 0.0, 5.0, 1.0;
 
-# Update boundary fields
-yelmo_set_var2D!("bnd_H_sed", fill(200.0,ylmo.g.nx,ylmo.g.ny) )
+for t in time_init:dt:time_end
+
+    # Advance by dt
+    time_step!(ylmo,dt);
+
+    # Update boundary fields
+    yelmo_set_var2D!("bnd_H_sed", fill(200.0,ylmo.g.nx,ylmo.g.ny) )
+
+end
 
 # Plot some data
 heatmap(log10.(ylmo.dyn.uxy_s))

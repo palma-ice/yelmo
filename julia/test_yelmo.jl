@@ -3,7 +3,7 @@ cd(@__DIR__)
 import Pkg; Pkg.activate(".")
 #########################################################
 
-using CairoMakie
+#using CairoMakie
 
 include("Yelmo.jl")
 

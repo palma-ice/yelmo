@@ -7,8 +7,8 @@ using Oceananigans
 using NCDatasets
 using CairoMakie
 
-include("Yelmo.jl")
-using .Yelmo
+include("YelmoIO.jl")
+using .YelmoIO
 
 # Define grid from NetCDF file
 path = "/Users/alrobi001/models/yelmox/output/16KM/test/restart-0.000-kyr/yelmo_restart.nc"

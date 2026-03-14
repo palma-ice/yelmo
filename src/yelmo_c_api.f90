@@ -50,15 +50,17 @@ contains
   ! C-bound grid sizes getter: returns nx, ny, nz_aa, nz_ac only.
   ! Call this first to learn buffer sizes before calling yelmo_get_grid_info.
   ! =========================================================================
-  subroutine yelmo_get_grid_sizes(nx, ny, nz_aa, nz_ac) &
+  subroutine yelmo_get_grid_sizes(nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac) &
                                   bind(C, name="yelmo_get_grid_sizes")
     use iso_c_binding
-    integer(c_int), intent(out) :: nx, ny, nz_aa, nz_ac
+    integer(c_int), intent(out) :: nx, ny, nz_aa, nz_ac, nzr_aa, nzr_ac
 
     nx    = ylmo%grd%nx
     ny    = ylmo%grd%ny
     nz_aa = ylmo%par%nz_aa
     nz_ac = ylmo%par%nz_ac
+    nzr_aa = ylmo%thrm%par%nzr_aa
+    nzr_ac = ylmo%thrm%par%nzr_ac
 
   end subroutine yelmo_get_grid_sizes
 
@@ -68,16 +70,18 @@ contains
   ! Caller must have already called yelmo_get_grid_sizes and allocated:
   !   xc[nx], yc[ny], zeta_aa[nz_aa], zeta_ac[nz_ac]
   ! =========================================================================
-  subroutine yelmo_get_grid_info(xc, yc, zeta_aa, zeta_ac) &
+  subroutine yelmo_get_grid_info(xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac) &
                                  bind(C, name="yelmo_get_grid_info")
     use iso_c_binding
-    type(c_ptr), value :: xc, yc, zeta_aa, zeta_ac
+    type(c_ptr), value :: xc, yc, zeta_aa, zeta_ac, zeta_r_aa, zeta_r_ac
 
     ! Local variables
     real(c_double), pointer :: xc_f(:)      => null()
     real(c_double), pointer :: yc_f(:)      => null()
     real(c_double), pointer :: zeta_aa_f(:) => null()
     real(c_double), pointer :: zeta_ac_f(:) => null()
+    real(c_double), pointer :: zeta_r_aa_f(:) => null()
+    real(c_double), pointer :: zeta_r_ac_f(:) => null()
 
     if (c_associated(xc)) then
       call c_f_pointer(xc,      xc_f,      [ylmo%grd%nx])
@@ -97,6 +101,16 @@ contains
     if (c_associated(zeta_ac)) then
       call c_f_pointer(zeta_ac, zeta_ac_f, [ylmo%par%nz_ac])
       zeta_ac_f = real(ylmo%par%zeta_ac, c_double)
+    end if
+
+    if (c_associated(zeta_r_aa)) then
+      call c_f_pointer(zeta_r_aa, zeta_r_aa_f, [ylmo%thrm%par%nzr_aa])
+      zeta_r_aa_f = real(ylmo%thrm%par%zr%zeta_aa, c_double)
+    end if
+
+    if (c_associated(zeta_r_ac)) then
+      call c_f_pointer(zeta_r_ac, zeta_r_ac_f, [ylmo%thrm%par%nzr_ac])
+      zeta_r_ac_f = real(ylmo%thrm%par%zr%zeta_ac, c_double)
     end if
 
   end subroutine yelmo_get_grid_info

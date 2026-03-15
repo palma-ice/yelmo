@@ -511,9 +511,6 @@ contains
 
   end subroutine yelmo_get_var3D
 
-! =========================================================================
-  ! C-bound boundary field setter: restricted to ybound_class fields only.
-  ! =========================================================================
   subroutine yelmo_set_var2D(v2D, nx, ny, name, alias) bind(C, name="yelmo_set_var2D")
     use iso_c_binding
     integer(c_int),    value      :: nx, ny
@@ -527,31 +524,54 @@ contains
     f_name = trim(c_to_f_string(name))
 
     call yelmo_set_alias(alias)
-    
+
     select case(trim(f_name))
-      case("bnd_z_bed");       ylmo%bnd%z_bed      = real(v2D, wp)
-      case("bnd_z_bed_sd");    ylmo%bnd%z_bed_sd   = real(v2D, wp)
-      case("bnd_z_sl");        ylmo%bnd%z_sl       = real(v2D, wp)
-      case("bnd_H_sed");       ylmo%bnd%H_sed      = real(v2D, wp)
-      case("bnd_smb_ref");     ylmo%bnd%smb        = real(v2D, wp)
-      case("bnd_T_srf");       ylmo%bnd%T_srf      = real(v2D, wp)
-      case("bnd_bmb_shlf");    ylmo%bnd%bmb_shlf   = real(v2D, wp)
-      case("bnd_fmb_shlf");    ylmo%bnd%fmb_shlf   = real(v2D, wp)
-      case("bnd_T_shlf");      ylmo%bnd%T_shlf     = real(v2D, wp)
-      case("bnd_Q_geo");       ylmo%bnd%Q_geo      = real(v2D, wp)
-      case("bnd_basins");      ylmo%bnd%basins     = real(v2D, wp)
-      case("bnd_basin_mask");  ylmo%bnd%basin_mask = real(v2D, wp)
-      case("bnd_regions");     ylmo%bnd%regions    = real(v2D, wp)
-      case("bnd_region_mask"); ylmo%bnd%region_mask = real(v2D, wp)
-      case("bnd_enh_srf");     ylmo%bnd%enh_srf    = real(v2D, wp)
-      case("bnd_H_ice_ref");   ylmo%bnd%H_ice_ref  = real(v2D, wp)
-      case("bnd_z_bed_ref");   ylmo%bnd%z_bed_ref  = real(v2D, wp)
-      case("bnd_ice_allowed"); ylmo%bnd%ice_allowed = (int(v2D) /= 0)
-      case("bnd_calv_mask");   ylmo%bnd%calv_mask   = (int(v2D) /= 0)
-      case("bnd_tau_relax");   ylmo%bnd%tau_relax  = real(v2D, wp)
-      case("bnd_z_bed_corr");  ylmo%bnd%z_bed_corr = real(v2D, wp)
-      case("bnd_dzbdt_corr");  ylmo%bnd%dzbdt_corr = real(v2D, wp)
-      case("bnd_domain_mask"); ylmo%bnd%domain_mask = real(v2D, wp)
+
+      ! -----------------------------------------------------------------------
+      ! ybound
+      ! -----------------------------------------------------------------------
+      case("bnd_z_bed");         ylmo%bnd%z_bed         = real(v2D, wp)
+      case("bnd_z_bed_sd");      ylmo%bnd%z_bed_sd      = real(v2D, wp)
+      case("bnd_z_sl");          ylmo%bnd%z_sl          = real(v2D, wp)
+      case("bnd_H_sed");         ylmo%bnd%H_sed         = real(v2D, wp)
+      case("bnd_smb_ref");       ylmo%bnd%smb           = real(v2D, wp)
+      case("bnd_T_srf");         ylmo%bnd%T_srf         = real(v2D, wp)
+      case("bnd_bmb_shlf");      ylmo%bnd%bmb_shlf      = real(v2D, wp)
+      case("bnd_fmb_shlf");      ylmo%bnd%fmb_shlf      = real(v2D, wp)
+      case("bnd_T_shlf");        ylmo%bnd%T_shlf        = real(v2D, wp)
+      case("bnd_Q_geo");         ylmo%bnd%Q_geo         = real(v2D, wp)
+      case("bnd_enh_srf");       ylmo%bnd%enh_srf       = real(v2D, wp)
+      case("bnd_basins");        ylmo%bnd%basins        = real(v2D, wp)
+      case("bnd_basin_mask");    ylmo%bnd%basin_mask    = real(v2D, wp)
+      case("bnd_regions");       ylmo%bnd%regions       = real(v2D, wp)
+      case("bnd_region_mask");   ylmo%bnd%region_mask   = real(v2D, wp)
+      case("bnd_H_ice_ref");     ylmo%bnd%H_ice_ref     = real(v2D, wp)
+      case("bnd_z_bed_ref");     ylmo%bnd%z_bed_ref     = real(v2D, wp)
+      case("bnd_ice_allowed");   ylmo%bnd%ice_allowed   = (int(v2D) /= 0)
+      case("bnd_calv_mask");     ylmo%bnd%calv_mask     = (int(v2D) /= 0)
+      case("bnd_tau_relax");     ylmo%bnd%tau_relax     = real(v2D, wp)
+      case("bnd_z_bed_corr");    ylmo%bnd%z_bed_corr    = real(v2D, wp)
+      case("bnd_dzbdt_corr");    ylmo%bnd%dzbdt_corr    = real(v2D, wp)
+      case("bnd_domain_mask");   ylmo%bnd%domain_mask   = real(v2D, wp)
+
+      ! -----------------------------------------------------------------------
+      ! ytopo%now (ytopo_state_class)
+      ! -----------------------------------------------------------------------
+      case("tpo_H_ice");         ylmo%tpo%now%H_ice         = real(v2D, wp)
+
+      ! -----------------------------------------------------------------------
+      ! ydyn%now — depth-integrated / surface / basal 2D fields
+      ! -----------------------------------------------------------------------
+      case("dyn_N_eff");         ylmo%dyn%now%N_eff         = real(v2D, wp)
+      case("dyn_cb_tgt");        ylmo%dyn%now%cb_tgt        = real(v2D, wp)
+      case("dyn_cb_ref");        ylmo%dyn%now%cb_ref        = real(v2D, wp)
+      case("dyn_c_bed");         ylmo%dyn%now%c_bed         = real(v2D, wp)
+
+      ! -----------------------------------------------------------------------
+      ! ytherm%now — 2D fields
+      ! -----------------------------------------------------------------------
+      case("thrm_H_w");          ylmo%thrm%now%H_w          = real(v2D, wp)
+
       case DEFAULT
         write(*,*) "yelmo_set_var2D:: variable not found or not settable: "//trim(f_name)
     end select
@@ -559,6 +579,42 @@ contains
     nullify(ylmo)
 
   end subroutine yelmo_set_var2D
+
+  subroutine yelmo_set_var3D(v3D, nx, ny, nz, name, alias) bind(C, name="yelmo_set_var3D")
+    use iso_c_binding
+    integer(c_int),    value      :: nx, ny, nz
+    real(c_double),    intent(in) :: v3D(nx, ny, nz)
+    character(c_char), intent(in) :: name(*)
+    character(c_char), intent(in) :: alias(*)
+
+    ! Local variables
+    character(len=256) :: f_name
+
+    f_name = trim(c_to_f_string(name))
+
+    call yelmo_set_alias(alias)
+
+    select case(trim(f_name))
+
+      ! -----------------------------------------------------------------------
+      ! ydyn%now — 3D fields
+      ! -----------------------------------------------------------------------
+      case("dyn_ux");            ylmo%dyn%now%ux            = real(v3D, wp)
+      case("dyn_uy");            ylmo%dyn%now%uy            = real(v3D, wp)
+      case("dyn_uz");            ylmo%dyn%now%uz            = real(v3D, wp)
+
+      ! -----------------------------------------------------------------------
+      ! ytherm%now — 3D fields
+      ! -----------------------------------------------------------------------
+      case("thrm_T_ice");          ylmo%thrm%now%T_ice      = real(v3D, wp)
+
+      case DEFAULT
+        write(*,*) "yelmo_set_var3D:: variable not found or not settable: "//trim(f_name)
+    end select
+
+    nullify(ylmo)
+
+  end subroutine yelmo_set_var3D
 
   function c_to_f_string(c_str) result(f_str)
     use iso_c_binding

@@ -1,5 +1,13 @@
 # Yelmo release/tag notes
 
+## Unreleased
+
+- New `libs/fast_hydrology/` module providing distributed-water-flux / effective-pressure hydrology with method dispatch in the style of `basal_hydro_simple`. Currently exposes the K24 model (`method = 2`); `method = 0` is no-op (state frozen) and `method = 1` is reserved.
+- K24 physics (constants, potential filling, smoothed gradients, flux accumulation, cavity-height blend, effective pressure) now lives in `fast_hydrology_k24` (`libs/fast_hydrology/k24.f90`). Constants are loaded at runtime from the `&fast_hydrology_k24` namelist group; defaults reproduce the previous hardcoded values.
+- Two interchangeable flux solvers selectable via `flux_solver`: `0` = recursive depth-first (default; preserves current numerics), `1` = topological-sort (iterative, stack-safe; matches CISM's approach). FastHydrology.jl observed small numerical differences between the two — recursive remains default until the toposort variant is validated against a real run.
+- API contract: the persistent water-layer thickness (`hyd%now%H_w`) is externally mutable by the host model; K24 reads ice geometry, bed, melt, sliding speed and Glen rate factor and returns `q_x`, `q_y`, `N`, `p_w` as diagnostics without touching `H_w`.
+- New build dependency: FFTW3 (`-lfftw3`). Available via `fesm-utils`; configs that build this module need the link flag added.
+
 ## v1.15 (2026-01-19)
 
 - Use of Gaussian Quadrature module from fesm-utils for calculating the Jacobian of velocity (strain-rate tensor), vertical velocity, dynamic viscosity (DIVA, SSA), basal friction, and other quantities.

@@ -146,6 +146,24 @@ contains
   end subroutine
 
   ! =========================================================================
+  ! C-bound restart writer — dump the full Yelmo state to a NetCDF restart
+  ! file at `filename` with timestamp `time`. The file format matches what
+  ! YelmoModel(restart_file, time; ...) reads via load_state!.
+  ! =========================================================================
+  subroutine yelmo_restart_write_wrapper(filename, time, alias) &
+                                        bind(C, name="yelmo_restart_write")
+    use iso_c_binding
+    character(c_char), intent(in) :: filename(*)
+    real(c_double), value         :: time
+    character(c_char), intent(in) :: alias(*)
+    character(len=1028) :: f_filename
+    f_filename = trim(c_to_f_string(filename))
+    call yelmo_set_alias(alias)
+    call yelmo_restart_write(ylmo, trim(f_filename), real(time, wp))
+    nullify(ylmo)
+  end subroutine yelmo_restart_write_wrapper
+
+  ! =========================================================================
   ! C-bound grid sizes getter: returns nx, ny, nz_aa, nz_ac only.
   ! Call this first to learn buffer sizes before calling yelmo_get_grid_info.
   ! =========================================================================

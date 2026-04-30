@@ -1,7 +1,8 @@
 module yelmo_c_api
   
   use yelmo
-
+  use yelmo_grid
+  
   implicit none
 
   type(yelmo_class), target :: ylmo1   ! persistent state
@@ -30,6 +31,62 @@ contains
 
     return
   end subroutine yelmo_set_alias
+
+  subroutine yelmo_init_grid_fromaxes_wrapper(grid_name, nx, ny, xc, yc, lon, lat, area, alias) &
+      bind(C, name="yelmo_init_grid")
+
+    use iso_c_binding
+    use yelmo_defs, only: wp   ! or wherever wp is defined
+    implicit none
+
+    character(c_char),  intent(in) :: grid_name(*)
+    integer(c_int),     intent(in) :: nx, ny
+    type(c_ptr), value, intent(in) :: xc, yc, lon, lat, area
+    character(c_char),  intent(in) :: alias(*)
+
+    ! Local variables
+    character(len=256)              :: grid_name_f
+    real(c_double), pointer         :: xc_d(:)     => null()
+    real(c_double), pointer         :: yc_d(:)     => null()
+    real(c_double), pointer         :: lon_d(:,:)  => null()
+    real(c_double), pointer         :: lat_d(:,:)  => null()
+    real(c_double), pointer         :: area_d(:,:) => null()
+
+    real(wp), allocatable           :: xc_f(:)
+    real(wp), allocatable           :: yc_f(:)
+    real(wp), allocatable           :: lon_f(:,:)
+    real(wp), allocatable           :: lat_f(:,:)
+    real(wp), allocatable           :: area_f(:,:)
+
+    ! Convert C string to Fortran string (null-terminated scan)
+    grid_name_f = trim(c_to_f_string(grid_name))
+
+    ! Associate C pointers with c_double Fortran pointer arrays
+    call c_f_pointer(xc,   xc_d,   [nx])
+    call c_f_pointer(yc,   yc_d,   [ny])
+    call c_f_pointer(lon,  lon_d,  [nx, ny])
+    call c_f_pointer(lat,  lat_d,  [nx, ny])
+    call c_f_pointer(area, area_d, [nx, ny])
+
+    ! Copy/convert to wp arrays
+    allocate(xc_f(nx),       source=real(xc_d,   wp))
+    allocate(yc_f(ny),       source=real(yc_d,   wp))
+    allocate(lon_f(nx, ny),  source=real(lon_d,  wp))
+    allocate(lat_f(nx, ny),  source=real(lat_d,  wp))
+    allocate(area_f(nx, ny), source=real(area_d, wp))
+
+    ! Call the actual Fortran routine with wp arrays
+    call yelmo_set_alias(alias)
+
+    call yelmo_init_grid_fromaxes(ylmo%grd, grid_name_f, xc_f, yc_f, lon_f, lat_f, area_f)
+
+    nullify(ylmo)
+
+    ! Clean up
+    nullify(xc_d, yc_d, lon_d, lat_d, area_d)
+    deallocate(xc_f, yc_f, lon_f, lat_f, area_f)
+
+  end subroutine yelmo_init_grid_fromaxes_wrapper
 
   subroutine yelmo_init_wrapper(filename, grid_def, time, alias) bind(C, name="yelmo_init")
     use iso_c_binding

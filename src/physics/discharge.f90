@@ -76,14 +76,14 @@ contains
                         ! to the ice margin.
 
                         ! Calculate the angle of descent relative to the direction of the coast
-                        call calc_coastal_cosine_angle(cosalpha,z_srf,dist_grline,dx,i,j)
+                        call calc_coastal_cosine_angle(cosalpha,z_srf,dist_grline*dx_km,dx,i,j)
 
                         if (cosalpha .ge. cosalpha_max) then
                             ! Ice is flowing towards the coast, more or less, apply parameterization
 
                             ! Calculate scaling factors (roughness, distance to coast and resolution)
                             f_sd = tanh(z_bed_sd(i,j)/sigma_ref)
-                            f_l  = ( dl / (dl + dist_grline(i,j)) )**m_d
+                            f_l  = ( dl / (dl + max(dl,dist_grline(i,j)*dx_km)) )**m_d
                             f_r  = ( dx_km/dl )**m_r 
 
                             ! Calculate subgrid discharge mass balance rate (negative, for mass loss)

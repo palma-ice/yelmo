@@ -130,7 +130,7 @@ contains
         integer  :: n_lim
         real(wp) :: mb_max
 
-        logical, parameter :: verbose = .TRUE.
+        logical, parameter :: verbose = .FALSE.
 
         if (dt .gt. 0.0) then 
             ! Only apply this routine if dt > 0!

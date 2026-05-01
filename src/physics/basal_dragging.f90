@@ -1632,14 +1632,14 @@ contains
                     call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,j),beta(i,jp1), &
                                     uy_aa_a,uy_aa_b,H_ice(i,j),H_ice(i,jp1),f_grnd_acy(i,j))
 
-                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
                     ! Floating to the bottom 
 
                     uy_aa_a = 0.5_wp*(uy(i,jp1)+uy(i,j))
                     uy_aa_b = 0.5_wp*(uy(i,jm1)+uy(i,j))
                     
                     call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,jp1),beta(i,j), &
-                                    uy_aa_a,uy_aa_b,H_ice(i,jp1),H_ice(i,j),f_grnd_acx(i,j))
+                                    uy_aa_a,uy_aa_b,H_ice(i,jp1),H_ice(i,j),f_grnd_acy(i,j))
 
                 end if 
 

@@ -369,9 +369,15 @@ contains
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
             ! Calculate SSA as normal 
 
-            ! Set diva parameters from Yelmo settings 
-            ssa_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
-            ssa_par%boundaries     = dyn%par%boundaries  
+            ! Set diva parameters from Yelmo settings
+            ssa_par%ssa_solver     = dyn%par%ssa_solver
+            select case(trim(dyn%par%ssa_solver))
+                case("energy")
+                    ssa_par%ssa_lis_opt = dyn%par%ssa_lis_opt_energy
+                case DEFAULT
+                    ssa_par%ssa_lis_opt = dyn%par%ssa_lis_opt_residual
+            end select
+            ssa_par%boundaries     = dyn%par%boundaries
             ssa_par%ssa_lateral_bc = dyn%par%ssa_lat_bc  
             ssa_par%visc_method    = dyn%par%visc_method 
             ssa_par%visc_const     = dyn%par%visc_const 
@@ -499,9 +505,15 @@ contains
         ! dyn%now%ssa_mask_acy = 0_wp 
         ! dyn%now%uy_bar = 0.0_wp 
 
-        ! Set diva parameters from Yelmo settings 
-        diva_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
-        diva_par%boundaries     = dyn%par%boundaries 
+        ! Set diva parameters from Yelmo settings
+        diva_par%ssa_solver     = dyn%par%ssa_solver
+        select case(trim(dyn%par%ssa_solver))
+            case("energy")
+                diva_par%ssa_lis_opt = dyn%par%ssa_lis_opt_energy
+            case DEFAULT
+                diva_par%ssa_lis_opt = dyn%par%ssa_lis_opt_residual
+        end select
+        diva_par%boundaries     = dyn%par%boundaries
         diva_par%ssa_lateral_bc = dyn%par%ssa_lat_bc 
         diva_par%no_slip        = no_slip 
         diva_par%visc_method    = dyn%par%visc_method 
@@ -587,9 +599,10 @@ contains
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
                     tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
 
-        ! Set diva parameters from Yelmo settings 
-        l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
-        l1l2_par%ssa_lateral_bc = dyn%par%ssa_lat_bc 
+        ! Set diva parameters from Yelmo settings
+        ! Note: L1L2 always uses the residual SSA assembler for now (energy form is SSA-only).
+        l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt_residual
+        l1l2_par%ssa_lateral_bc = dyn%par%ssa_lat_bc
         l1l2_par%boundaries     = dyn%par%boundaries 
         l1l2_par%no_slip        = no_slip 
         l1l2_par%visc_method    = dyn%par%visc_method 
@@ -1050,8 +1063,13 @@ contains
         call nml_read(filename,group_ydyn,"eps_0",              par%eps_0,              init=init_pars)
         call nml_read(filename,group_ydyn,"scale_T",            par%scale_T,            init=init_pars)
         call nml_read(filename,group_ydyn,"T_frz",              par%T_frz,              init=init_pars)
-        call nml_read(filename,group_ydyn,"ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_solver",         par%ssa_solver,         init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_lis_opt_residual",par%ssa_lis_opt_residual,init=init_pars)
+        call nml_read(filename,group_ydyn,"ssa_lis_opt_energy", par%ssa_lis_opt_energy, init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
+
+        ! Apply default for ssa_solver if not set in namelist
+        if (trim(par%ssa_solver) .eq. "") par%ssa_solver = "residual"
         call nml_read(filename,group_ydyn,"ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
         call nml_read(filename,group_ydyn,"ssa_iter_max",       par%ssa_iter_max,       init=init_pars)

@@ -5,9 +5,10 @@ module velocity_diva
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
-    use basal_dragging 
+    use basal_dragging
     use solver_ssa_ac
-    use solver_linear 
+    use solver_ssa_ac_energy, only : linear_solver_matrix_ssa_ac_csr_2D_energy
+    use solver_linear
     use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle,  &
                         picard_relax_vel, picard_relax_visc, &
@@ -23,7 +24,8 @@ module velocity_diva
 
     type diva_param_class
 
-        character(len=256) :: ssa_lis_opt 
+        character(len=56)  :: ssa_solver        ! "residual" | "energy"
+        character(len=256) :: ssa_lis_opt
         character(len=256) :: ssa_lateral_bc
         character(len=256) :: boundaries 
         character(len=256) :: glf_method 
@@ -311,9 +313,18 @@ if (.FALSE.) then
 end if 
             
             ! Populate ssa matrices Ax=b
-            call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
+            select case(trim(par%ssa_solver))
+                case("energy")
+                    ! Symmetric positive-definite Hessian of the SSA energy density (CG/AMG-friendly).
+                    call linear_solver_matrix_ssa_ac_csr_2D_energy(lgs_now,ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
                                 ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx,taud_acy, &
                                 taul_int_acx,taul_int_acy,dx,dy,par%beta_min,par%boundaries,par%ssa_lateral_bc)
+                case DEFAULT
+                    ! Original Larour-style residual formulation.
+                    call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
+                                ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx,taud_acy, &
+                                taul_int_acx,taul_int_acy,dx,dy,par%beta_min,par%boundaries,par%ssa_lateral_bc)
+            end select
 
             ! Solve linear equation
             call linear_solver_matrix_solve(lgs_now,par%ssa_lis_opt)

@@ -64,6 +64,10 @@ $(objdir)/solver_ssa_ac.o: $(srcdir)/physics/solver_ssa_ac.f90 $(objdir)/yelmo_d
 							$(objdir)/yelmo_tools.o $(objdir)/solver_linear.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) $(INC_FESMUTILS) -c -o $@ $<
 
+$(objdir)/solver_ssa_ac_energy.o: $(srcdir)/physics/solver_ssa_ac_energy.f90 $(objdir)/yelmo_defs.o \
+							$(objdir)/yelmo_tools.o $(objdir)/solver_linear.o $(objdir)/solver_ssa_ac.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) $(INC_FESMUTILS) -c -o $@ $<
+
 $(objdir)/solver_linear.o: $(srcdir)/physics/solver_linear.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) $(INC_FESMUTILS) -c -o $@ $<
@@ -97,12 +101,14 @@ $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 
 $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
+						  	$(objdir)/solver_ssa_ac.o $(objdir)/solver_ssa_ac_energy.o \
+						  	$(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
+						  	$(objdir)/solver_ssa_ac.o $(objdir)/solver_ssa_ac_energy.o \
+						  	$(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
@@ -220,6 +226,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/runge_kutta.o \
 					   $(objdir)/solver_ssa_ac.o \
+					   $(objdir)/solver_ssa_ac_energy.o \
 					   $(objdir)/solver_linear.o \
 					   $(objdir)/solver_tridiagonal.o \
 					   $(objdir)/solver_advection.o \

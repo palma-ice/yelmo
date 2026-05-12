@@ -133,6 +133,13 @@ levelset : yelmo-static tests/test_levelset.f90
 		@echo "    test_levelset.x is ready."
 		@echo " "
 
+ssa_energy : yelmo-static tests/test_ssa_energy.f90
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/test_ssa_energy.x tests/test_ssa_energy.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)
+		@echo " "
+		@echo "    test_ssa_energy.x is ready."
+		@echo " "
+
 mismip1 : yelmo-static
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip_new.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)

@@ -17,8 +17,11 @@ module solver_ssa_ac
     ! Routines that make use of the linear_solver_class object defined in the module solver_linear.F90:
     public :: linear_solver_save_velocity
     public :: linear_solver_matrix_ssa_ac_csr_2D
-    
-contains 
+
+    ! Helper used by alternative SSA assemblers (e.g. solver_ssa_ac_energy):
+    public :: stagger_visc_aa_ab
+
+contains
     
     subroutine linear_solver_save_velocity(ux,uy,lgs,ulim)
         ! Extract velocity solution from lgs object. 

@@ -146,8 +146,10 @@
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     scale_T             = 1               ! 0: no scaling of c_bed with T, 1: linearly increase c_bed to c_bed_frozen=cf_ref*N_eff for cold ice
     T_frz               = -3.0            ! Temperature below which ice considered fully frozen (linear increase in friction )
-    ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
-    ssa_lat_bc          = "floating"      ! "all", "marine", "floating", "none", "slab"
+    ssa_solver              = "energy"    ! "residual" | "energy"
+    ssa_lis_opt_residual    = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
+    ssa_lis_opt_energy      = "-i cg -p jacobi -maxiter 200 -tol 1.0e-4 -initx_zeros false"       ! SPD => CG (matches Yelmo.jl default)
+    ssa_lat_bc          = "all"           ! "all", "marine", "floating", "none", "slab"
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution

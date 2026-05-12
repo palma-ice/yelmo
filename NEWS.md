@@ -1,5 +1,12 @@
 # Yelmo release/tag notes
 
+## Unreleased
+
+- New SSA momentum-balance formulation: **energy-based assembler** (`src/physics/solver_ssa_ac_energy.f90`), selectable via the new `ydyn.ssa_solver` parameter (`"residual"` | `"energy"`). The energy form assembles the symmetric positive-definite Hessian of the discrete viscous-energy density (membrane + shear + basal drag + driving), with η, β, H frozen per Picard iteration. Algebraic identity `K_inner = -A_residual_inner * dx*dy` for interior cells; calving-front BC encoded as a linear boundary-work term in the RHS rather than a one-sided FD stencil. SSA and DIVA both dispatch to the new assembler when `ssa_solver = "energy"`. The `ssa_lis_opt` namelist parameter has been split into `ssa_lis_opt_residual` and `ssa_lis_opt_energy` so each formulation carries its own LIS solver settings (defaults: `bicgsafe + jacobi` for residual, `cg + jacobi` for energy — CG is safe because the energy Hessian is SPD by construction).
+- **initmip-grl finding (GRL-16KM, 100 yr, AB-SAM, dt_method=0)**: with `ssa_lat_bc="all"` (lateral BC applied to all ice fronts including grounded marine), the residual solver takes 48.9 s, the energy solver 5.8 s — **8.4× speedup**. Picard iterations: 2030 (residual) vs 135 (energy). The residual solver is BC-sensitive — switching from `"floating"` to `"all"` raises `uxy_s_max` from 4948 → 5424 m/yr and triples the Picard work. The energy solver is essentially insensitive to this switch (`uxy_s_max` literally identical, 3567 m/yr in both). This supports the prior intuition that the residual one-sided FD discretization of the calving-front BC is deficient at grounded marine fronts; the energy formulation's variational BC handling avoids the instability.
+- New defaults: `ssa_solver = "energy"` in all parameter files; `ssa_lat_bc = "all"` in production files (`yelmo_initmip.nml`, `yelmo_TROUGH-F17.nml`, `yelmo_MISMIP+.nml`, `yelmo_calvingmip.nml`). Idealised infinite-slab benchmarks (`yelmo_SLAB-S06.nml`, `yelmo_ISMIPHOM.nml`) keep `ssa_lat_bc = "slab"` since their physics requires the slab extension.
+- Algebraic-identity validation test: `tests/test_ssa_energy.f90` (build target `make ssa_energy`). Confirms the energy assembler matches `-A_residual * dx*dy` to single-precision roundoff on a periodic synthetic grid.
+
 ## v1.15 (2026-01-19)
 
 - Use of Gaussian Quadrature module from fesm-utils for calculating the Jacobian of velocity (strain-rate tensor), vertical velocity, dynamic viscosity (DIVA, SSA), basal friction, and other quantities.

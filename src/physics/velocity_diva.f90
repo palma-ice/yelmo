@@ -144,12 +144,6 @@ contains
         real(wp), allocatable :: corr_nm1(:) 
         real(wp), allocatable :: corr_nm2(:) 
         
-        ! For glf methods 
-        logical :: with_glf 
-        real(wp), allocatable :: ATT_bar(:,:) 
-        real(wp), allocatable :: qq_gl_acx(:,:) 
-        real(wp), allocatable :: qq_gl_acy(:,:) 
-        
         real(wp) :: corr_theta
         real(wp) :: corr_rel 
         real(wp) :: L2_norm 
@@ -160,7 +154,6 @@ contains
         logical, parameter :: write_ssa_diagnostics      = .FALSE. 
         logical, parameter :: write_ssa_diagnostics_stop = .FALSE.   ! Stop simulation after completing iterations?
 
-        type(linear_solver_class) :: lgs_prev 
         type(linear_solver_class) :: lgs_now
 
         nx    = size(ux,1)
@@ -178,11 +171,8 @@ contains
         allocate(ssa_mask_acx_ref(nx,ny))
         allocate(ssa_mask_acy_ref(nx,ny))
 
-        allocate(corr_nm1(2*nx*ny))
-        allocate(corr_nm2(2*nx*ny))
-
-        with_glf = .FALSE. 
-        if (trim(par%glf_method) .eq. "power") with_glf = .TRUE.
+        !allocate(corr_nm1(2*nx*ny))
+        !allocate(corr_nm2(2*nx*ny))
 
         ! Store original ssa mask before iterations
         ssa_mask_acx_ref = ssa_mask_acx
@@ -192,8 +182,8 @@ contains
         ssa_err_acx = 1.0_wp 
         ssa_err_acy = 1.0_wp 
         
-        corr_nm1 = 0.0_wp 
-        corr_nm2 = 0.0_wp 
+        !corr_nm1 = 0.0_wp 
+        !corr_nm2 = 0.0_wp 
 
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
@@ -205,7 +195,6 @@ contains
 
         ! Initialize linear solver variables for current and previous iteration
         call linear_solver_init(lgs_now,nx,ny,nvar=2,n_terms=9)
-        lgs_prev = lgs_now 
 
         do iter = 1, par%ssa_iter_max 
 
@@ -301,8 +290,6 @@ contains
 
             ! Solve high-res as normal 
             ! -------------------------------------------------------
-
-
 
 if (.FALSE.) then 
             if (iter .gt. 1) then
@@ -1099,7 +1086,7 @@ end if
         integer :: i, j, nx, ny 
 
         nx = size(taub_acx,1)
-        ny = size(taub_acy,2) 
+        ny = size(taub_acx,2) 
 
         !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 

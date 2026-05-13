@@ -657,13 +657,6 @@ contains
                                     +H_ice(i,j-1)+H_ice(i,j+1)) / 4.0 
         end if  
         
-        ! Artificially delete ice from locations that are not allowed
-        ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
-        where (mask_ice .eq. -1) H_ice_new = 0.0_wp
-
-        ! Impose reference ice thickness where mask_ice == 0
-        where (mask_ice .eq.  0) H_ice_new = H_ice_ref
-        
         ! Remove margin points that are too thin, or points that are below tolerance ====
 
         H_tmp = H_ice_new 
@@ -795,18 +788,27 @@ contains
 
                 !call fill_borders_2D(H_ice_new,nfill=1,fill=H_ice_ref)
 
-            case DEFAULT    ! e.g., None/none, zeros, EISMINT
-                ! By default, impose zero ice thickness on grid borders
+            case("zeros","EISMINT")
+                ! Force zero ice thickness on all four grid borders
+                ! (overrides bnd%mask_ice on border cells)
 
-                ! Set border values to zero
                 H_ice_new(1,:)  = 0.0
                 H_ice_new(nx,:) = 0.0
 
                 H_ice_new(:,1)  = 0.0
                 H_ice_new(:,ny) = 0.0
-     
+
+            case DEFAULT    ! e.g., None/none
+                ! Apply forced-zero mask from bnd%mask_ice
+
+                where (mask_ice .eq. -1) H_ice_new = 0.0_wp
+
         end select
-        
+
+        ! Impose reference ice thickness where bnd%mask_ice == 0
+        ! (applied universally, independent of the boundary BC choice above)
+        where (mask_ice .eq. 0) H_ice_new = H_ice_ref
+
         ! Determine rate of mass balance related to changes applied here
         ! (10% higher for safety - this will be adjusted by apply_tendency later anyway)
         if (dt .ne. 0.0) then 

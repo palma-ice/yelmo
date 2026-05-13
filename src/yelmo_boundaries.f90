@@ -265,9 +265,14 @@ contains
                 bnd%mask_ice(nx,:) = -1
 
             case DEFAULT
-                ! Let ice grow everywhere for unknown domain (mask_ice can always be modified later)
+                ! Unknown domain: active interior, forced-zero borders
+                ! (mask_ice can always be modified later)
 
-                bnd%mask_ice = 1
+                bnd%mask_ice       = 1
+                bnd%mask_ice(1,:)  = -1
+                bnd%mask_ice(nx,:) = -1
+                bnd%mask_ice(:,1)  = -1
+                bnd%mask_ice(:,ny) = -1
 
         end select
 

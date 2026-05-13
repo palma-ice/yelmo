@@ -1185,7 +1185,7 @@ contains
             bnd_restart%H_ice_ref   = dom%bnd%H_ice_ref 
             bnd_restart%z_bed_ref   = dom%bnd%z_bed_ref 
 
-            bnd_restart%domain_mask = dom%bnd%domain_mask 
+            bnd_restart%mask_ice    = dom%bnd%mask_ice
             bnd_restart%tau_relax   = dom%bnd%tau_relax 
 
             bnd_restart%basins      = dom%bnd%basins 

@@ -128,7 +128,7 @@ contains
         real(wp), intent(IN)    :: n_glen 
         type(diva_param_class), intent(IN) :: par       ! List of parameters that should be defined
 
-        ! Local variables 
+        ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac, iter 
         logical :: is_converged
 
@@ -138,14 +138,7 @@ contains
         real(wp), allocatable :: beta_eff_acx(:,:)
         real(wp), allocatable :: beta_eff_acy(:,:)  
         real(wp), allocatable :: F2(:,:)              ! [Pa^-1 a^-1 m == (Pa a/m)^-1]
-        integer,  allocatable :: ssa_mask_acx_ref(:,:)
-        integer,  allocatable :: ssa_mask_acy_ref(:,:)
 
-        real(wp), allocatable :: corr_nm1(:) 
-        real(wp), allocatable :: corr_nm2(:) 
-        
-        real(wp) :: corr_theta
-        real(wp) :: corr_rel 
         real(wp) :: L2_norm 
         real(wp) :: ssa_resid 
 
@@ -168,23 +161,10 @@ contains
         allocate(beta_eff_acy(nx,ny))
         allocate(F2(nx,ny))
 
-        allocate(ssa_mask_acx_ref(nx,ny))
-        allocate(ssa_mask_acy_ref(nx,ny))
-
-        !allocate(corr_nm1(2*nx*ny))
-        !allocate(corr_nm2(2*nx*ny))
-
-        ! Store original ssa mask before iterations
-        ssa_mask_acx_ref = ssa_mask_acx
-        ssa_mask_acy_ref = ssa_mask_acy
-            
         ! Initially set error very high 
         ssa_err_acx = 1.0_wp 
         ssa_err_acy = 1.0_wp 
         
-        !corr_nm1 = 0.0_wp 
-        !corr_nm2 = 0.0_wp 
-
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
         !call set_inactive_margins(ux_bar,uy_bar,f_ice,par%boundaries)
@@ -322,31 +302,8 @@ end if
             ! Store velocity solution
             call linear_solver_save_velocity(ux_bar,uy_bar,lgs_now,par%ssa_vel_max)
 
-! ajr: use adapative ssa relaxation or use parameter value
-! For Antarctica, the adaptive method can give some strange
-! convergence issues. It has been disabled for now (2022-02-09).
-if (.FALSE.) then
-            ! Calculate errors 
-            corr_nm2 = corr_nm1 
-            call picard_calc_error(corr_nm1,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)
-
-            ! Calculate error angle 
-            call picard_calc_error_angle(corr_theta,corr_nm1,corr_nm2) 
-
-            if (corr_theta .le. pi/8.0_wp) then 
-                corr_rel = 2.5_wp 
-            else if (corr_theta .lt. 19.0_wp*pi/20.0_wp) then 
-                corr_rel = 1.0_wp 
-            else 
-                corr_rel = 0.5_wp 
-            end if 
-else
-            corr_rel = par%ssa_iter_rel
-end if
-            !write(*,*) "pic: ", iter, corr_theta, corr_rel
-
             ! Apply relaxation to keep things stable
-            call picard_relax_vel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=corr_rel)
+            call picard_relax_vel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=par%ssa_iter_rel)
             
             ! Check for convergence
             ! is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,ssa_mask_acx.gt.0,     &

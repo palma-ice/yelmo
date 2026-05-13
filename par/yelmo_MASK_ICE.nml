@@ -1,0 +1,292 @@
+&ctrl
+
+    domain          = "MASK_ICE"        ! Synthetic mask_ice stability test
+
+    ! Timing parameters
+    time_init       = 0.0               ! [yr] Starting time
+    time_end        = 200.0             ! [yr] Ending time
+    dtt             = 1.0               ! [yr] Main loop timestep
+    dt1D_out        = 10.0              ! [yr] Frequency of 1D output
+    dt2D_out        = 20.0              ! [yr] Frequency of 2D output
+
+    ! Grid (centered on origin: x in [-lx/2, lx/2], y in [-ly/2, ly/2])
+    dx              = 2.0               ! [km] Grid resolution
+    lx              = 50.0              ! [km] Domain length, x-direction
+    ly              = 50.0              ! [km] Domain length, y-direction
+
+    ! Bedrock construction
+    !   z_bed(i,j) = zb_mean + zb_slope*x[km]
+    !              + zb_amp_sin * sin(2*pi*x/zb_wave_x) * cos(2*pi*y/zb_wave_y)
+    !              + zb_amp_noise * rand([-1,+1])
+    zb_mean         = 300.0             ! [m]   Mean bedrock elevation
+    zb_slope        = -5.0              ! [m/km] Linear slope in x
+    zb_amp_sin      = 100.0             ! [m]   Sinusoidal bump amplitude
+    zb_wave_x       = 25.0              ! [km]  Wavelength in x
+    zb_wave_y       = 25.0              ! [km]  Wavelength in y
+    zb_amp_noise    = 5.0               ! [m]   Uniform random noise amplitude (set 0 to disable)
+
+    ! Initial ice thickness
+    H_ice_init      = 500.0             ! [m]   Slab thickness everywhere
+    H_ice_noise     = 5.0               ! [m]   Uniform random noise amplitude on H_ice (set 0 to disable)
+
+    ! Boundary forcing
+    z_sl_const      = -5000.0           ! [m]   Sea level (very low, no floating ice expected)
+    T_srf_const     = -20.0             ! [degC] Surface temperature anomaly relative to T0
+    smb_const       = 0.3               ! [m/yr] Surface mass balance
+    Q_geo_const     = 50.0              ! [mW/m2] Geothermal heat flux
+
+    ! ============================================================
+    ! Border mask (applied uniformly to all four border rings AFTER
+    ! yelmo_init):
+    !    mask_bnd = -1  ->  forced zero ice (ablation)
+    !    mask_bnd =  0  ->  imposed = H_ice_ref (held at initial H_ice)
+    !    mask_bnd = +1  ->  active (solver evolves border ice)
+    ! ============================================================
+    mask_bnd        = 1
+
+/
+
+&yelmo
+    domain          = "MASK_ICE"
+    grid_name       = "MASK_ICE"
+    grid_path       = "none"
+    phys_const      = "Earth"
+    experiment      = "MASK_ICE"        ! Routes to boundaries="mask"
+    nml_ytopo       = "ytopo"
+    nml_ycalv       = "ycalv"
+    nml_ydyn        = "ydyn"
+    nml_ytill       = "ytill"
+    nml_yneff       = "yneff"
+    nml_ymat        = "ymat"
+    nml_ytherm      = "ytherm"
+    nml_masks       = "yelmo_masks"
+    nml_init_topo   = "yelmo_init_topo"
+    nml_data        = "yelmo_data"
+    restart         = "no"
+    restart_z_bed   = False
+    restart_H_ice   = False
+    restart_relax   = 1e3
+    log_timestep    = False
+    disable_kill    = True              ! Keep the test running even if PC tolerance is exceeded
+    zeta_scale      = "exp"
+    zeta_exp        = 2.0
+    nz_aa           = 10
+    dt_method       = 2                 ! adaptive, predictor-corrector
+    dt_min          = 0.01
+    cfl_max         = 0.1
+    cfl_diff_max    = 0.12
+    pc_method       = "AB-SAM"
+    pc_controller   = "PI42"
+    pc_use_H_pred   = False
+    pc_filter_vel   = False
+    pc_corr_vel     = False
+    pc_n_redo       = 5
+    pc_tol          = 50.0
+    pc_eps          = 10.0
+/
+
+&ytopo
+    solver              = "impl-lis"
+    surf_gl_method      = 0
+    grad_lim            = 0.5
+    grad_lim_zb         = 0.5
+    dHdt_dyn_lim        = 100.0
+    margin2nd           = False
+    margin_flt_subgrid  = False
+    use_bmb             = False
+    topo_fixed          = False
+    topo_rel            = 0
+    topo_rel_tau        = 10.0
+    topo_rel_field      = "H_ref"
+
+    bmb_gl_method       = "pmp"
+    gl_sep              = 1
+    gz_nx               = 15
+
+    dist_grz            = 200.0
+    gz_Hg0              = 0.0
+    gz_Hg1              = 0.0
+
+    dmb_method          = 0
+    dmb_alpha_max       = 60.0
+    dmb_tau             = 100.0
+    dmb_sigma_ref       = 300.0
+    dmb_m_d             = 3.0
+    dmb_m_r             = 1.0
+
+    fmb_method          = 0
+    fmb_scale           = 1.0
+/
+
+&ycalv
+    use_lsf             = False
+    dt_lsf              = -1
+    calv_flt_method     = "zero"
+    calv_grnd_method    = "zero"
+
+    H_min_grnd          = 0.0
+    H_min_flt           = 0.0
+    sd_min              = 100.0
+    sd_max              = 500.0
+    calv_grnd_max       = 0.0
+
+    calv_tau            = 1.0
+    calv_thin           = 30.0
+    k2                  = 3.2e9
+    w2                  = 0.0
+    kt_ref              = 0.0025
+    kt_deep             = 0.1
+    tau_ice             = 250.0e3
+
+    Hc_ref_flt          = 200.0
+    Hc_ref_grnd         = 200.0
+    Hc_ref_thin         = 50.0
+    Hc_deep             = 500.0
+    zb_deep_0           = -1000.0
+    zb_deep_1           = -1500.0
+    zb_sigma            = 0.0
+/
+
+&ydyn
+    solver              = "sia"
+    uz_method           = 3
+    visc_method         = 1
+    visc_const          = 1e7
+    beta_method         = 3
+    beta_const          = 1e3
+    beta_q              = 0.2
+    beta_u0             = 100.0
+    beta_gl_scale       = 0
+    beta_gl_stag        = 1
+    beta_gl_f           = 1.0
+    taud_gl_method      = 0
+    H_grnd_lim          = 500.0
+    beta_min            = 0.0
+    eps_0               = 1e-6
+    scale_T             = 1
+    T_frz               = -3.0
+    ssa_solver              = "energy"
+    ssa_lis_opt_residual    = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"
+    ssa_lis_opt_energy      = "-i cg -p jacobi -maxiter 200 -tol 1.0e-4 -initx_zeros false"
+    ssa_lat_bc          = "all"
+    ssa_beta_max        = 1e20
+    ssa_vel_max         = 5000.0
+    ssa_iter_max        = 2
+    ssa_iter_rel        = 0.7
+    ssa_iter_conv       = 1e-2
+    taud_lim            = 2e5
+    cb_sia              = 0.0
+/
+
+&ytill
+    method          = 1
+    scale_zb        = 0
+    scale_sed       = 0
+    is_angle        = True
+    n_sd            = 1
+    f_sed           = 1.0
+    sed_min         = 5.0
+    sed_max         = 15.0
+    z0              = -300.0
+    z1              =  200.0
+    cf_min          =  0.1
+    cf_ref          =  30.0
+/
+
+&yneff
+    method          = 3
+    nxi             = 0
+    const           = 1e7
+    p               = 0.0
+    H_w_max         = -1.0
+    N0              = 1000.0
+    delta           = 0.02
+    e0              = 0.69
+    Cc              = 0.12
+    s_const         = 0.5
+/
+
+&ymat
+    flow_law                = "glen"
+    rf_method               = 1
+    rf_const                = 1e-16
+    rf_use_eismint2         = False
+    rf_with_water           = False
+    n_glen                  = 3.0
+    visc_min                = 1e3
+    de_max                  = 2.0
+    enh_method              = "shear3D"
+    enh_shear               = 1.0
+    enh_stream              = 1.0
+    enh_shlf                = 1.0
+    enh_umin                = 50.0
+    enh_umax                = 500.0
+    calc_age                = False
+    age_iso                 = 0.0
+    tracer_method           = "expl"
+    tracer_impl_kappa       = 1.5
+/
+
+&ytherm
+    method          = "temp"
+    qb_method       = 2
+    dt_method       = "FE"
+    solver_advec    = "impl-upwind"
+    gamma           = 1.0
+    use_strain_sia  = False
+    use_const_cp    = True
+    const_cp        = 2009.0
+    use_const_kt    = True
+    const_kt        = 6.62e7
+    enth_cr         = 1e-3
+    omega_max       = 0.01
+    till_rate       = 0.0
+    H_w_max         = 2.0
+
+    rock_method     = "equil"
+    nzr_aa          = 5
+    zeta_scale_rock = "exp-inv"
+    zeta_exp_rock   = 2.0
+    H_rock          = 2000.0
+    cp_rock         = 1000.0
+    kt_rock         = 6.3e7
+/
+
+&yelmo_masks
+    basins_load     = False
+    basins_path     = "none"
+    basins_nms      = "basin" "basin_mask"
+    regions_load    = False
+    regions_path    = "none"
+    regions_nms     = "mask" "None"
+/
+
+&yelmo_init_topo
+    init_topo_load  = False
+    init_topo_path  = "none"
+    init_topo_names = "H_ice" "z_bed" "z_bed_sd" "z_srf"
+    init_topo_state = 0
+    z_bed_f_sd      = 0.0
+    smooth_H_ice    = 0.0
+    smooth_z_bed    = 0.0
+/
+
+&yelmo_data
+    pd_topo_load      = False
+    pd_topo_path      = "none"
+    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"
+    pd_tsrf_load      = False
+    pd_tsrf_path      = "none"
+    pd_tsrf_name      = "T_srf"
+    pd_tsrf_monthly   = False
+    pd_smb_load       = False
+    pd_smb_path       = "none"
+    pd_smb_name       = "smb"
+    pd_smb_monthly    = False
+    pd_vel_load       = False
+    pd_vel_path       = "none"
+    pd_vel_names      = "ux_srf" "uy_srf"
+    pd_age_load       = False
+    pd_age_path       = "none"
+    pd_age_names      = "age_iso" "depth_iso"
+/

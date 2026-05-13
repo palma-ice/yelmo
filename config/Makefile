@@ -168,6 +168,13 @@ slab : yelmo-static
 		@echo "    yelmo_slab.x is ready."
 		@echo " "
 
+mask_ice : yelmo-static
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_mask_ice.x tests/yelmo_mask_ice.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)
+		@echo " "
+		@echo "    yelmo_mask_ice.x is ready."
+		@echo " "
+
 check_sim :
 		$(FC) $(DFLAGS) $(INC_FESMUTILS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
 			$(LFLAGS)

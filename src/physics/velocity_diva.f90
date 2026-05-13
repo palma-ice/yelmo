@@ -410,9 +410,9 @@ end if
         !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
         do i = 1, nx 
-            if ( is_equal(f_ice(i,j),1.0) ) then 
-                F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)
-            end if  
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then
+                F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0_wp-zeta_aa),zeta_aa)
+            end if
         end do
         end do  
         !$omp end parallel do
@@ -585,9 +585,9 @@ end if
         allocate(dvdx(nx,ny,nz))
         allocate(dvdy(nx,ny,nz))
 
-        ! Calculate exponents 
-        p1 = (1.0 - n_glen)/(2.0*n_glen)
-        p2 = -1.0/n_glen
+        ! Calculate exponents
+        p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
+        p2 = -1.0_wp/n_glen
 
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0
@@ -619,7 +619,7 @@ end if
         do j = 1, ny  
         do i = 1, nx
 
-            if (f_ice(i,j) == 1.0) then
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then
 
                 ! Get neighbor indices
                 call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
@@ -650,7 +650,7 @@ if (.not. use_gq3D) then
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
-                    viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
+                    viscn = 0.5_wp * (eps_sq_n)**(p1) * ATTn**(p2)
                     visc(i,j,k) = sum(viscn*gq2d%wt)/gq2d%wt_tot
 
                 end do
@@ -697,7 +697,7 @@ else
                     !ATTn = ATT(i,j,k)
 
                     ! Calculate effective viscosity on nodes and averaged to center aa-node
-                    viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
+                    viscn8 = 0.5_wp * (eps_sq_n8)**(p1) * ATTn8**(p2)
                     visc(i,j,k) = sum(viscn8*gq3d%wt)/gq3d%wt_tot
                 end do
 
@@ -848,7 +848,7 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            if ( is_equal(f_ice(i,j),1.0) ) then
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then
                 ! Calculate the vertically averaged viscosity for this point
                 visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
 

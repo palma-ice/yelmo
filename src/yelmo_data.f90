@@ -263,6 +263,11 @@ contains
                 dta%pd%H_ice = 0.0
                 dta%pd%z_srf = max(dta%pd%z_bed,0.0)
             end where
+
+            ! Impose reference ice thickness at locations marked as prescribed.
+            ! Note: z_srf is left as loaded from PD; the downstream H_grnd /
+            ! mask_bed recalculation uses H_ice, z_bed and z_sl.
+            where (bnd%mask_ice .eq.  0) dta%pd%H_ice = bnd%H_ice_ref
             
             ! Calculate H_grnd (ice thickness overburden)
             ! (extracted from `calc_H_grnd` in topography)

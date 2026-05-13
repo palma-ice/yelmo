@@ -787,11 +787,11 @@ module yelmo_defs
         ! (-1: ice thickness must be zero, 0: ice thickness is prescribed, 1: ice thickness is calculated)
         integer, allocatable :: mask_ice(:,:)
 
-        ! Field to define relaxation timescales (spatially variable), when relaxation is used
-        ! Only valid within area of mask_ice==1
-        ! tau_relax < 0: no relaxation
-        ! tau_relax   0: ice thickness imposed
-        ! tau_relax > 0: relaxation timescale used => H_ice_ref
+        ! Field to define relaxation timescales (spatially variable), when relaxation is used.
+        ! Only valid within area of mask_ice==1.
+        ! tau_relax <= 0: no relaxation
+        ! tau_relax >  0: relaxation timescale used => H_ice_ref
+        ! Note: to impose ice thickness directly, use mask_ice == 0 (not tau_relax == 0).
         real(wp), allocatable :: tau_relax(:,:)
 
         ! Other external variables that can be useful, ie maybe with tracers

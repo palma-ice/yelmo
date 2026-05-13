@@ -660,6 +660,9 @@ contains
         ! Artificially delete ice from locations that are not allowed
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (mask_ice .eq. -1) H_ice_new = 0.0_wp
+
+        ! Impose reference ice thickness where mask_ice == 0
+        where (mask_ice .eq.  0) H_ice_new = H_ice_ref
         
         ! Remove margin points that are too thin, or points that are below tolerance ====
 
@@ -817,9 +820,9 @@ contains
     end subroutine calc_G_boundaries
 
     subroutine set_tau_relax(tau_relax,H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,boundaries)
-        ! This routines allows ice within a given mask to be
-        ! relaxed to a reference state with certain timescale tau 
-        ! (if tau=0), then H_ice = H_ice_ref directly 
+        ! Build a per-cell relaxation timescale field from a topo_rel mask choice and
+        ! a uniform tau. Only tau > 0 produces actual relaxation; to impose an ice
+        ! thickness directly, set bnd%mask_ice == 0 instead.
 
         implicit none 
 
@@ -914,51 +917,40 @@ contains
     end subroutine set_tau_relax
     
     subroutine calc_G_relaxation(dHdt,H_ice,H_ref,tau_relax,dt)
-        ! This routines allows ice within a given mask to be
-        ! relaxed to a reference state with certain timescale tau 
-        ! (if tau=0), then H_ice = H_ice_ref directly 
+        ! Relax ice toward a reference state with a finite timescale tau_relax > 0.
+        ! Note: imposing the ice thickness directly is handled separately via
+        ! mask_ice == 0 in calc_G_boundaries (no longer via tau_relax == 0).
 
-        implicit none 
+        implicit none
 
-        real(wp), intent(OUT)   :: dHdt(:,:) 
-        real(wp), intent(IN)    :: H_ice(:,:) 
-        real(wp), intent(IN)    :: H_ref(:,:) 
+        real(wp), intent(OUT)   :: dHdt(:,:)
+        real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: H_ref(:,:)
         real(wp), intent(IN)    :: tau_relax(:,:)
-        real(wp), intent(IN)    :: dt 
-        
-        ! Local variables 
+        real(wp), intent(IN)    :: dt
+
+        ! Local variables
         integer  :: i, j, nx, ny
 
         nx = size(H_ice,1)
-        ny = size(H_ice,2) 
+        ny = size(H_ice,2)
 
-        dHdt = 0.0 
+        dHdt = 0.0
 
         !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny
-        do i = 1, nx 
+        do i = 1, nx
 
-            if (tau_relax(i,j) .eq. 0.0) then
-                ! Impose ice thickness 
-
-                if (dt .gt. 0.0) then
-                    dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / dt
-                else
-                    dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / 1.0
-                end if
-
-            else if (tau_relax(i,j) .gt. 0.0) then
-                ! Apply relaxation to reference state 
-
+            if (tau_relax(i,j) .gt. 0.0) then
+                ! Apply relaxation to reference state
                 dHdt(i,j) = (H_ref(i,j) - H_ice(i,j)) / tau_relax(i,j)
-
             end if
 
-        end do 
-        end do 
+        end do
+        end do
         !$omp end parallel do
 
-        return 
+        return
 
     end subroutine calc_G_relaxation
 

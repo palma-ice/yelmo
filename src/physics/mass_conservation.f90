@@ -606,17 +606,17 @@ contains
 
     end subroutine calc_G_calv
 
-    subroutine calc_G_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,ice_allowed,boundaries, &
+    subroutine calc_G_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,mask_ice,boundaries, &
                                                             H_ice_ref,H_min_flt,H_min_grnd,dt)
 
         implicit none
 
         real(wp),           intent(INOUT)   :: mb_resid(:,:)            ! [m/yr] Residual mass balance
-        real(wp),           intent(IN)      :: H_ice(:,:)               ! [m] Ice thickness 
+        real(wp),           intent(IN)      :: H_ice(:,:)               ! [m] Ice thickness
         real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
         real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
         real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
-        logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
+        integer,            intent(IN)      :: mask_ice(:,:)            ! Mask: -1 forced zero, 0 imposed (=H_ice_ref), 1 active
         character(len=*),   intent(IN)      :: boundaries               ! Boundary condition choice
         real(wp),           intent(IN)      :: H_ice_ref(:,:)           ! [m]  Reference ice thickness to fill with for boundaries=="fixed"
         real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
@@ -659,7 +659,7 @@ contains
         
         ! Artificially delete ice from locations that are not allowed
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
-        where (.not. ice_allowed) H_ice_new = 0.0 
+        where (mask_ice .eq. -1) H_ice_new = 0.0_wp
         
         ! Remove margin points that are too thin, or points that are below tolerance ====
 

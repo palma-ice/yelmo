@@ -223,8 +223,8 @@ end if
             yelmo1%bnd%Q_geo = 42.0 
             yelmo1%bnd%smb   = buel%mbal 
             
-            ! Update boundary mask to limit ice growth 
-            where(buel%H_ice .eq. 0.0) yelmo1%bnd%ice_allowed = .FALSE. 
+            ! Update boundary mask to limit ice growth
+            where(buel%H_ice .eq. 0.0) yelmo1%bnd%mask_ice = -1
 
             ! Update topography to match exact solution to start 
             yelmo1%tpo%now%H_ice  = buel%H_ice
@@ -242,7 +242,7 @@ end if
             yelmo1%bnd%smb   = buel%mbal 
             
             ! Update boundary mask to limit ice growth 
-            !where(buel%H_ice .eq. 0.0) yelmo1%bnd%ice_allowed = .FALSE. 
+            !where(buel%H_ice .eq. 0.0) yelmo1%bnd%mask_ice = -1
 
             ! Update topography to match exact solution to start 
             yelmo1%tpo%now%H_ice  = buel%H_ice
@@ -260,7 +260,7 @@ end if
             yelmo1%bnd%smb   = buel%mbal 
             
             ! Update boundary mask to limit ice growth 
-            !where(buel%H_ice .eq. 0.0) yelmo1%bnd%ice_allowed = .FALSE. 
+            !where(buel%H_ice .eq. 0.0) yelmo1%bnd%mask_ice = -1
 
             ! Update topography to match exact solution to start 
             yelmo1%tpo%now%H_ice  = buel%H_ice
@@ -278,7 +278,7 @@ end if
             yelmo1%bnd%smb   = buel%mbal 
             
             ! Update boundary mask to limit ice growth 
-            !where(buel%H_ice .eq. 0.0) yelmo1%bnd%ice_allowed = .FALSE. 
+            !where(buel%H_ice .eq. 0.0) yelmo1%bnd%mask_ice = -1
 
             ! Update topography to match exact solution to start 
             yelmo1%tpo%now%H_ice  = buel%H_ice
@@ -367,7 +367,7 @@ end if
     !call yelmo_write_step(yelmo1,file2D,ts%time) 
             
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
     call yelmo_write_reg_step(yelmo1,file1D,time=ts%time) 
 
     ! Comparison file 

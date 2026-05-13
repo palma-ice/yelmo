@@ -778,7 +778,6 @@ module yelmo_defs
         real(wp), allocatable :: regions(:,:) 
         real(wp), allocatable :: region_mask(:,:) 
 
-        logical,  allocatable :: ice_allowed(:,:)       ! Locations where ice thickness can be greater than zero 
         logical,  allocatable :: calv_mask(:,:)         ! for calv_method="kill-loc", where calv_mask==False, calv.
         
         real(wp), allocatable :: H_ice_ref(:,:)         ! Reference ice thickness, may be used for relaxation routines

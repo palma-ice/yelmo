@@ -798,6 +798,11 @@ contains
                 H_ice_new(:,1)  = 0.0
                 H_ice_new(:,ny) = 0.0
 
+            case("mask")
+                ! Defer border treatment entirely to bnd%mask_ice.
+
+                where (mask_ice .eq. -1) H_ice_new = 0.0_wp
+
             case DEFAULT    ! e.g., None/none
                 ! Apply forced-zero mask from bnd%mask_ice
 

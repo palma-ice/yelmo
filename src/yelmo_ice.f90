@@ -849,12 +849,20 @@ contains
                 dom%dyn%par%boundaries  = "periodic-x"
                 dom%thrm%par%boundaries = "periodic-x"
 
-            case("infinite") 
-                ! Set border points equal to interior neighbors 
+            case("infinite")
+                ! Set border points equal to interior neighbors
 
                 dom%tpo%par%boundaries  = "infinite"
                 dom%dyn%par%boundaries  = "infinite"
                 dom%thrm%par%boundaries = "infinite"
+
+            case("MASK_ICE")
+                ! Border treatment is driven by bnd%mask_ice; solvers use
+                ! "infinite"-style neighbor stencils.
+
+                dom%tpo%par%boundaries  = "mask"
+                dom%dyn%par%boundaries  = "mask"
+                dom%thrm%par%boundaries = "mask"
 
             case DEFAULT
                 ! zeros by default - safest option

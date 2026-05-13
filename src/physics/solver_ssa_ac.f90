@@ -200,10 +200,10 @@ contains
                 bcs(3) = "free-slip"
                 bcs(4) = "periodic"
             
-            case("infinite")
+            case("infinite","mask")
 
-                bcs(1:4) = "free-slip" 
-            
+                bcs(1:4) = "free-slip"
+
             case("zeros")
 
                 bcs(1:4) = "no-slip" 

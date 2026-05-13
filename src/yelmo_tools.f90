@@ -126,11 +126,11 @@ contains
 
         select case(trim(boundaries))
 
-            case("infinite")
+            case("infinite","mask")
                 im1 = max(i-1,1)
-                ip1 = min(i+1,nx) 
+                ip1 = min(i+1,nx)
                 jm1 = max(j-1,1)
-                jp1 = min(j+1,ny) 
+                jp1 = min(j+1,ny)
 
             case("MISMIP3D","TROUGH")
                 im1 = max(i-1,1)
@@ -222,6 +222,7 @@ contains
             case("TROUGH");     code = BND_TROUGH
             case("periodic");   code = BND_PERIODIC
             case("periodic-x"); code = BND_PERIODIC_X
+            case("mask");       code = BND_INFINITE
             case default
                 write(io_unit_err,*) "boundary_code:: Error: Boundary string not recognized: "//trim(boundaries)
                 stop
@@ -813,10 +814,10 @@ end if
         ! is the same, not the variable itself.
         select case(trim(boundaries))
 
-            case("infinite","MISMIP3D","TROUGH") 
+            case("infinite","MISMIP3D","TROUGH","mask")
                 dvardx(1,:)  = dvardx(2,:)
                 dvardx(nx,:) = dvardx(nx-1,:)
-            
+
         end select
 
         ! Finally, ensure that gradient is beneath desired limit 
@@ -919,7 +920,7 @@ end if
         ! is the same, not the variable itself.
         select case(trim(boundaries))
 
-            case("infinite") 
+            case("infinite","mask")
                 dvardy(:,1)  = dvardy(:,2)
                 dvardy(:,ny) = dvardy(:,ny-1)
 
@@ -1220,17 +1221,17 @@ end if
                 var(1,:)    = var(2,:)          ! x=0, Symmetry 
                 var(nx,:)   = 0.0               ! x=800km, no ice
                 
-            case("infinite")
-                ! Set border points equal to inner neighbors 
+            case("infinite","mask")
+                ! Set border points equal to inner neighbors
 
                 call fill_borders_2D(var,nfill=1)
 
-            case("fixed") 
+            case("fixed")
                 ! Set border points equal to prescribed values from array
 
                 call fill_borders_2D(var,nfill=1,fill=var_ref)
 
-            case DEFAULT 
+            case DEFAULT
 
                 write(io_unit_err,*) "set_boundaries_2D_aa:: error: boundary method not recognized."
                 write(io_unit_err,*) "boundaries = ", trim(boundaries)
@@ -1307,18 +1308,18 @@ end if
                 var_acx(:,1)    = var_acx(:,2)
                 var_acx(:,ny)   = var_acx(:,ny-1) 
 
-            case("infinite") 
-                
-                var_acx(1,:)    = var_acx(2,:) 
-                var_acx(nx-1,:) = var_acx(nx-2,:) 
-                var_acx(nx,:)   = var_acx(nx-1,:) 
-                var_acx(:,1)    = var_acx(:,2)
-                var_acx(:,ny)   = var_acx(:,ny-1) 
+            case("infinite","mask")
 
-            case("MISMIP3D","TROUGH") 
-                
-                !var_acx(1,:)    = var_acx(2,:) 
-                var_acx(nx-1,:) = var_acx(nx-2,:) 
+                var_acx(1,:)    = var_acx(2,:)
+                var_acx(nx-1,:) = var_acx(nx-2,:)
+                var_acx(nx,:)   = var_acx(nx-1,:)
+                var_acx(:,1)    = var_acx(:,2)
+                var_acx(:,ny)   = var_acx(:,ny-1)
+
+            case("MISMIP3D","TROUGH")
+
+                !var_acx(1,:)    = var_acx(2,:)
+                var_acx(nx-1,:) = var_acx(nx-2,:)
                 var_acx(nx,:)   = var_acx(nx-1,:) 
                 var_acx(:,1)    = var_acx(:,2)
                 var_acx(:,ny)   = var_acx(:,ny-1) 
@@ -1360,13 +1361,13 @@ end if
                 var_acx(:,1,:)    = var_acx(:,2,:)
                 var_acx(:,ny,:)   = var_acx(:,ny-1,:) 
 
-            case("infinite") 
-                
-                var_acx(1,:,:)    = var_acx(2,:,:) 
-                var_acx(nx-1,:,:) = var_acx(nx-2,:,:) 
-                var_acx(nx,:,:)   = var_acx(nx-1,:,:) 
+            case("infinite","mask")
+
+                var_acx(1,:,:)    = var_acx(2,:,:)
+                var_acx(nx-1,:,:) = var_acx(nx-2,:,:)
+                var_acx(nx,:,:)   = var_acx(nx-1,:,:)
                 var_acx(:,1,:)    = var_acx(:,2,:)
-                var_acx(:,ny,:)   = var_acx(:,ny-1,:) 
+                var_acx(:,ny,:)   = var_acx(:,ny-1,:)
 
             case("MISMIP3D","TROUGH") 
                 
@@ -1413,25 +1414,25 @@ end if
                 var_acy(:,ny-1) = var_acy(:,ny-2) 
                 var_acy(:,ny)   = var_acy(:,ny-1)
 
-            case("infinite") 
-                
-                var_acy(1,:)    = var_acy(2,:) 
-                var_acy(nx,:)   = var_acy(nx-1,:) 
+            case("infinite","mask")
+
+                var_acy(1,:)    = var_acy(2,:)
+                var_acy(nx,:)   = var_acy(nx-1,:)
                 var_acy(:,1)    = var_acy(:,2)
-                var_acy(:,ny-1) = var_acy(:,ny-2) 
+                var_acy(:,ny-1) = var_acy(:,ny-2)
                 var_acy(:,ny)   = var_acy(:,ny-1)
 
-            case("MISMIP3D","TROUGH") 
-                
-                var_acy(1,:)    = var_acy(2,:) 
-                var_acy(nx,:)   = var_acy(nx-1,:) 
+            case("MISMIP3D","TROUGH")
+
+                var_acy(1,:)    = var_acy(2,:)
+                var_acy(nx,:)   = var_acy(nx-1,:)
                 var_acy(:,1)    = var_acy(:,2)
-                var_acy(:,ny-1) = var_acy(:,ny-2) 
+                var_acy(:,ny-1) = var_acy(:,ny-2)
                 var_acy(:,ny)   = var_acy(:,ny-1)
 
-        end select 
+        end select
 
-        return 
+        return
 
     end subroutine set_boundaries_2D_acy
 
@@ -1466,15 +1467,15 @@ end if
                 var_acy(:,ny-1,:) = var_acy(:,ny-2,:) 
                 var_acy(:,ny,:)   = var_acy(:,ny-1,:)
 
-            case("infinite") 
-                
-                var_acy(1,:,:)    = var_acy(2,:,:) 
-                var_acy(nx,:,:)   = var_acy(nx-1,:,:) 
+            case("infinite","mask")
+
+                var_acy(1,:,:)    = var_acy(2,:,:)
+                var_acy(nx,:,:)   = var_acy(nx-1,:,:)
                 var_acy(:,1,:)    = var_acy(:,2,:)
-                var_acy(:,ny-1,:) = var_acy(:,ny-2,:) 
+                var_acy(:,ny-1,:) = var_acy(:,ny-2,:)
                 var_acy(:,ny,:)   = var_acy(:,ny-1,:)
 
-            case("MISMIP3D","TROUGH") 
+            case("MISMIP3D","TROUGH")
                 
                 var_acy(1,:,:)    = var_acy(2,:,:) 
                 var_acy(nx,:,:)   = var_acy(nx-1,:,:) 

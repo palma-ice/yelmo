@@ -10,7 +10,7 @@ module yelmo_boundaries
     private
     public :: ybound_define_physical_constants
     public :: ybound_load_masks
-    public :: ybound_define_ice_allowed
+    public :: ybound_define_mask_ice
     public :: ybound_alloc, ybound_dealloc
     
 contains
@@ -192,88 +192,91 @@ contains
 
     end subroutine ybound_load_masks
 
-    subroutine ybound_define_ice_allowed(bnd,domain)
-        ! Update mask of where ice is allowed to be greater than zero 
+    subroutine ybound_define_mask_ice(bnd,domain)
+        ! Update mask defining where ice is solved (1), imposed (0), or forced to zero (-1).
 
-        implicit none 
+        implicit none
 
         type(ybound_class), intent(INOUT) :: bnd
-        character(len=*),   intent(IN)    :: domain    
+        character(len=*),   intent(IN)    :: domain
 
-        ! Local variables 
-        integer :: i, nx, ny 
+        ! Local variables
+        integer :: i, nx, ny
 
-        nx = size(bnd%ice_allowed,1)
-        ny = size(bnd%ice_allowed,2)
+        nx = size(bnd%mask_ice,1)
+        ny = size(bnd%mask_ice,2)
 
-        ! Initially set ice_allowed to true everywhere 
-        bnd%ice_allowed = .TRUE. 
+        ! Initially mark all points as active (ice is solved)
+        bnd%mask_ice = 1
 
         ! Also set calv_mask false everywhere (no imposed calving front)
-        bnd%calv_mask   = .FALSE. 
-        
+        bnd%calv_mask   = .FALSE.
+
         ! Determine allowed regions based on domain
         select case(trim(domain))
 
-            case ("North") 
-                ! Allow ice everywhere except the open ocean 
+            case ("North")
+                ! Allow ice everywhere except the open ocean
 
-                where (bnd%regions .eq. 1.0) bnd%ice_allowed = .FALSE. 
-                bnd%ice_allowed(1,:)  = .FALSE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                bnd%ice_allowed(:,1)  = .FALSE. 
-                bnd%ice_allowed(:,ny) = .FALSE. 
+                where (bnd%regions .eq. 1.0) bnd%mask_ice = -1
+                bnd%mask_ice(1,:)  = -1
+                bnd%mask_ice(nx,:) = -1
+                bnd%mask_ice(:,1)  = -1
+                bnd%mask_ice(:,ny) = -1
 
-            case ("Eurasia") 
+            case ("Eurasia")
                 ! Allow ice only in the Eurasia domain (1.2*)
 
-                where (bnd%regions .lt. 1.2 .or. bnd%regions .gt. 1.29) bnd%ice_allowed = .FALSE. 
-                bnd%ice_allowed(1,:)  = .FALSE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                bnd%ice_allowed(:,1)  = .FALSE. 
-                bnd%ice_allowed(:,ny) = .FALSE. 
+                where (bnd%regions .lt. 1.2 .or. bnd%regions .gt. 1.29) bnd%mask_ice = -1
+                bnd%mask_ice(1,:)  = -1
+                bnd%mask_ice(nx,:) = -1
+                bnd%mask_ice(:,1)  = -1
+                bnd%mask_ice(:,ny) = -1
 
-            case ("Greenland") 
+            case ("Greenland")
 
-                bnd%ice_allowed = .FALSE. 
-                where (bnd%regions .eq. 1.3)  bnd%ice_allowed = .TRUE.      ! Main Greenland region
-                where (bnd%regions .eq. 1.11) bnd%ice_allowed = .TRUE.      ! Ellesmere Island
-                where (bnd%regions .eq. 1.0)  bnd%ice_allowed = .TRUE.      ! Open ocean (included some connections between 1.3 and 1.11)
-                
-            case ("Antarctica") 
+                bnd%mask_ice = -1
+                where (bnd%regions .eq. 1.3)  bnd%mask_ice = 1      ! Main Greenland region
+                where (bnd%regions .eq. 1.11) bnd%mask_ice = 1      ! Ellesmere Island
+                where (bnd%regions .eq. 1.0)  bnd%mask_ice = 1      ! Open ocean (included some connections between 1.3 and 1.11)
 
-                where (bnd%regions .eq. 2.0) bnd%ice_allowed = .FALSE. 
-                bnd%ice_allowed(1,:)  = .FALSE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                bnd%ice_allowed(:,1)  = .FALSE. 
-                bnd%ice_allowed(:,ny) = .FALSE. 
+            case ("Antarctica")
 
-            
+                where (bnd%regions .eq. 2.0) bnd%mask_ice = -1
+                bnd%mask_ice(1,:)  = -1
+                bnd%mask_ice(nx,:) = -1
+                bnd%mask_ice(:,1)  = -1
+                bnd%mask_ice(:,ny) = -1
+
+
             case ("EISMINT")
 
-                ! Ice can grow everywhere, except borders 
-                bnd%ice_allowed       = .TRUE. 
-                bnd%ice_allowed(1,:)  = .FALSE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                bnd%ice_allowed(:,1)  = .FALSE. 
-                bnd%ice_allowed(:,ny) = .FALSE. 
+                ! Ice can grow everywhere, except borders
+                bnd%mask_ice       = 1
+                bnd%mask_ice(1,:)  = -1
+                bnd%mask_ice(nx,:) = -1
+                bnd%mask_ice(:,1)  = -1
+                bnd%mask_ice(:,ny) = -1
 
-            case ("MISMIP") 
+            case ("MISMIP")
 
-                ! Ice can grow everywhere, except farthest x-border  
-                bnd%ice_allowed       = .TRUE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                
-            case DEFAULT 
-                ! Let ice grow everywhere for unknown domain (ice_allowed can always be modified later)
+                ! Ice can grow everywhere, except farthest x-border
+                bnd%mask_ice       = 1
+                bnd%mask_ice(nx,:) = -1
 
-                bnd%ice_allowed = .TRUE. 
+            case DEFAULT
+                ! Let ice grow everywhere for unknown domain (mask_ice can always be modified later)
+
+                bnd%mask_ice = 1
 
         end select
-          
-        return 
 
-    end subroutine ybound_define_ice_allowed
+        ! Keep legacy logical mask in sync (true where ice is solved or imposed)
+        bnd%ice_allowed = (bnd%mask_ice /= -1)
+
+        return
+
+    end subroutine ybound_define_mask_ice
 
     subroutine ybound_alloc(now,nx,ny)
 

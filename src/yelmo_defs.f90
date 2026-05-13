@@ -784,12 +784,12 @@ module yelmo_defs
         real(wp), allocatable :: H_ice_ref(:,:)         ! Reference ice thickness, may be used for relaxation routines
         real(wp), allocatable :: z_bed_ref(:,:)         ! Reference bedrock elevation, may be used for relaxation routines
 
-        ! Mask to define numerical regions within domain 
+        ! Mask to define numerical regions within domain
         ! (-1: ice thickness must be zero, 0: ice thickness is prescribed, 1: ice thickness is calculated)
-        integer, allocatable :: domain_mask(:,:)
+        integer, allocatable :: mask_ice(:,:)
 
         ! Field to define relaxation timescales (spatially variable), when relaxation is used
-        ! Only valid within area of domain_mask==1
+        ! Only valid within area of mask_ice==1
         ! tau_relax < 0: no relaxation
         ! tau_relax   0: ice thickness imposed
         ! tau_relax > 0: relaxation timescale used => H_ice_ref

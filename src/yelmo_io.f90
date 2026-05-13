@@ -1817,8 +1817,8 @@ contains
             case("z_bed_ref")
                 call nc_write(filename,trim(v%varname),ylmo%bnd%z_bed_ref(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("domain_mask")
-                call nc_write(filename,trim(v%varname),ylmo%bnd%domain_mask(i1:i2,j1:j2), &
+            case("mask_ice")
+                call nc_write(filename,trim(v%varname),ylmo%bnd%mask_ice(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("tau_relax")
                 call nc_write(filename,trim(v%varname),ylmo%bnd%tau_relax(i1:i2,j1:j2), &

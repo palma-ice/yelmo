@@ -261,6 +261,9 @@ end if
                                                tpo%par%topo_rel,tpo%par%topo_rel_tau,tpo%par%boundaries)
                         end if
 
+                        ! Relaxation is only meaningful where ice is actively solved
+                        where (bnd%mask_ice .ne. 1) tpo%now%tau_relax = -1.0_wp
+
                         select case(trim(tpo%par%topo_rel_field))
 
                             case("H_ref")

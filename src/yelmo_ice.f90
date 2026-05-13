@@ -873,8 +873,8 @@ contains
         ! Load region/basin masks
         call ybound_load_masks(dom%bnd,filename,dom%par%nml_masks,dom%par%domain,dom%par%grid_name)
         
-        ! Update the ice_allowed mask based on domain definition 
-        call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
+        ! Update the mask_ice mask based on domain definition
+        call ybound_define_mask_ice(dom%bnd,dom%par%domain)
         
         ! Define the advection mask (by default, for now allow advection everywhere)
         dom%tpo%now%mask_adv = 1

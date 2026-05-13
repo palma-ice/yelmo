@@ -904,13 +904,13 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            ! Calculate the vertically averaged viscosity for this point
-            visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
-            
-            if ( is_equal(f_ice(i,j),1.0) ) then 
+            if ( is_equal(f_ice(i,j),1.0) ) then
+                ! Calculate the vertically averaged viscosity for this point
+                visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
+
                 visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
-                visc_eff_int(i,j) = visc_eff_mean 
+                visc_eff_int(i,j) = visc_min 
             end if 
 
             ! Avoid very low viscosity values, e.g. when ice thickness is < 1m

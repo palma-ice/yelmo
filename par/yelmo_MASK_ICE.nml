@@ -36,13 +36,18 @@
     Q_geo_const     = 50.0              ! [mW/m2] Geothermal heat flux
 
     ! ============================================================
-    ! Border mask (applied uniformly to all four border rings AFTER
-    ! yelmo_init):
-    !    mask_bnd = -1  ->  forced zero ice (ablation)
-    !    mask_bnd =  0  ->  imposed = H_ice_ref (held at initial H_ice)
-    !    mask_bnd = +1  ->  active (solver evolves border ice)
+    ! Border mask per edge (applied AFTER yelmo_init; each in {-1,0,1}):
+    !    -1  ->  forced zero ice
+    !     0  ->  imposed = H_ice_ref (held at initial H_ice)
+    !    +1  ->  active (solver evolves border ice)
+    ! Default config: upslope (west) imposed inflow, downslope (east)
+    ! forced-zero terminus, north/south free. With zb_slope < 0, ice
+    ! flows west -> east.
     ! ============================================================
-    mask_bnd        = 1
+    mask_bnd_w      = 0                 ! west  (x = -lx/2, upslope)
+    mask_bnd_e      = -1                ! east  (x = +lx/2, downslope)
+    mask_bnd_s      = 1                 ! south (y = -ly/2)
+    mask_bnd_n      = 1                 ! north (y = +ly/2)
 
 /
 
@@ -148,7 +153,7 @@
 /
 
 &ydyn
-    solver              = "sia"
+    solver              = "diva"
     uz_method           = 3
     visc_method         = 1
     visc_const          = 1e7
@@ -171,7 +176,7 @@
     ssa_lat_bc          = "all"
     ssa_beta_max        = 1e20
     ssa_vel_max         = 5000.0
-    ssa_iter_max        = 2
+    ssa_iter_max        = 20
     ssa_iter_rel        = 0.7
     ssa_iter_conv       = 1e-2
     taud_lim            = 2e5

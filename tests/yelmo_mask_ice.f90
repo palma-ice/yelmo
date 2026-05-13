@@ -42,8 +42,8 @@ program yelmo_mask_ice
     real(wp) :: smb_const
     real(wp) :: Q_geo_const
 
-    ! Mask choice on all four borders
-    integer  :: mask_bnd
+    ! Mask choice per border ring (west/east/south/north)
+    integer  :: mask_bnd_w, mask_bnd_e, mask_bnd_s, mask_bnd_n
 
     ! Local
     integer  :: i, j
@@ -89,12 +89,15 @@ program yelmo_mask_ice
     call nml_read(path_par,"ctrl","smb_const",    smb_const)
     call nml_read(path_par,"ctrl","Q_geo_const",  Q_geo_const)
 
-    call nml_read(path_par,"ctrl","mask_bnd",     mask_bnd)
+    call nml_read(path_par,"ctrl","mask_bnd_w",   mask_bnd_w)
+    call nml_read(path_par,"ctrl","mask_bnd_e",   mask_bnd_e)
+    call nml_read(path_par,"ctrl","mask_bnd_s",   mask_bnd_s)
+    call nml_read(path_par,"ctrl","mask_bnd_n",   mask_bnd_n)
 
-    if (mask_bnd .lt. -1 .or. mask_bnd .gt. 1) then
-        write(*,*) "yelmo_mask_ice:: Error: mask_bnd must be -1, 0, or 1. Got: ", mask_bnd
-        stop
-    end if
+    call check_mask_bnd(mask_bnd_w,"mask_bnd_w")
+    call check_mask_bnd(mask_bnd_e,"mask_bnd_e")
+    call check_mask_bnd(mask_bnd_s,"mask_bnd_s")
+    call check_mask_bnd(mask_bnd_n,"mask_bnd_n")
 
     ! === Grid ===
     grid_name = "MASK_ICE"
@@ -155,15 +158,16 @@ program yelmo_mask_ice
     ! === Set mask_ice on the four border rings ===
     ! Interior is left as initialized by ybound_define_mask_ice (= 1 for
     ! the MASK_ICE experiment, which routes through the DEFAULT case).
-    yelmo1%bnd%mask_ice(1,:)  = mask_bnd
-    yelmo1%bnd%mask_ice(nx,:) = mask_bnd
-    yelmo1%bnd%mask_ice(:,1)  = mask_bnd
-    yelmo1%bnd%mask_ice(:,ny) = mask_bnd
+    yelmo1%bnd%mask_ice(1,:)  = mask_bnd_w      ! west  (x = -lx/2)
+    yelmo1%bnd%mask_ice(nx,:) = mask_bnd_e      ! east  (x = +lx/2)
+    yelmo1%bnd%mask_ice(:,1)  = mask_bnd_s      ! south (y = -ly/2)
+    yelmo1%bnd%mask_ice(:,ny) = mask_bnd_n      ! north (y = +ly/2)
 
     write(*,*) "yelmo_mask_ice:: domain    = ", trim(domain)
     write(*,*) "yelmo_mask_ice:: nx, ny    = ", nx, ny
     write(*,*) "yelmo_mask_ice:: dx [km]   = ", dx
-    write(*,*) "yelmo_mask_ice:: mask_bnd  = ", mask_bnd
+    write(*,"(a,4i4)") " yelmo_mask_ice:: mask_bnd w/e/s/n = ", &
+        mask_bnd_w, mask_bnd_e, mask_bnd_s, mask_bnd_n
     write(*,*) "yelmo_mask_ice:: H_ice min/max = ", minval(yelmo1%tpo%now%H_ice), maxval(yelmo1%tpo%now%H_ice)
     write(*,*) "yelmo_mask_ice:: z_bed min/max = ", minval(yelmo1%bnd%z_bed),     maxval(yelmo1%bnd%z_bed)
 
@@ -207,7 +211,8 @@ program yelmo_mask_ice
     end do
 
     ! === Summary ===
-    write(*,*) "====== "//trim(domain)//"  mask_bnd = ",mask_bnd," ======="
+    write(*,"(a,a,4i4,a)") " ====== "//trim(domain)//"  mask_bnd w/e/s/n = ", "", &
+        mask_bnd_w, mask_bnd_e, mask_bnd_s, mask_bnd_n, "  ======="
     write(*,*) "H_ice min/max = ", minval(yelmo1%tpo%now%H_ice), maxval(yelmo1%tpo%now%H_ice)
 
     call yelmo_restart_write(yelmo1,file_restart,time=ts%time)
@@ -218,6 +223,15 @@ program yelmo_mask_ice
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ts%time_end-ts%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
+
+    subroutine check_mask_bnd(val,name)
+        integer,          intent(IN) :: val
+        character(len=*), intent(IN) :: name
+        if (val .lt. -1 .or. val .gt. 1) then
+            write(*,*) "yelmo_mask_ice:: Error: "//trim(name)//" must be -1, 0, or 1. Got: ", val
+            stop
+        end if
+    end subroutine check_mask_bnd
 
     subroutine random_seed_init()
         ! Deterministic seed so the noise field is reproducible across runs.

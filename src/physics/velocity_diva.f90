@@ -773,18 +773,22 @@ end if
 
         visc_eff = visc_min
 
-        do j = 1, ny 
-        do i = 1, nx 
+        !$omp parallel do collapse(2) private(i,j,k,im1,ip1,jm1,jp1, &
+        !$omp&   dudx_aa,dvdy_aa,dudy_aa_1,dudy_aa_2,dudy_aa, &
+        !$omp&   dvdx_aa_1,dvdx_aa_2,dvdx_aa,duxdz_aa,duydz_aa, &
+        !$omp&   eps_sq_aa,ATT_aa)
+        do j = 1, ny
+        do i = 1, nx
 
-            if ( is_equal(f_ice(i,j),1.0_wp) ) then 
+            if ( is_equal(f_ice(i,j),1.0_wp) ) then
 
                 ! Get neighbor indices
                 call get_neighbor_indices_bc_codes(im1,ip1,jm1,jp1,i,j,nx,ny,BC)
 
                 ! Get strain rate terms
-                dudx_aa = (ux(i,j)-ux(im1,j))/dx 
-                dvdy_aa = (uy(i,j)-uy(i,jm1))/dy 
-                
+                dudx_aa = (ux(i,j)-ux(im1,j))/dx
+                dvdy_aa = (uy(i,j)-uy(i,jm1))/dy
+
                 dudy_aa_1 = (ux(i,jp1)-ux(i,jm1))/(2.0_wp*dy)
                 dudy_aa_2 = (ux(im1,jp1)-ux(im1,jm1))/(2.0_wp*dy)
                 dudy_aa   = 0.5_wp*(dudy_aa_1+dudy_aa_2)
@@ -794,13 +798,13 @@ end if
                 dvdx_aa   = 0.5_wp*(dvdx_aa_1+dvdx_aa_2)
 
                 ! Loop over column
-                do k = 1, nz 
+                do k = 1, nz
 
                     ! Get vertical shear strain rate terms
                     duxdz_aa = 0.5_wp*(duxdz(i,j,k)+duxdz(im1,j,k))
                     duydz_aa = 0.5_wp*(duydz(i,j,k)+duydz(i,jm1,k))
 
-                    ! Calculate the total effective strain rate from L19, Eq. 21 
+                    ! Calculate the total effective strain rate from L19, Eq. 21
                     eps_sq_aa = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_wp*(dudy_aa+dvdx_aa)**2 &
                                 + 0.25_wp*duxdz_aa**2 + 0.25_wp*duydz_aa**2 + eps_0_sq
 
@@ -810,12 +814,13 @@ end if
                     ! Calculate effective viscosity on ab-nodes
                     visc_eff(i,j,k) = 0.5_wp*(eps_sq_aa)**(p1) * ATT_aa**(p2)
 
-                end do 
+                end do
 
-            end if 
+            end if
 
-        end do  
-        end do 
+        end do
+        end do
+        !$omp end parallel do
 
         return 
 

@@ -287,7 +287,7 @@ contains
       case("bnd_tau_relax");     v2D = real(ylmo%bnd%tau_relax,     c_double)
       case("bnd_z_bed_corr");    v2D = real(ylmo%bnd%z_bed_corr,    c_double)
       case("bnd_dzbdt_corr");    v2D = real(ylmo%bnd%dzbdt_corr,    c_double)
-      case("bnd_domain_mask");   v2D = real(ylmo%bnd%domain_mask,   c_double)
+      case("bnd_mask_ice");      v2D = real(ylmo%bnd%mask_ice,      c_double)
 
       ! -----------------------------------------------------------------------
       ! ytopo%now (ytopo_state_class)
@@ -627,7 +627,7 @@ contains
       case("bnd_tau_relax");     ylmo%bnd%tau_relax     = real(v2D, wp)
       case("bnd_z_bed_corr");    ylmo%bnd%z_bed_corr    = real(v2D, wp)
       case("bnd_dzbdt_corr");    ylmo%bnd%dzbdt_corr    = real(v2D, wp)
-      case("bnd_domain_mask");   ylmo%bnd%domain_mask   = real(v2D, wp)
+      case("bnd_mask_ice");      ylmo%bnd%mask_ice      = nint(v2D)
 
       ! -----------------------------------------------------------------------
       ! ytopo%now (ytopo_state_class)

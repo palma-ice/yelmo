@@ -201,7 +201,7 @@ program yelmo_ismiphom
     call write_step_2D(yelmo1,file2D,time=time_init)  
     
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
     call yelmo_write_reg_step(yelmo1,file1D,time=time_init) 
 
     ! Advance timesteps

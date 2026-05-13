@@ -259,10 +259,10 @@ contains
             call adjust_topography_gradients(dta%pd%z_bed,dta%pd%H_ice,grad_lim_zb,dx,boundaries)
 
             ! Artificially delete ice from locations that are not allowed
-            where (.not. bnd%ice_allowed) 
-                dta%pd%H_ice = 0.0 
+            where (bnd%mask_ice .eq. -1)
+                dta%pd%H_ice = 0.0
                 dta%pd%z_srf = max(dta%pd%z_bed,0.0)
-            end where 
+            end where
             
             ! Calculate H_grnd (ice thickness overburden)
             ! (extracted from `calc_H_grnd` in topography)

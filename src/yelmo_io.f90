@@ -69,7 +69,7 @@ contains
         call get_region_indices(i1,i2,j1,j2,ylmo%grd%nx,ylmo%grd%ny,irange,jrange)
 
         ! Write static fields
-        call nc_write(filename,"ice_allowed", ylmo%bnd%ice_allowed(i1:i2,j1:j2), dim1="xc",dim2="yc",units="",long_name="Ice-allowed mask")
+        call nc_write(filename,"mask_ice",    ylmo%bnd%mask_ice(i1:i2,j1:j2),    dim1="xc",dim2="yc",units="",long_name="Ice mask (-1=zero, 0=imposed, 1=active)")
         call nc_write(filename,"basins",      ylmo%bnd%basins(i1:i2,j1:j2),      dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
         call nc_write(filename,"regions",     ylmo%bnd%regions(i1:i2,j1:j2),     dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions") 
         call nc_write(filename,"z_bed_sd",    ylmo%bnd%z_bed_sd(i1:i2,j1:j2),    dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
@@ -733,7 +733,18 @@ contains
         call nc_read_interp(filename,"basin_mask",  bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"regions",     bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"region_mask", bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"ice_allowed", bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        if (nc_exists_var(filename,"mask_ice")) then
+            call nc_read_interp(filename,"mask_ice", bnd%mask_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        else
+            ! Legacy restart: translate logical ice_allowed (-> 1 / -1)
+            block
+                logical, allocatable :: ice_allowed_legacy(:,:)
+                allocate(ice_allowed_legacy(size(bnd%mask_ice,1),size(bnd%mask_ice,2)))
+                call nc_read_interp(filename,"ice_allowed", ice_allowed_legacy,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+                bnd%mask_ice = merge(1, -1, ice_allowed_legacy)
+                deallocate(ice_allowed_legacy)
+            end block
+        end if
         call nc_read_interp(filename,"calv_mask",   bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"H_ice_ref",   bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"z_bed_ref",   bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
@@ -1804,9 +1815,6 @@ contains
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("region_mask")
                 call nc_write(filename,trim(v%varname),ylmo%bnd%region_mask(i1:i2,j1:j2), &
-                            start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
-            case("ice_allowed")
-                call nc_write(filename,trim(v%varname),ylmo%bnd%ice_allowed(i1:i2,j1:j2), &
                             start=[1,1,n],units=v%units,long_name=v%long_name,dims=dims,ncid=ncid)
             case("calv_mask")
                 call nc_write(filename,trim(v%varname),ylmo%bnd%calv_mask(i1:i2,j1:j2), &

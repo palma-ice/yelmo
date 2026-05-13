@@ -97,9 +97,9 @@ program yelmo_mismip
             yelmo1%tpo%now%H_ice  = 100.0
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
-            ! Limit ice to circular domain for symmetry improvements 
-            yelmo1%bnd%ice_allowed = .TRUE. 
-            where(yelmo1%bnd%z_bed .lt. -1000.0) yelmo1%bnd%ice_allowed = .FALSE. 
+            ! Limit ice to circular domain for symmetry improvements
+            yelmo1%bnd%mask_ice = 1
+            where(yelmo1%bnd%z_bed .lt. -1000.0) yelmo1%bnd%mask_ice = -1
 
         case("overdeepened")
             ! Add a marine bed for testing ice shelves following MISMIP
@@ -208,7 +208,7 @@ program yelmo_mismip
     call write_step_2D(yelmo1,file2D,time=time_init,x_gl=x_gl,x_gl_std=x_gl_std)  
     
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
     call yelmo_write_reg_step(yelmo1,file1D,time=time_init) 
 
 

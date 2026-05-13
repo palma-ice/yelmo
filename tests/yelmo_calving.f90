@@ -155,7 +155,7 @@ program yelmo_calving
     end if 
     
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,ctl%file1D,time_init=ctl%time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_init(yelmo1,ctl%file1D,time_init=ctl%time_init,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
     if (.FALSE.) then
         call yelmo_write_reg_step(yelmo1,ctl%file1D,time=ctl%time_init) 
     else

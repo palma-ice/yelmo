@@ -243,7 +243,7 @@ program yelmo_trough
     call write_step_2D(yelmo1,file2D,time=ts%time) 
 
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
     call yelmo_write_reg_step(yelmo1,file1D,time=ts%time)  
     
     ! Advance timesteps

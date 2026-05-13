@@ -298,7 +298,7 @@ end if
                     ! Finally, apply all additional (generally artificial) ice thickness adjustments 
                     ! and store changes in residual mass balance field. 
                     call calc_G_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                            dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                            dyn%now%uxy_b,bnd%mask_ice,tpo%par%boundaries,bnd%H_ice_ref, &
                                             tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
                     ! Apply rate and update ice thickness

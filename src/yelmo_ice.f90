@@ -886,7 +886,7 @@ contains
         ! Initialize region: global domain
         ! Writing to file will only take place if user-program calls yelmo_regions_write(),
         ! which uses the flag specified below. Note currently this assumes outfldr="./" too.
-        call yelmo_region_init(dom%reg,"global",mask=dom%bnd%ice_allowed,write_to_file=.TRUE.)
+        call yelmo_region_init(dom%reg,"global",mask=(dom%bnd%mask_ice /= -1),write_to_file=.TRUE.)
 
         ! Initialize regional averaging domains too (global region + zero subdomains for now)
         ! If regional subdomains are desired, this call will be made explicitly outside the program
@@ -1093,7 +1093,7 @@ contains
             ! Finally, calculate and apply all additional (generally artificial) ice thickness adjustments
             ! Set minimum ice thickness to 1m for safety to start.
             call calc_G_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
-                                                dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
+                                                dom%dyn%now%uxy_b,dom%bnd%mask_ice,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
                                                 H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=1.0_wp)
             ! Apply rate and update ice thickness
             call apply_tendency(dom%tpo%now%H_ice,dom%tpo%now%mb_resid,dt=1.0_wp,label="init")
@@ -1180,13 +1180,11 @@ contains
             ! were loaded via parameter file choices. These should not be loaded 
             ! from the restart file, especially if the restart file was at, e.g., 
             ! a lower resolution 
-            bnd_restart%ice_allowed = dom%bnd%ice_allowed 
-            bnd_restart%calv_mask   = dom%bnd%calv_mask 
-            bnd_restart%H_ice_ref   = dom%bnd%H_ice_ref 
-            bnd_restart%z_bed_ref   = dom%bnd%z_bed_ref 
-
             bnd_restart%mask_ice    = dom%bnd%mask_ice
-            bnd_restart%tau_relax   = dom%bnd%tau_relax 
+            bnd_restart%calv_mask   = dom%bnd%calv_mask
+            bnd_restart%H_ice_ref   = dom%bnd%H_ice_ref
+            bnd_restart%z_bed_ref   = dom%bnd%z_bed_ref
+            bnd_restart%tau_relax   = dom%bnd%tau_relax
 
             bnd_restart%basins      = dom%bnd%basins 
             bnd_restart%basin_mask  = dom%bnd%basin_mask 

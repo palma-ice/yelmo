@@ -271,9 +271,6 @@ contains
 
         end select
 
-        ! Keep legacy logical mask in sync (true where ice is solved or imposed)
-        bnd%ice_allowed = (bnd%mask_ice /= -1)
-
         return
 
     end subroutine ybound_define_mask_ice
@@ -305,7 +302,6 @@ contains
         allocate(now%regions(nx,ny))
         allocate(now%region_mask(nx,ny))
         
-        allocate(now%ice_allowed(nx,ny))
         allocate(now%calv_mask(nx,ny))
         
         allocate(now%H_ice_ref(nx,ny))
@@ -335,8 +331,7 @@ contains
         now%regions     = 0.0_wp 
         now%region_mask = 0.0_wp 
         
-        now%ice_allowed = .TRUE.  ! By default allow ice everywhere 
-        now%calv_mask   = .FALSE. ! By default no, no calving mask 
+        now%calv_mask   = .FALSE. ! By default no, no calving mask
 
         now%H_ice_ref   = 0.0_wp 
         now%z_bed_ref   = 0.0_wp
@@ -375,7 +370,6 @@ contains
         if (allocated(now%regions))     deallocate(now%regions)
         if (allocated(now%region_mask)) deallocate(now%region_mask)
         
-        if (allocated(now%ice_allowed)) deallocate(now%ice_allowed)
         if (allocated(now%calv_mask))   deallocate(now%calv_mask)
         
         if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref) 

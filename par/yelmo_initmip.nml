@@ -9,7 +9,7 @@
     with_ice_sheet  = True              ! Active ice-sheet component? 
     equil_method    = "opt"             ! "none", "relax", "opt"
 
-    clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
+    set_nm          = "set_grl_pd"     ! "set_grl_pd", "set_ant_pd" or "set_ant_lgm"
     
     load_cb_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cb_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
@@ -19,19 +19,34 @@
 
 /
 
-&clim_pd_grl 
+&set_grl_pd
+    init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     bmb_shlf_const  = -1.0              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
 
-&clim_pd_ant 
+&set_ant_pd
+    init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
     bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
 
-&clim_lgm 
+&set_ant_lgm 
+    init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
     bmb_shlf_const  = 0.0               ! [m/a] Basal mass balance of ice shelves
     dT_ann          = -10.0             ! [K] Temperature anomaly (atm)
     z_sl            = -120.0            ! [m] Sea level relative to present-day 

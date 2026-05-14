@@ -139,7 +139,8 @@ module yelmo_defs
         real(wp)           :: dmb_m_d 
         real(wp)           :: dmb_m_r
         logical            :: use_lsf
-        real(wp)           :: dt_lsf
+        real(wp)           :: dt_lsf            ! Deprecated: kept for namelist backwards-compatibility, no longer used
+        integer            :: lsf_redist_n_iter ! Sussman/Osher redistancing iterations (0 = off)
         real(wp)           :: tau_ice
 
         ! Internal parameters 

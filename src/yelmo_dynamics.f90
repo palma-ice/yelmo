@@ -1540,12 +1540,18 @@ contains
 
             case("infinite")
                 ! ajr: we should check setting border H values equal to inner neighbors
-                
+
                 write(*,*) "calc_ice_thickness:: error: boundary method not implemented yet: "//trim(boundaries)
                 write(*,*) "TO DO!"
-                stop 
+                stop
 
-            case DEFAULT 
+            case("mask")
+
+                ! Border velocity values are governed by the mask_ice mask
+                ! together with the "infinite"-style neighbor stencils used
+                ! by the dynamics solvers. No explicit border assignment here.
+
+            case DEFAULT
 
                 write(*,*) "calc_ice_thickness:: error: boundary method not recognized: "//trim(boundaries)
                 stop 

@@ -502,12 +502,12 @@ contains
                 ! in MISMIP symmetric experiments
                 beta(1,:) = beta(2,:) 
 
-            case("infinite") 
-            
+            case("infinite","mask")
+
                 beta(1,:)  = beta(nx-1,:)
-                beta(nx,:) = beta(2,:) 
+                beta(nx,:) = beta(2,:)
                 beta(:,1)  = beta(:,2)
-                beta(:,ny) = beta(:,ny-1) 
+                beta(:,ny) = beta(:,ny-1)
 
         end select
 
@@ -617,9 +617,9 @@ contains
                 beta_acy(:,ny-1) = beta_acy(:,2) 
                 beta_acy(:,ny)   = beta_acy(:,3)
 
-            case("infinite","MISMIP3D") 
+            case("infinite","MISMIP3D","mask")
 
-                beta_acx(1,:)    = beta_acx(2,:) 
+                beta_acx(1,:)    = beta_acx(2,:)
                 beta_acx(nx-1,:) = beta_acx(nx-2,:) 
                 beta_acx(nx,:)   = beta_acx(nx-2,:) 
                 beta_acx(:,1)    = beta_acx(:,2)

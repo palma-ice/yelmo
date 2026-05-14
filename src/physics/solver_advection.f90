@@ -197,10 +197,10 @@ contains
                 bcs(3) = "infinite"
                 bcs(4) = "periodic" 
 
-            case("infinite")
+            case("infinite","mask")
 
-                bcs(1:4) = "infinite" 
-            
+                bcs(1:4) = "infinite"
+
             case("zeros")
 
                 bcs(1:4) = "zero" 

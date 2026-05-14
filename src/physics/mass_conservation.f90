@@ -814,11 +814,19 @@ contains
         ! (applied universally, independent of the boundary BC choice above)
         where (mask_ice .eq. 0) H_ice_new = H_ice_ref
 
-        ! Determine rate of mass balance related to changes applied here
-        ! (10% higher for safety - this will be adjusted by apply_tendency later anyway)
-        if (dt .ne. 0.0) then 
-            mb_resid = 1.1 * (H_ice_new - H_ice) / dt 
-        else 
+        ! Determine rate of mass balance related to changes applied here.
+        ! For mask_ice == 0 (imposed) cells use no overshoot, so apply_tendency
+        ! lands exactly on H_ice_ref each step (no drift from a persistent
+        ! dyn inflow/outflow imbalance). For other cells keep the 10% safety
+        ! margin so the apply_tendency clip-to-zero handles the mask_ice == -1
+        ! path robustly.
+        if (dt .ne. 0.0) then
+            where (mask_ice .eq. 0)
+                mb_resid = (H_ice_new - H_ice) / dt
+            elsewhere
+                mb_resid = 1.1_wp * (H_ice_new - H_ice) / dt
+            end where
+        else
             mb_resid = 0.0
         end if
 

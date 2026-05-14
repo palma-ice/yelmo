@@ -788,7 +788,15 @@ end if
         ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
-                       tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver)
+                       tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+
+        ! Restore |grad lsf| ~= 1 near the front via Sussman/Osher
+        ! Hamilton-Jacobi redistancing. Replaces the old ad-hoc
+        ! neighbour-snap and periodic ±1 re-flag.
+        if (tpo%par%lsf_redist_n_iter .gt. 0) then
+            call LSFredistance(tpo%now%lsf,tpo%par%dx,tpo%par%dy, &
+                               tpo%par%lsf_redist_n_iter,tpo%par%boundaries)
+        end if
 
         ! LSF should not affect points above sea level
         where(bnd%z_bed .gt. bnd%z_sl) tpo%now%lsf = -1.0_wp
@@ -803,22 +811,9 @@ end if
             tpo%now%cmb_flt(i,j) = ((0.5*(tpo%now%cmb_flt_x(im1,j)+tpo%now%cmb_flt_x(i,j)))**2 + &
                                     (0.5*(tpo%now%cmb_flt_y(i,jm1)+tpo%now%cmb_flt_y(i,j)))**2)**0.5
 
-            ! Redefine LSF    
-            if(tpo%now%lsf(i,j) .gt. 0.0_wp) then
-                ! Calve ice outside LSF mask (cmb = H_ice)
-                tpo%now%cmb(i,j) =  -(tpo%now%H_ice(i,j) / dt_kill)
-
-                ! reset LSF border
-                if ((tpo%now%lsf(im1,j) .gt. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .gt. 0.0_wp) .and. &
-                    (tpo%now%lsf(i,jm1) .gt. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .gt. 0.0_wp)) then
-                    tpo%now%lsf(i,j) = 1.0_wp
-                end if
-            else
-                ! reset LSF border
-                if ((tpo%now%lsf(im1,j) .le. 0.0_wp) .and. (tpo%now%lsf(ip1,j) .le. 0.0_wp) .and. &
-                    (tpo%now%lsf(i,jm1) .le. 0.0_wp) .and. (tpo%now%lsf(i,jp1) .le. 0.0_wp)) then
-                    tpo%now%lsf(i,j) = -1.0_wp
-                end if
+            if (tpo%now%lsf(i,j) .gt. 0.0_wp) then
+                ! Calve ice outside LSF mask (cmb = H_ice / dt_kill)
+                tpo%now%cmb(i,j) = -(tpo%now%H_ice(i,j) / dt_kill)
             end if
         end do
         end do
@@ -843,14 +838,6 @@ end if
 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice, &
                         bnd%c%rho_sw,tpo%par%boundaries,tpo%par%margin_flt_subgrid)
-
-        ! reset LSF function after dt_lsf (only if dt_lsf is positive)
-        if (tpo%par%dt_lsf .gt. 0.0) then
-            if (mod(nint(time_now*100),nint(tpo%par%dt_lsf*100))==0) then
-                where(tpo%now%lsf .gt. 0.0) tpo%now%lsf = 1.0
-                where(tpo%now%lsf .le. 0.0) tpo%now%lsf = -1.0
-            end if
-        end if
 
         ! if there is no ice (for example due to oceanic melt) ensure that point is now ocean in the lsf mask
         select case(trim(tpo%par%calv_flt_method))
@@ -1247,7 +1234,8 @@ end if
 
         ! === read calving routine ===
         call nml_read(filename,group_ycalv,"use_lsf",           par%use_lsf,            init=init_pars)
-        call nml_read(filename,group_ycalv,"dt_lsf",            par%dt_lsf,             init=init_pars)        
+        call nml_read(filename,group_ycalv,"dt_lsf",            par%dt_lsf,             init=init_pars)
+        call nml_read(filename,group_ycalv,"lsf_redist_n_iter", par%lsf_redist_n_iter,  init=init_pars)
         call nml_read(filename,group_ycalv,"calv_flt_method",   par%calv_flt_method,    init=init_pars)
         call nml_read(filename,group_ycalv,"calv_grnd_method",  par%calv_grnd_method,   init=init_pars)
         ! ?

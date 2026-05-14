@@ -335,7 +335,7 @@ contains
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dom%bnd%z_bed, &
                                 dom%bnd%z_sl,dom%bnd%c%rho_ice,dom%bnd%c%rho_sw,dom%par%pc_eps, &
                                 dom%tpo%par%boundaries,dom%tpo%par%margin_flt_subgrid)
-                eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
+                eta_now = calc_pc_eta(dom%time%pc_tau,H_ice=dom%tpo%now%corr%H_ice,mask=pc_mask)
 
                 ! Save masked pc_tau for output too 
                 dom%time%pc_tau_masked = dom%time%pc_tau 

@@ -38,13 +38,19 @@ program yelmo_test
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
         
-        character(len=512) :: clim_nm
+        character(len=512) :: set_nm
           
         logical :: load_cb_ref 
         character(len=256) :: file_cb_ref 
 
         logical :: load_bmelt
         character(len=256) :: file_bmelt 
+
+        character(len=512) :: init_topo_path
+        character(len=512) :: pd_topo_path
+        character(len=512) :: pd_tsrf_path
+        character(len=512) :: pd_smb_path
+        character(len=512) :: pd_vel_path
 
         real(wp) :: bmb_shlf_const
         real(wp) :: dT_ann
@@ -79,7 +85,7 @@ program yelmo_test
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
-    call nml_read(path_par,"ctrl","clim_nm",        ctl%clim_nm)            ! Namelist group holding climate information
+    call nml_read(path_par,"ctrl","set_nm",         ctl%set_nm)             ! Namelist group holding relevant setup (topo and climate information)
     
     call nml_read(path_par,"ctrl","load_cb_ref",    ctl%load_cb_ref)        ! Load cb_ref from file? Otherwise define from till_cf_ref + inline tuning
     call nml_read(path_par,"ctrl","file_cb_ref",    ctl%file_cb_ref)        ! Filename holding cb_ref to load 
@@ -87,10 +93,23 @@ program yelmo_test
     call nml_read(path_par,"ctrl","load_bmelt",     ctl%load_bmelt)         ! Load bmelt from file?
     call nml_read(path_par,"ctrl","file_bmelt",     ctl%file_bmelt)         ! Filename holding bmelt field to load 
         
-    ! Load climate (eg, clim_pd or clim_lgm)
-    call nml_read(path_par,ctl%clim_nm,  "bmb_shlf_const",  ctl%bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
-    call nml_read(path_par,ctl%clim_nm,  "dT_ann",          ctl%dT_ann)                    ! [K] Temperature anomaly (atm)
-    call nml_read(path_par,ctl%clim_nm,  "z_sl",            ctl%z_sl)                      ! [m] Sea level relative to present-day
+    ! Load climate (eg, set_pd or set_lgm)
+    call nml_read(path_par,ctl%set_nm,  "init_topo_path",  ctl%init_topo_path)
+    call nml_read(path_par,ctl%set_nm,  "pd_topo_path",    ctl%pd_topo_path)
+    call nml_read(path_par,ctl%set_nm,  "pd_tsrf_path",    ctl%pd_tsrf_path)
+    call nml_read(path_par,ctl%set_nm,  "pd_smb_path",     ctl%pd_smb_path)
+    call nml_read(path_par,ctl%set_nm,  "pd_vel_path",     ctl%pd_vel_path)
+
+    ! Parse ctl filenames as needed
+    call nml_set_param(path_par, "yelmo_init_topo", "init_topo_path", ctl%init_topo_path)
+    call nml_set_param(path_par, "yelmo_data", "pd_topo_path", ctl%pd_topo_path)
+    call nml_set_param(path_par, "yelmo_data", "pd_tsrf_path", ctl%pd_tsrf_path)
+    call nml_set_param(path_par, "yelmo_data", "pd_smb_path",  ctl%pd_smb_path)
+    call nml_set_param(path_par, "yelmo_data", "pd_vel_path",  ctl%pd_vel_path)
+    
+    call nml_read(path_par,ctl%set_nm,  "bmb_shlf_const",  ctl%bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,ctl%set_nm,  "dT_ann",          ctl%dT_ann)                    ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,ctl%set_nm,  "z_sl",            ctl%z_sl)                      ! [m] Sea level relative to present-day
 
     ! Get output times
     call timeout_init(t1D,  path_par,"t1D",  "small",  ctl%time_init,ctl%time_end)
@@ -745,6 +764,87 @@ end if
         return 
 
     end subroutine scale_cf_gaussian
+
+    subroutine nml_set_param(filename, nml_group, par_name, value)
+        implicit none
+        character(len=*), intent(in) :: filename, nml_group, par_name, value
+
+        integer, parameter :: MAX_LINES = 50000
+        integer, parameter :: LINE_LEN  = 1024
+
+        character(len=LINE_LEN) :: lines(MAX_LINES)
+        character(len=LINE_LEN) :: trimmed
+        integer :: unit, io, n_lines, i, ieq
+        logical :: in_group, found
+
+        open(newunit=unit, file=trim(filename), status='old', action='read', iostat=io)
+        if (io /= 0) stop 'nml_set_param ERROR: cannot open file'
+
+        n_lines = 0
+        do
+            read(unit, '(A)', iostat=io) lines(n_lines + 1)
+            if (io /= 0) exit
+            n_lines = n_lines + 1
+        end do
+        close(unit)
+
+        in_group = .false.
+        found    = .false.
+
+        do i = 1, n_lines
+            trimmed = adjustl(lines(i))
+
+            if (.not. in_group) then
+                if (trimmed(1:1) == '&' .and. str_eq_ci(trim(trimmed(2:)), nml_group)) &
+                    in_group = .true.
+            else
+                if (trimmed(1:1) == '/') exit
+                ieq = index(trimmed, '=')
+                if (ieq > 1 .and. str_eq_ci(trim(trimmed(1:ieq-1)), par_name)) then
+                    lines(i) = " " // trim(par_name) // " = '" // trim(value) // "'"
+                    found = .true.
+                    exit
+                end if
+            end if
+        end do
+
+        if (.not. found) then
+            write(*,'(4a)') 'nml_set_param WARNING: "', trim(par_name), &
+                '" not found in group "', trim(nml_group)//'"'
+            return
+        end if
+
+        open(newunit=unit, file=trim(filename), status='replace', action='write', iostat=io)
+        if (io /= 0) stop 'nml_set_param ERROR: cannot write file'
+        do i = 1, n_lines
+            write(unit, '(A)') trim(lines(i))
+        end do
+        close(unit)
+
+    end subroutine nml_set_param
+
+    pure function str_eq_ci(a, b) result(eq)
+        implicit none
+        character(len=*), intent(in) :: a, b
+        logical :: eq
+        integer :: j, n
+        n  = len_trim(a)
+        eq = (n == len_trim(b))
+        if (.not. eq) return
+        do j = 1, n
+            eq = (lower_char(a(j:j)) == lower_char(b(j:j)))
+            if (.not. eq) return
+        end do
+    end function str_eq_ci
+
+    pure function lower_char(c) result(lc)
+        implicit none
+        character, intent(in) :: c
+        character             :: lc
+        integer               :: ic
+        ic = iachar(c)
+        lc = merge(achar(ic+32), c, ic >= iachar('A') .and. ic <= iachar('Z'))
+    end function lower_char
 
 end program yelmo_test
 

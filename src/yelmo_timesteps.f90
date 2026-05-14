@@ -272,19 +272,24 @@ end if
 
     end subroutine set_pc_mask
 
-    function calc_pc_eta(tau,mask) result(eta)
+    function calc_pc_eta(tau,H_ice,mask) result(eta)
 
         implicit none 
 
         real(wp), intent(IN) :: tau(:,:) 
-        logical,  intent(IN) :: mask(:,:) 
+        real(wp), intent(IN) :: H_ice(:,:)  ! Ice thickness (ice-sheet specific) 
+        logical,  intent(IN) :: mask(:,:)   ! General mask
         real(wp) :: eta 
 
-        real(wp), parameter :: eta_tol = 1e-8 
-
+        ! Local variables
+        integer :: i, j, nx, ny
         integer :: npts
-
-if (.TRUE.) then
+        real(wp) :: s_now
+        real(wp), parameter :: eta_tol = 1e-8 
+        real(wp), parameter :: a_tol = 1.0 ! [m]
+        real(wp), parameter :: r_tol = 1e-2 ! [--] r_tol*H = [m]
+        
+if (.FALSE.) then
         ! Calculate eta 
         eta = maxval(abs(tau),mask=mask)
 
@@ -297,11 +302,30 @@ else
     ! ajr: testing rmse(tau) instead of max(tau)
     ! So far, this works, but leads to large areas of Antarctica on the coast with large tau values.
         npts = count(mask)
-        if (npts .eq. 0) then 
-            eta = eta_tol 
-        else 
-            eta = sqrt(sum(tau**2,mask=mask)/real(npts,wp))
+        if (npts .gt. 0) then 
+            ! eta = sqrt(sum(tau**2,mask=mask)/real(npts,wp))
+            ! eta = max(eta,eta_tol)
+
+            nx = size(tau,1)
+            ny = size(tau,2)
+
+            eta = 0.0
+
+            do i = 1, nx
+            do j = 1, ny
+                s_now = a_tol + r_tol*H_ice(i,j)
+                eta = eta + (tau(i,j) / s_now)**2
+            end do
+            end do
+            
+            eta = sqrt(eta/npts)
+
             eta = max(eta,eta_tol)
+
+        else    ! npts == 0
+
+            eta = eta_tol
+
         end if
 end if 
 

@@ -462,6 +462,61 @@ contains
 
         end do
 
+        ! ----------------------------------------------------------------
+        ! Symmetrise Dirichlet rows by lifting their columns to the RHS.
+        !
+        ! A Dirichlet row I is encoded above as a single entry
+        ! K(I,I) = 1, b(I) = u_known. The interior stencil of any
+        ! neighbour J still adds K(J, I) /= 0 cross-couplings to the
+        ! Dirichlet DOF, leaving K structurally non-symmetric and
+        ! breaking the SPD property the CG solver assumes. The standard
+        ! fix is "static condensation": substitute u(I) = u_known into
+        ! every K(J, I) term, lift the contribution to b(J), and zero
+        ! the matrix entry. The slot is left in place (value 0) so the
+        ! CSR sparsity pattern stays unchanged.
+        !
+        ! Affects no-slip domain edges (whose row is K(I,I)=1, b(I)=0)
+        ! and any cell with ssa_mask = 0 or -1. Free-slip edges (which
+        ! have a 2-entry constraint row K(I,I)=1, K(I,nbr)=-1, b(I)=0)
+        ! and lateral-BC rows (mask=3, which still use the full interior
+        ! stencil) are NOT touched.
+        ! ----------------------------------------------------------------
+        block
+            logical, allocatable :: is_dir(:)
+            integer  :: idx, n, nc
+            real(wp) :: u_known
+            integer  :: nnz_in_row
+
+            allocate(is_dir(lgs%nmax))
+            is_dir = .FALSE.
+
+            do n = 1, lgs%nmax
+                nnz_in_row = lgs%a_ptr(n+1) - lgs%a_ptr(n)
+                if (nnz_in_row == 1) then
+                    idx = lgs%a_ptr(n)
+                    if (lgs%a_index(idx) == n .and. &
+                        abs(real(lgs%a_value(idx), wp) - 1.0_wp) < 1.0e-12_wp) then
+                        is_dir(n) = .TRUE.
+                    end if
+                end if
+            end do
+
+            do n = 1, lgs%nmax
+                if (is_dir(n)) cycle
+                do idx = lgs%a_ptr(n), lgs%a_ptr(n+1)-1
+                    nc = lgs%a_index(idx)
+                    if (nc /= n .and. is_dir(nc)) then
+                        u_known = real(lgs%b_value(nc), wp)
+                        lgs%b_value(n) = lgs%b_value(n) &
+                                       - real(lgs%a_value(idx), wp) * u_known
+                        lgs%a_value(idx) = 0.0_wp
+                    end if
+                end do
+            end do
+
+            deallocate(is_dir)
+        end block
+
         return
 
     end subroutine linear_solver_matrix_ssa_ac_csr_2D_energy

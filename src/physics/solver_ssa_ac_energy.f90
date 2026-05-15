@@ -296,10 +296,19 @@ contains
                 lgs%a_value(k) = -2.0_wp*N_aa(i,j) - N_ab(i,jm1)
                 lgs%a_index(k) = nc
 
-                ! Right-hand side: driving stress + (optional) calving-front boundary work
+                ! Right-hand side: driving stress + (optional) calving-front boundary work.
+                ! Sign of the boundary work follows the outward normal at the front:
+                !   ice on left,  ocean on right  -> n = +x  -> +taul_int*dy
+                !   ocean on left, ice on right   -> n = -x  -> -taul_int*dy
+                ! Without the sign split the same +taul_int*dy is applied at left
+                ! and right fronts, breaking L<->R symmetry of b.
                 lgs%b_value(nr) = -taud_acx(i,j)*dxdy
                 if (ssa_mask_acx(i,j) .eq. 3) then
-                    lgs%b_value(nr) = lgs%b_value(nr) + taul_int_acx(i,j)*dy
+                    if (is_equal(f_ice(i,j),1.0_wp) .and. f_ice(ip1,j) .lt. 1.0_wp) then
+                        lgs%b_value(nr) = lgs%b_value(nr) + taul_int_acx(i,j)*dy
+                    else
+                        lgs%b_value(nr) = lgs%b_value(nr) - taul_int_acx(i,j)*dy
+                    end if
                 end if
                 lgs%x_value(nr) = ux(i,j)
 
@@ -452,7 +461,11 @@ contains
 
                 lgs%b_value(nr) = -taud_acy(i,j)*dxdy
                 if (ssa_mask_acy(i,j) .eq. 3) then
-                    lgs%b_value(nr) = lgs%b_value(nr) + taul_int_acy(i,j)*dx
+                    if (is_equal(f_ice(i,j),1.0_wp) .and. f_ice(i,jp1) .lt. 1.0_wp) then
+                        lgs%b_value(nr) = lgs%b_value(nr) + taul_int_acy(i,j)*dx
+                    else
+                        lgs%b_value(nr) = lgs%b_value(nr) - taul_int_acy(i,j)*dx
+                    end if
                 end if
                 lgs%x_value(nr) = uy(i,j)
 

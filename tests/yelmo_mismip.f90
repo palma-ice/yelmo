@@ -69,8 +69,8 @@ program yelmo_mismip
 
         ! When to apply time modifications
         time_mod_1 = 15000.0   ! Switch from Stnd => P75S
-        time_mod_2 = 15100.0   ! Switch back from P75S => Stnd 
-        time_end   = time_mod_2 + 1000.0 
+        time_mod_2 = 15100.0   ! Switch back from P75S => Stnd
+        time_end   = time_mod_2 + 1000.0
 
         !time_mod_1 = 20000.0
         !time_mod_2 = time_mod_1
@@ -271,13 +271,12 @@ program yelmo_mismip
                 time, maxval(yelmo1%tpo%now%H_ice), trim(experiment), yelmo1%mat%par%rf_const, x_gl 
         end if 
 
-        if (exit_loop) exit 
+        if (exit_loop) exit
 
-        ! AJR: diagnostics for instability, exit time loop early
+        ! AJR: diagnostics for instability, higher output frequency near P75S
         if (time .ge. 11.5e3) dt2D_out = dtt
-        if (time .ge. 12.0e3) exit
-                
-    end do 
+
+    end do
 
     ! Write summary 
     write(*,*) "====== "//trim(domain)//"-"//trim(experiment)//" ======="

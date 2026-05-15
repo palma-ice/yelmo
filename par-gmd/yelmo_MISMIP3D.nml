@@ -19,6 +19,7 @@
     phys_const      = "MISMIP3D"
     experiment      = "MISMIP3D"        ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     nml_ytopo       = "ytopo"
+    nml_ycalv       = "ycalv"
     nml_ydyn        = "ydyn"
     nml_ytill       = "ytill"
     nml_yneff       = "yneff"
@@ -91,7 +92,8 @@
 &ycalv
     ! === calving method & law ===
     use_lsf             = False             ! use level-set method
-    dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
+    dt_lsf              = -1                ! Deprecated (no effect); kept for backwards compatibility
+    lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations (0 = off)
     calv_flt_method     = "kill-pos"        ! "zero", "simple", "flux", "vm-l19", "vm-m16", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12", "vm-m16"
     

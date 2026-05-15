@@ -147,6 +147,13 @@ ssa_energy_sym : yelmo-static tests/test_ssa_energy_sym.f90
 		@echo "    test_ssa_energy_sym.x is ready."
 		@echo " "
 
+ssa_energy_lr_sym : yelmo-static tests/test_ssa_energy_lr_sym.f90
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/test_ssa_energy_lr_sym.x tests/test_ssa_energy_lr_sym.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)
+		@echo " "
+		@echo "    test_ssa_energy_lr_sym.x is ready."
+		@echo " "
+
 mismip1 : yelmo-static
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip_new.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS)

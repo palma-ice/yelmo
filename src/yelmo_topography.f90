@@ -791,10 +791,17 @@ end if
                        tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
 
         ! Restore |grad lsf| ~= 1 near the front via Sussman/Osher
-        ! Hamilton-Jacobi redistancing. Replaces the old ad-hoc
-        ! neighbour-snap and periodic ±1 re-flag.
+        ! Hamilton-Jacobi redistancing.
+        !
+        ! lsf is in normalized ±1 units (LSFupdate saturates it to that
+        ! range), so we redistance in grid-cell units (dx=dy=1) so that
+        ! the PDE drives |grad lsf| -> 1 per cell near the zero level
+        ! set, producing lsf ≈ ±1 at adjacent cells. Passing physical
+        ! dx (e.g. 25000 m) would make the smoothed sign function
+        ! ≈ ±lsf/dx ≈ 0 several cells out from the front, freezing
+        ! the front in place (see issue #34). Matches Yelmo.jl.
         if (tpo%par%lsf_redist_n_iter .gt. 0) then
-            call LSFredistance(tpo%now%lsf,tpo%par%dx,tpo%par%dy, &
+            call LSFredistance(tpo%now%lsf,1.0_wp,1.0_wp, &
                                tpo%par%lsf_redist_n_iter,tpo%par%boundaries)
         end if
 

@@ -175,34 +175,39 @@ contains
 
         select case(BC)
 
-            case(BND_INFINITE)
+            case(BND_ZEROS,BND_INFINITE)
+                ! Clamp neighbour indices to the domain edge so that ghost
+                ! reads return the edge value (Neumann-zero / zero-gradient
+                ! extension). Previously BND_ZEROS fell into the periodic
+                ! DEFAULT branch, silently wrapping the field around the
+                ! domain — see issue #34 follow-up.
                 im1 = max(i-1,1)
-                ip1 = min(i+1,nx) 
+                ip1 = min(i+1,nx)
                 jm1 = max(j-1,1)
-                jp1 = min(j+1,ny) 
+                jp1 = min(j+1,ny)
 
             case(BND_MISMIP3D,BND_TROUGH)
                 im1 = max(i-1,1)
-                ip1 = min(i+1,nx) 
+                ip1 = min(i+1,nx)
                 jm1 = j-1
                 if (jm1 .eq. 0)    jm1 = ny
                 jp1 = j+1
-                if (jp1 .eq. ny+1) jp1 = 1 
-                
-            case DEFAULT 
+                if (jp1 .eq. ny+1) jp1 = 1
+
+            case DEFAULT
                 ! Periodic, periodic-x (for now treat the same way)
 
                 im1 = i-1
-                if (im1 .eq. 0)    im1 = nx 
+                if (im1 .eq. 0)    im1 = nx
                 ip1 = i+1
-                if (ip1 .eq. nx+1) ip1 = 1 
+                if (ip1 .eq. nx+1) ip1 = 1
 
                 jm1 = j-1
                 if (jm1 .eq. 0)    jm1 = ny
                 jp1 = j+1
-                if (jp1 .eq. ny+1) jp1 = 1 
+                if (jp1 .eq. ny+1) jp1 = 1
 
-        end select 
+        end select
 
         return
 

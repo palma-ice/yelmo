@@ -203,7 +203,7 @@ contains
 
             case("zeros")
 
-                bcs(1:4) = "zero" 
+                bcs(1:4) = "zero"
 
             case("periodic","periodic-xy")
 

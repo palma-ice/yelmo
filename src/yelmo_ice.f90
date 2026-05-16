@@ -1233,8 +1233,15 @@ contains
         !call yelmo_restart_write(dom,"./yelmo_check_z_bed.nc",time=0.0_wp,init=.TRUE.)
         !stop 
 
-        ! Finally lets initialize the LSF mask
-        call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice,dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%dx)
+        ! Finally lets initialize the LSF mask -- but only if we are not
+        ! restarting; the restart file already carries a distance field
+        ! built up by the Sussman/Osher redistancing, and overwriting it
+        ! with a saturated ±1 step here would force the LSF to "warm up"
+        ! again before sub-grid front motion could resume (see #34
+        ! follow-up: CalvingMIP exp2 re-advance was broken by this).
+        if (.not. dom%par%use_restart) then
+            call LSFinit(dom%tpo%now%lsf,dom%tpo%now%H_ice,dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%dx)
+        end if
 
         return 
 

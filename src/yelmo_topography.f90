@@ -787,8 +787,17 @@ end if
         ! === LSF advection ===
         ! Store previous lsf mask. Necessary to avoid compute it two times.
         tpo%now%lsf_n = tpo%now%lsf
+        ! Use "infinite" (Neumann-zero) boundaries for the LSF advection
+        ! regardless of the model-wide tpo%par%boundaries: the LSF is a
+        ! signed-distance field that must continue smoothly outside the
+        ! domain. With a Dirichlet-zero boundary (the "zeros" semantic)
+        ! the matrix builder would force lsf=0 at every edge cell, which
+        ! creates a spurious LSF=0 contour one cell from the boundary and
+        ! the Sussman/Osher redistance fights it every step (see issue
+        ! #34 follow-up). Matches Yelmo.jl, whose Oceananigans `:bounded`
+        ! BC zeros only the halo, leaving edge cells free.
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
-                       tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
+                       tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,"infinite")
 
         ! LSF should not affect points above sea level. Pin BEFORE the
         ! redistance pass so that phi0 carries the right (land = -1) value
@@ -805,9 +814,12 @@ end if
         ! dx (e.g. 25000 m) would make the smoothed sign function
         ! ≈ ±lsf/dx ≈ 0 several cells out from the front, freezing
         ! the front in place (see issue #34). Matches Yelmo.jl.
+        ! Boundary is "infinite" for the same reason as the LSF advection
+        ! call above: Neumann-zero / zero-gradient extension is the only
+        ! sensible BC for the SO redistance of a signed-distance field.
         if (tpo%par%lsf_redist_n_iter .gt. 0) then
             call LSFredistance(tpo%now%lsf,1.0_wp,1.0_wp, &
-                               tpo%par%lsf_redist_n_iter,tpo%par%boundaries)
+                               tpo%par%lsf_redist_n_iter,"infinite")
         end if
 
         ! === Calving ===

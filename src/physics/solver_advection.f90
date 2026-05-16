@@ -202,15 +202,8 @@ contains
                 bcs(1:4) = "infinite"
 
             case("zeros")
-                ! Treat "zeros" as zero-gradient (Neumann) at the
-                ! domain edge, consistent with the BND_ZEROS branch
-                ! in `get_neighbor_indices_bc_codes`. The original
-                ! Dirichlet-zero handling forced the edge cell value
-                ! to 0 every step, which created a spurious LSF=0
-                ! contour at the domain boundary — visible right
-                ! next to the real ice front at the calving radius
-                ! and damping the front cycle in CalvingMIP exp2.
-                bcs(1:4) = "infinite"
+
+                bcs(1:4) = "zero"
 
             case("periodic","periodic-xy")
 

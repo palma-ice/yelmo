@@ -519,12 +519,13 @@ contains
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) mask_clvmip = 3
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp) mask_clvmip = 2
         where(ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp) mask_clvmip = 1
-            
-        ! compute subgrid floating margin
-        !call calc_ice_fraction_new(fice_subgrid,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%bnd%z_sl,ylmo%bnd%c%rho_ice, &
-        !    ylmo%bnd%c%rho_sw,ylmo%tpo%par%boundaries,.TRUE.)
 
-        ! convert velocities into aa-nodes    
+        ! Use the model's actual subgrid ice fraction (tpo%now%f_ice) — the
+        ! prior `fice_subgrid` local was allocated but never assigned, so it
+        ! was uninitialised stack noise.
+        fice_subgrid = ylmo%tpo%now%f_ice
+
+        ! convert velocities into aa-nodes
         do i=2, ylmo%grd%nx-1
         do j=2, ylmo%grd%ny-1
             ux_bar_aa(i,j) = 0.5*(ylmo%dyn%now%ux_bar(i,j)+ylmo%dyn%now%ux_bar(i-1,j))
@@ -535,7 +536,6 @@ contains
 
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) ux_bar_aa = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = mv
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_clvmip  = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_frnt    = mv
         where(ylmo%tpo%now%H_ice .eq. 0.0_wp) calverate = mv
 

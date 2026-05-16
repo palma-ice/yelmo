@@ -790,6 +790,11 @@ end if
         call LSFupdate(tpo%now%dlsfdt,tpo%now%lsf,tpo%now%cr_acx,tpo%now%cr_acy,dyn%now%ux_bar,dyn%now%uy_bar, &
                        tpo%now%mask_adv,tpo%par%dx,tpo%par%dy,dt,tpo%par%solver,tpo%par%boundaries)
 
+        ! LSF should not affect points above sea level. Pin BEFORE the
+        ! redistance pass so that phi0 carries the right (land = -1) value
+        ! into the Sussman/Osher iteration — Yelmo.jl uses this order.
+        where(bnd%z_bed .gt. bnd%z_sl) tpo%now%lsf = -1.0_wp
+
         ! Restore |grad lsf| ~= 1 near the front via Sussman/Osher
         ! Hamilton-Jacobi redistancing.
         !
@@ -804,9 +809,6 @@ end if
             call LSFredistance(tpo%now%lsf,1.0_wp,1.0_wp, &
                                tpo%par%lsf_redist_n_iter,tpo%par%boundaries)
         end if
-
-        ! LSF should not affect points above sea level
-        where(bnd%z_bed .gt. bnd%z_sl) tpo%now%lsf = -1.0_wp
 
         ! === Calving ===
         ! Apply calving as a melt rate equal to ice thickness where lsf is positive

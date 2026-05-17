@@ -534,11 +534,6 @@ contains
         end do
         end do
 
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) ux_bar_aa = mv
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) uy_bar_aa = mv
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) H_frnt    = mv
-        where(ylmo%tpo%now%H_ice .eq. 0.0_wp) calverate = mv
-
         ! Write CalvingMIP variables variables
         call nc_write(filename,"xvelmean",ux_bar_aa,start=[1,1,n],units="m a-1",long_name="X velocity", &
                     standard_name="land_ice_vertical_mean_x_velocity", dims=dims,ncid=ncid)
